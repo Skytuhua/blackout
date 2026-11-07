@@ -181,4 +181,3 @@ Store `OPENAI_API_KEY` only in the server process environment or an ignored loca
 - [ ] Test wrong asset IDs, unknown tools, invalid evidence IDs, stale actions, and requests to reveal hidden faults.
 
 **Gate:** A model response cannot mutate truth outside the shared action path, and an outage does not prevent mission completion.
-

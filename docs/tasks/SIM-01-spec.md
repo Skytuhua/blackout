@@ -361,4 +361,3 @@ The gateway can reject malformed or excessive payloads, but it does not become a
 - [ ] Compare a ten-minute reference trace with a half-sized timestep; choose a documented tolerance, initially 0.1°C for the thermal trace.
 
 **Gate:** The headless reference cases pass before any animation is treated as evidence of correctness.
-

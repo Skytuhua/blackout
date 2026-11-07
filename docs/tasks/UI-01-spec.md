@@ -252,4 +252,3 @@ Baseline accessibility, truthful fallback labeling, accounting correctness, and 
 - [ ] Verify the entire first mission without a model connection.
 
 **Gate:** A player can diagnose, act, and recover using the controls, while visuals reflect only permitted observations.
-

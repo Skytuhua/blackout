@@ -59,8 +59,11 @@ export const RunRecordSchema = object({ schemaVersion: version, engineVersion: i
 const comparisonIdentity = { baseRunId: id, branchRunId: id, continuationPolicy: z.string(), externalScheduleIdentity: id, supportedHorizon: seconds, baseline: OutcomeLedgerSchema, explanation: z.string() };
 export const ComparisonResultSchema = z.discriminatedUnion('status', [
   object({ status: z.literal('complete'), ...comparisonIdentity, alternative: OutcomeLedgerSchema }),
-  object({ status: z.literal('unsupported'), ...comparisonIdentity, firstInvalidAction: RecordedCommandSchema, reason: z.string() }),
-]);
+  object({ status: z.literal('unsupported'), ...comparisonIdentity, firstInvalidAction: RecordedCommandSchema, reason: z.string(), validPrefix: object({ baseline: OutcomeLedgerSchema, alternative: OutcomeLedgerSchema }) }),
+]).superRefine((result, context) => {
+  const ledgers = result.status === 'complete' ? [result.baseline, result.alternative] : [result.validPrefix.baseline, result.validPrefix.alternative];
+  if (ledgers.some(ledger => ledger.horizon !== result.supportedHorizon)) context.addIssue({ code: 'custom', message: 'Comparison evidence must use the supported equal horizon.' });
+});
 
 export const GatewayStartSchema = object({ kind: z.literal('start'), ...gatewayIdentity, role: RoleSchema, message: z.string().max(1600), view: KnowledgeViewSchema, procedures: z.array(object({ id, text: z.string().max(3000) })).max(4), promptVersion: id, debriefContext: object({ ledger: OutcomeLedgerSchema, comparison: ComparisonResultSchema.nullable() }).optional() });
 export const GatewayContinueSchema = object({ kind: z.literal('continue'), ...gatewayIdentity, interactionId: id, expectedCallId: id, view: KnowledgeViewSchema, result: PublicToolResultSchema });
