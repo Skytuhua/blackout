@@ -1,0 +1,118 @@
+{
+  "provenance": "Original pixel artwork authored programmatically for Blackout; no external assets.",
+  "palette": [
+    "#07111b",
+    "#102332",
+    "#193747",
+    "#254858",
+    "#315a68",
+    "#497887",
+    "#83adba",
+    "#dceaf2",
+    "#45d5e8",
+    "#ca70ea",
+    "#f4b860",
+    "#f06b79",
+    "#12303c",
+    "#1d4752",
+    "#2b6370",
+    "#76aeb6",
+    "#3b5363",
+    "#5e7480",
+    "#1c2934",
+    "#687f8a",
+    "#303746",
+    "#4a5060",
+    "#8a758b",
+    "#d3ab82"
+  ],
+  "sampling": "nearest",
+  "frames": {
+    "floor": {
+      "file": "floor-wall.png",
+      "frame": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "anchor": [
+        8,
+        8
+      ],
+      "footprint": [
+        16,
+        16
+      ]
+    },
+    "wall": {
+      "file": "floor-wall.png",
+      "frame": [
+        16,
+        0,
+        16,
+        16
+      ],
+      "anchor": [
+        8,
+        8
+      ],
+      "footprint": [
+        16,
+        16
+      ]
+    },
+    "rack": {
+      "file": "rack.png",
+      "frame": [
+        0,
+        0,
+        16,
+        32
+      ],
+      "anchor": [
+        8,
+        16
+      ],
+      "footprint": [
+        16,
+        32
+      ]
+    },
+    "technician": {
+      "file": "technician.png",
+      "frame": [
+        0,
+        0,
+        12,
+        16
+      ],
+      "anchor": [
+        6,
+        8
+      ],
+      "footprint": [
+        12,
+        16
+      ]
+    },
+    "cooling": {
+      "file": "cooling.png",
+      "frame": [
+        0,
+        0,
+        32,
+        32
+      ],
+      "anchor": [
+        16,
+        16
+      ],
+      "footprint": [
+        32,
+        32
+      ]
+    }
+  },
+  "animation": "Static masters; no frame duration or simulated motion."
+}
