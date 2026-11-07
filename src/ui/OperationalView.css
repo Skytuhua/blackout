@@ -25,6 +25,10 @@
 .bo-summary small { font-size:12px; }
 .bo-layout { display:grid; grid-template-columns:minmax(0,1fr) minmax(290px,340px); gap:24px; padding-top:24px; align-items:start; }
 .bo-main { min-width:0; display:grid; gap:24px; }
+.bo-site-actions { margin-top:20px; padding:16px 0; border-bottom:1px solid var(--bo-line); }
+.bo-site-actions h2 { margin-bottom:12px; }
+.bo-site-actions > div { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:16px; }
+.bo-site-actions .bo-action + .bo-action { margin:0; padding:0; border:0; }
 .bo-world,.bo-list,.bo-crew,.bo-inspector,.bo-result { background:var(--bo-panel); border:1px solid var(--bo-line); }
 .bo-world,.bo-list,.bo-crew { padding:18px; }
 .bo-section-heading { display:flex; justify-content:space-between; align-items:end; gap:12px; margin-bottom:16px; }

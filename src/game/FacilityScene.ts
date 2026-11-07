@@ -8,15 +8,18 @@ type SceneView = { view: KnowledgeView; selectedId: string | null; overlay: MapO
 export class FacilityScene extends Phaser.Scene {
   private state: SceneView;
   private choose: (id: string) => void;
+  private needsRedraw = false;
   constructor(state: SceneView, choose: (id: string) => void) { super('facility'); this.state = state; this.choose = choose; }
   preload() {
     this.load.spritesheet('tiles', '/assets/floor-wall.png', { frameWidth: 16, frameHeight: 16 });
     this.load.image('rack', '/assets/rack.png'); this.load.image('cooling', '/assets/cooling.png'); this.load.image('technician', '/assets/technician.png');
   }
-  create() { this.drawView(); }
-  setView(state: SceneView) { this.state = state; if (this.sys.isActive()) this.drawView(); }
+  create() { this.drawView(); this.needsRedraw = false; }
+  setView(state: SceneView) { this.state = state; this.needsRedraw = true; }
+  // One redraw per frame lets Phaser settle its input insertion/removal queues in order.
+  update() { if (this.needsRedraw) { this.needsRedraw = false; this.drawView(); } }
   private drawView() {
-    this.children.removeAll(true);
+    for (const child of [...this.children.getChildren()]) child.destroy();
     const { view, selectedId, overlay } = this.state;
     for (let y = 0; y < 12; y++) for (let x = 0; x < 20; x++) this.add.image(x * 16, y * 16, 'tiles', x === 0 || y === 0 || x === 19 || y === 11 ? 1 : 0).setOrigin(0);
     const graphics = this.add.graphics().setDepth(2);

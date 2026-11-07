@@ -2,7 +2,7 @@
 
 Updated: 7 November 2026.
 
-Foundation implemented; awaiting final G0 review. The visible shell is a development fixture, not a playable mission. Public repository: https://github.com/Skytuhua/blackout. No production atlas, live tool cycle or recording is claimed.
+G0 merged and independently reviewed; UI fixture under review. The visible shell is a development fixture, not a playable mission. Public repository: https://github.com/Skytuhua/blackout. No production atlas, live tool cycle or recording is claimed.
 
 ## Task queue
 
@@ -10,11 +10,11 @@ Foundation implemented; awaiting final G0 review. The visible shell is a develop
 |---|---|---|---|---|
 | PLAN-01: solo/parallel master revision | Coordinator | User decisions and planning reviews | Prepared | Master plan, ownership, contracts, gates, and task packets. |
 | REPO-00: public repository seed | Coordinator | Authorized repository-creation capability | Integrated: 6cf1bac | Actual public URL and initial commit; verify public read access. |
-| CORE-00: foundation and contract version 1 | Coordinator | Plan | Ready for review | Lockfile, scripts, schema-valid fixtures, production shell build, worker round trip. |
+| CORE-00: foundation and contract version 1 | Coordinator | Plan | Integrated: fb8e798 (PR1) | Lockfile, scripts, schema-valid fixtures, production shell build, worker round trip. |
 | CONTENT-01: Hot Restart data | Coordinator | CORE-00 | Initial data; feasibility pending SIM-02 | Profile, topology, procedures, one declared seed, objectives, permitted-knowledge policy. |
 | SIM-01: physical reference cases | Simulation worker | CORE-00 | Queued | Equilibrium, cooling-loss, recovery, battery-energy, and capacity checks. |
 | SIM-02: full mission behavior | Simulation worker | SIM-01 and CONTENT-01 | Queued | Crew/task timing, observations, protection, success/failure/timeout/reset traces. |
-| UI-01: runtime masters and fixture UI | Game/UI worker | CORE-00 | Queued | Native/3× sprite review, selection/dispatch flow, accessible controls. |
+| UI-01: runtime masters and fixture UI | Game/UI worker, coordinator corrections | CORE-00 | Ready for integration after review corrections (PR2) | Native/3× sprite review, selection/dispatch flow, accessible controls. |
 | AI-01: gateway and mock tool cycle | OpenAI worker | CORE-00 | Queued | Strict schemas, bounded transport, fallback, usage/race checks. |
 | UI-02: real mission and radio integration | Game/UI worker | SIM-02 and UI-01 | Queued | Complete offline mission using actual worker and projected views. |
 | AI-02: real coworker tool cycle | OpenAI worker | G1 and available API credentials | Queued | Authenticated request, valid inspection receipt, completed observation, grounded response. |
@@ -47,3 +47,9 @@ The public event schedule reviewed during planning listed an initial deadline at
 - OpenAI: one authenticated strict structured response succeeded against the selected model. Full worker tool cycle remains pending AI-02. No credentials in Git.
 - Dependency audit: zero known vulnerabilities after updating the test runner.
 - Kickoff schedule recheck: official event page still lists initial entry 23:00 CT Nov 7 and final submissions noon CT Nov 8. Its Devpost link points to the generic site; full initial-entry, AI/provenance and eligibility rules remain unverified. No submission performed. Keep the plan's 22:30 CT entry-preparation checkpoint.
+
+## CI and UI review evidence
+
+- CI-only PR3 merged at `21a4b5881a88595c638b6c1c069bb2b4286a8932`; independent review approved and hosted verify passed. This covers the foundation gate, not mission acceptance.
+- UI-01 delivered four authored runtime masters and observation-only fixture controls. Coordinator independently ran typecheck and 18 tests, inspected desktop/native captures and accepted four fresh-review findings. All four now have failing-before/passing-after browser checks; see `docs/reviews/UI-01.md`.
+- User confirmed no additional event requirements; supplied master plan remains the delivery requirements.
