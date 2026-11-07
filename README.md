@@ -6,9 +6,9 @@ The player directs a data-center team through a cooling failure. Power, heat, wo
 
 ## Status
 
-Planning package. The application, runtime assets, and automated game tests have not been implemented. The master plan defines the intended behavior and release gates; it is not a claim that those gates have passed.
+Foundation shell: strict schemas, authored scenario inputs, React/Phaser host, typed worker bridge, local production server and contract/browser checks. The displayed world and readings are labeled development fixtures. The mission engine, final artwork, model gateway and replay are not integrated yet.
 
-The delivery target is a local laptop-browser demonstration for judges. The repository is intended to be public. No public game hosting is required for the initial release.
+The delivery target is a local laptop-browser demonstration for judges. [Public source repository](https://github.com/Skytuhua/blackout). No public game hosting is required for the initial release.
 
 ## Start here
 
@@ -19,11 +19,23 @@ The delivery target is a local laptop-browser demonstration for judges. The repo
 - [Initial agent packets](docs/agent-task-packets.md): foundation, simulation, game/interface, OpenAI, and reviewer briefs.
 - [Asset provenance](docs/asset-provenance.md): how shipped assets and template code will be attributed.
 
-## Planned stack
+## Run the foundation
+
+Requires Node.js 24 and npm. All runtime fonts are local.
+
+```sh
+npm ci
+npm run build
+npm run demo
+```
+
+Open `http://127.0.0.1:4173`. `npm run dev` starts client and local service together. `npm run verify` checks types, unit tests, the production build and Chromium tests (first install: `npx playwright install chromium`). Focused simulation, gateway and replay scripts are reserved for their upcoming packages.
+
+## Stack
 
 TypeScript, React, Phaser, Vite, a deterministic simulation Web Worker, a small local Node service, OpenAI Responses API, IndexedDB, Vitest, and Playwright. The foundation task pins a compatible dependency set and adds the runnable commands.
 
-The planned local production flow is dependency installation, production build, then a single demo command serving the client and API on a loopback address. These commands are release requirements and are not available in this documentation-only package.
+The production command serves client and API from one stable loopback origin, fails if its port is occupied, and defaults to scripted mode. Health checks never make paid provider calls.
 
 ## Development model
 

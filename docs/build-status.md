@@ -2,16 +2,16 @@
 
 Updated: 7 November 2026.
 
-This package contains planning documents and nonsecret configuration examples. No game implementation, production atlas, live API integration, test run, public repository URL, or demo recording is claimed by this status file.
+Foundation implemented; awaiting final G0 review. The visible shell is a development fixture, not a playable mission. Public repository: https://github.com/Skytuhua/blackout. No production atlas, live tool cycle or recording is claimed.
 
 ## Task queue
 
 | Task | Owner | Dependency | Status | Required evidence |
 |---|---|---|---|---|
 | PLAN-01: solo/parallel master revision | Coordinator | User decisions and planning reviews | Prepared | Master plan, ownership, contracts, gates, and task packets. |
-| REPO-00: public repository seed | Coordinator | Authorized repository-creation capability | Blocked on publishing capability | Actual public URL and initial commit; verify public read access. |
-| CORE-00: foundation and contract version 1 | Coordinator | Plan | Queued | Lockfile, scripts, schema-valid fixtures, production shell build, worker round trip. |
-| CONTENT-01: Hot Restart data | Coordinator | CORE-00 | Queued | Profile, topology, procedures, one declared seed, objectives, permitted-knowledge policy. |
+| REPO-00: public repository seed | Coordinator | Authorized repository-creation capability | Integrated: 6cf1bac | Actual public URL and initial commit; verify public read access. |
+| CORE-00: foundation and contract version 1 | Coordinator | Plan | Ready for review | Lockfile, scripts, schema-valid fixtures, production shell build, worker round trip. |
+| CONTENT-01: Hot Restart data | Coordinator | CORE-00 | Initial data; feasibility pending SIM-02 | Profile, topology, procedures, one declared seed, objectives, permitted-knowledge policy. |
 | SIM-01: physical reference cases | Simulation worker | CORE-00 | Queued | Equilibrium, cooling-loss, recovery, battery-energy, and capacity checks. |
 | SIM-02: full mission behavior | Simulation worker | SIM-01 and CONTENT-01 | Queued | Crew/task timing, observations, protection, success/failure/timeout/reset traces. |
 | UI-01: runtime masters and fixture UI | Game/UI worker | CORE-00 | Queued | Native/3× sprite review, selection/dispatch flow, accessible controls. |
@@ -38,3 +38,12 @@ No implementation evidence recorded yet.
 ## Time checkpoints
 
 The public event schedule reviewed during planning listed an initial deadline at 05:00 UTC November 8, 2026 and final submissions at 18:00 UTC November 8. Recheck current instructions. Prepare and verify the initial-entry requirements by 04:30 UTC. Reserve the final two hours for packaging/rehearsal, and rebase productive time on the actual start and remaining personal availability.
+
+## Foundation execution evidence
+
+- Original plan and ZIP hashes match supplied attachments; see asset provenance. Documentation seed committed unchanged.
+- Shared contract validation: meaningful RED then GREEN; actor projections and comparison discrimination covered.
+- Browser check: production React/Phaser shell renders and completes a typed worker round trip. This is fixture/G0 evidence only.
+- OpenAI: one authenticated strict structured response succeeded against the selected model. Full worker tool cycle remains pending AI-02. No credentials in Git.
+- Dependency audit: zero known vulnerabilities after updating the test runner.
+- Kickoff schedule recheck: official event page still lists initial entry 23:00 CT Nov 7 and final submissions noon CT Nov 8. Its Devpost link points to the generic site; full initial-entry, AI/provenance and eligibility rules remain unverified. No submission performed. Keep the plan's 22:30 CT entry-preparation checkpoint.

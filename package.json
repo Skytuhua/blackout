@@ -1,0 +1,41 @@
+{
+  "name": "blackout",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:contracts": "vitest run tests/contracts",
+    "test:sim": "vitest run tests/sim",
+    "test:llm": "vitest run tests/llm",
+    "test:replay": "vitest run tests/replay",
+    "test:e2e": "playwright test",
+    "build": "vite build && esbuild server/index.ts --bundle --platform=node --format=esm --packages=external --outfile=dist-server/index.js",
+    "demo": "node --env-file-if-exists=.env.local dist-server/index.js",
+    "verify": "npm run typecheck && npm test && npm run build && npm run test:e2e"
+  },
+  "dependencies": {
+    "@fontsource/barlow-condensed": "5.3.0",
+    "@fontsource/ibm-plex-sans": "5.3.0",
+    "lucide-react": "1.70.0",
+    "openai": "7.53.0",
+    "phaser": "4.0.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.0",
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "4.7.0",
+    "esbuild": "0.28.2",
+    "tsx": "4.23.15",
+    "typescript": "5.7.3",
+    "vite": "6.4.5",
+    "vitest": "5.1.0"
+  }
+}
