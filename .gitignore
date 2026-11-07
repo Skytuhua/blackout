@@ -11,3 +11,9 @@ logs/
 playwright-report/
 test-results/
 .DS_Store
+.worktrees/
+.superpowers/
+.impeccable/
+/blackout-repository.zip
+/blackout-master-plan.md
+coverage/
