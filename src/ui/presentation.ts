@@ -1,5 +1,9 @@
 import type { ActionIntent, KnowledgeView, Observation } from '../shared/contracts';
 
+export function parseCeiling(value: string): number | undefined {
+  return value.trim() ? Number(value) : undefined;
+}
+
 // Ten seconds is the mission's verification window, not a claim about sensor accuracy.
 export function readingStatus(observation: Observation | null, simTime: number): 'unknown' | 'stale' | 'fresh' {
   if (!observation || observation.value === null || observation.quality === 'unknown' || observation.observedAt > simTime) return 'unknown';

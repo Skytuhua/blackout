@@ -22,3 +22,9 @@ it('does not light equipment indicators without a current observed state', async
   expect(indicatorState([{ ...alarmFixture.observations[1], observedAt: 60 }], 75)).toBe('unknown');
   expect(indicatorState(alarmFixture.observations.filter(o => o.assetId === 'cooling-1'), 75)).toBe('attention');
 });
+
+it('does not turn an empty batch ceiling into a zero-percent dispatch', async () => {
+  const { parseCeiling } = await import('../../src/ui/presentation');
+  expect(parseCeiling('')).toBeUndefined();
+  expect(parseCeiling('50')).toBe(50);
+});
