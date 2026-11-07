@@ -50,4 +50,14 @@ describe('source, UPS ratings and stored DC energy', () => {
     expect(flow.poweredRackIds).toEqual([]);
     expect(flow.flows.every(f => f.outputKw === 0)).toBe(true);
   });
+
+  it('recharges an energized input even with no output load and never exceeds stored capacity', () => {
+    const ups = units();
+    ups[0].energyKwh = 4.9999;
+    const flow = resolvePower(hotRestart, utility, ups, []);
+    const charge = integrateBatteries(ups, flow.flows, 1, 5, hotRestart.profile);
+    expect(ups[0].energyKwh).toBe(5);
+    expect(charge).toBeCloseTo(0.0001 * 3600 / 0.95, 9);
+    expect(ups[1].energyKwh).toBe(5);
+  });
 });

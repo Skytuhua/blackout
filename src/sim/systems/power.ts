@@ -2,7 +2,7 @@ import type { ScenarioSpec } from '../../shared/contracts';
 
 export interface UpsState { id: string; energyKwh: number; tripped: boolean; faulted: boolean }
 export interface Sources { utilityAvailable: boolean; generatorReady: boolean; transferComplete: boolean }
-export interface UpsFlow { id: string; outputKw: number; inputKw: number; dischargeKw: number }
+export interface UpsFlow { id: string; outputKw: number; inputKw: number; dischargeKw: number; inputAvailable: boolean }
 export interface PowerResolution { sourceCapacityKw: number | null; remainingSourceKw: number; itInputKw: number; flows: UpsFlow[]; poweredRackIds: string[]; trippedIds: string[] }
 
 export function batteryRuntimeSeconds(energyKwh: number, outputKw: number, efficiency: number) {
@@ -59,7 +59,7 @@ export function resolvePower(spec: ScenarioSpec, sources: Sources, units: UpsSta
         active.delete(unit.id);
         removed = true;
       }
-      return { id: unit.id, outputKw, inputKw, dischargeKw };
+      return { id: unit.id, outputKw, inputKw, dischargeKw, inputAvailable: connected.has(unit.id) };
     });
     if (!removed) return { sourceCapacityKw, remainingSourceKw, itInputKw: budget - remainingSourceKw, flows, poweredRackIds, trippedIds };
   }
@@ -72,7 +72,7 @@ export function integrateBatteries(units: UpsState[], flows: UpsFlow[], seconds:
     const flow = flows.find(f => f.id === unit.id)!;
     if (flow.dischargeKw > 0) {
       unit.energyKwh = Math.max(0, unit.energyKwh - flow.dischargeKw * seconds / (3600 * profile.upsEfficiency));
-    } else if (!unit.tripped && !unit.faulted && flow.inputKw > 0) {
+    } else if (!unit.faulted && flow.inputAvailable) {
       const chargeKw = Math.min(profile.upsRechargeKw, chargeBudgetKw - chargedKw, Math.max(0, profile.upsEnergyKwh - unit.energyKwh) * 3600 / (seconds * profile.upsEfficiency));
       chargedKw += chargeKw;
       // Contract v1 has one UPS conversion efficiency, used in each direction separately.

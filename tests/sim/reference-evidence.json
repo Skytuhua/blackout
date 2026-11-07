@@ -1,0 +1,49 @@
+﻿{
+  "scope": "SIM-01 headless physical reference evidence only; no mission, live provider, browser or release proof",
+  "baseCommit": "fb8e7988e39fb767954f59a2b504932680a002b1",
+  "contractVersion": 1,
+  "engineVersion": "sim-01-v1",
+  "balanced600": {
+    "temperatureC": 24,
+    "itPowerKw": 64,
+    "coolingThermalKw": 64,
+    "coolingElectricKw": 25.333333333333332,
+    "itInputKw": 67.36842105263156,
+    "chargeInputKw": 0,
+    "sourceUsedKw": 92.70175438596489,
+    "sourceCapacityKw": null,
+    "criticalServedFraction": 1,
+    "interactiveServedFraction": 1
+  },
+  "coolingLoss75": {
+    "temperatureC": 26.999999999999936,
+    "slopeCPerSecond": 0.03999999999999915
+  },
+  "recovery100": {
+    "temperatureC": 26.196194047639377,
+    "analyticContinuousC": 26.207276647028653
+  },
+  "thermalTrace600": {
+    "oneSecondFinalC": 24.014430055747862,
+    "halfSecondFinalC": 24.014650354893146,
+    "maxDifferenceC": 0.005552882717640983,
+    "toleranceC": 0.1,
+    "configuration": "Uncoupled 200 kJ/K zones, 2 kW/K, 8 kW IT, 160 kW thermal pool, initial 30C; standalone thermal kernel with no protection"
+  },
+  "batteryRuntimeSeconds": {
+    "dual32KwEach": 534.375,
+    "single64Kw": 267.1875
+  },
+  "partialTick": {
+    "remainingDcKwh": [
+      0,
+      0
+    ],
+    "itEnergyKwh": 0.008888888888888889,
+    "criticalDelivered": 80,
+    "depletedAtSeconds": [
+      0.25,
+      0.5
+    ]
+  }
+}

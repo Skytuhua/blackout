@@ -30,12 +30,12 @@ describe('fictional equipment protection profile', () => {
     expect(r.mode).toBe('off');
     expect(r.thermalLatched).toBe(true);
     advanceProtection(r, 29, 29, 30, profile);
-    prepareRack(r, true, profile);
+    prepareRack(r, true, profile, 29);
     expect(r.mode).toBe('off');
     r.resetRequested = true; // Future accepted task effect; not a public command bypass.
-    prepareRack(r, false, profile);
+    prepareRack(r, false, profile, 29);
     expect(r.mode).toBe('off');
-    prepareRack(r, true, profile);
+    prepareRack(r, true, profile, 29);
     expect(r.mode).toBe('booting');
     advanceProtection(r, 29, 29, 19, profile);
     expect(r.mode).toBe('booting');
@@ -47,14 +47,22 @@ describe('fictional equipment protection profile', () => {
     const r = rack();
     advanceProtection(r, 31, 33, 1, profile);
     expect(r.hotSeconds).toBe(0.5);
-    prepareRack(r, false, profile);
+    prepareRack(r, false, profile, 33);
     expect(r.mode).toBe('off');
-    prepareRack(r, true, profile);
+    prepareRack(r, true, profile, 33);
     expect(r.mode).toBe('booting');
     expect(r.bootRemainingSeconds).toBe(20);
     advanceProtection(r, 33, 33, 10, profile);
-    prepareRack(r, false, profile);
-    prepareRack(r, true, profile);
+    prepareRack(r, false, profile, 33);
+    prepareRack(r, true, profile, 33);
     expect(r.bootRemainingSeconds).toBe(20);
+  });
+
+  it('cannot use an earlier cooling dwell to reset after temperature has risen again', () => {
+    const r = { ...rack(), mode: 'off' as const, thermalLatched: true, resetRequested: true, coolSeconds: 30 };
+    // Current truth remains a required prerequisite even if an earlier timer is retained.
+    prepareRack(r, true, profile, 35);
+    expect(r.mode).toBe('off');
+    expect(r.thermalLatched).toBe(true);
   });
 });

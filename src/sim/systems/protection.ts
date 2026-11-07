@@ -10,14 +10,14 @@ export interface RackProtection {
   coolSeconds: number;
 }
 
-export function prepareRack(rack: RackProtection, powered: boolean, profile: ScenarioSpec['profile']): string[] {
+export function prepareRack(rack: RackProtection, powered: boolean, profile: ScenarioSpec['profile'], temperatureC: number): string[] {
   if (!powered) {
     const changed = rack.mode !== 'off';
     rack.mode = 'off';
     rack.bootRemainingSeconds = 0;
     return changed ? ['power_off'] : [];
   }
-  if (rack.mode === 'off' && (!rack.thermalLatched || (rack.resetRequested && rack.coolSeconds >= profile.releaseDwellSeconds))) {
+  if (rack.mode === 'off' && (!rack.thermalLatched || (rack.resetRequested && temperatureC <= profile.releaseC && rack.coolSeconds >= profile.releaseDwellSeconds))) {
     rack.thermalLatched = false;
     rack.resetRequested = false;
     rack.bootRemainingSeconds = profile.bootSeconds;
