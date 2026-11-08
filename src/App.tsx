@@ -23,7 +23,7 @@ const words = (value: string) => value.toLowerCase().replaceAll('_', ' ');
 const clock = (at: number) => `${Math.floor(at / 60)}:${String(Math.floor(at % 60)).padStart(2, '0')}`;
 const ended = (view: KnowledgeView) => ['success', 'failure'].includes(view.mission.status);
 const person = (actorId: string) => conversationPeople.find(actor => actor.actorId === actorId);
-const labelAction = (intent: ActionIntent) => intent.action === 'inspect' ? 'Check cooling controls' : intent.action === 'repair_cooling' ? 'Repair the controls' : intent.action === 'pause_batch' ? 'Pause background jobs' : intent.action === 'set_batch_ceiling' || intent.action === 'resume_batch' ? 'Resume background jobs' : intent.action === 'verify_recovery' ? 'Check recovery' : words(intent.action);
+const labelAction = (intent: ActionIntent) => intent.action === 'inspect' ? intent.targetId === 'controller' ? 'Check cooling controls' : intent.args.technicianId === 'jules' ? 'Check power equipment' : 'Check equipment' : intent.action === 'repair_cooling' ? 'Repair the controls' : intent.action === 'pause_batch' ? 'Pause background jobs' : intent.action === 'set_batch_ceiling' || intent.action === 'resume_batch' ? 'Resume background jobs' : intent.action === 'verify_recovery' ? 'Check recovery' : words(intent.action);
 type RadioJob = { controller: AbortController; promise: Promise<CoworkerResult> };
 
 
@@ -219,7 +219,7 @@ export default function App() {
   if (!shown) return <main className="host-loading"><h1>BLACKOUT</h1><p role={error ? 'alert' : 'status'}>{error || 'Opening your shift…'}</p>{error && <button onClick={() => { transitioning.current = false; void begin('welcome'); }}>Retry</button>}</main>;
   const options = conversationOrders(shown);
   const displayedThreads = withConversationAssignments(replayActive && source ? savedConversations(source, shown) : threads, shown).map(thread => ({ ...thread, suggestedOrders: options.filter(order => order.actorId === thread.actorId).map(({ intent: _intent, ...order }) => order) }));
-  const coolingStopped = shown.observations.some(observation => observation.field === 'running' && observation.value === false && shown.simTime - observation.observedAt <= 10);
+  const coolingStopped = shown.observations.some(observation => observation.field === 'running' && observation.value === false && observation.quality !== 'unknown' && observation.observedAt <= shown.simTime && observation.receivedAt <= shown.simTime && shown.simTime - observation.observedAt <= 10 && shown.knownTopology.assets.some(asset => asset.id === observation.assetId && asset.kind === 'cooling'));
   const replayContent = <DesktopReplayView compactMenu saved={saved} ledger={ledger} comparison={comparison} cursor={cursor} playing={replayPlaying} busy={busy} active={replayActive} canSave={session === 'mission'} notice={notice} error={error}
     caps={source?.commands.filter(command => ['accepted', 'applied'].includes(command.receipt.status) && ['pause_batch', 'set_batch_ceiling'].includes(command.intent.action)).map(command => ({ sequence: command.sequence, at: command.at, label: words(command.intent.action) })) ?? []}
     dialogue={source?.dialogue ?? []} transcript={source ? JSON.stringify(source.interactions, null, 2) : ''}

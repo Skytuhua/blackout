@@ -14,7 +14,7 @@
 .conv-game input, .conv-game textarea { caret-color:var(--conv-cyan); }
 .conv-world-pane { display:flex; flex-direction:column; min-width:0; min-height:0; }
 .conv-header { display:flex; align-items:center; gap:14px; padding:8px 12px; border-bottom:1px solid var(--conv-wall); }
-.conv-header span { margin-left:auto; }
+.conv-header span { margin-left:auto; min-width:0; overflow-wrap:anywhere; }
 .conv-game time { font-variant-numeric:tabular-nums; white-space:nowrap; }
 .conv-objective { padding:12px 16px; display:flex; flex-direction:column; gap:6px; }
 .conv-objective p { color:var(--conv-amber); }
