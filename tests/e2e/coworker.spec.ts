@@ -138,6 +138,28 @@ test('restart cancels an old interaction and ignores its late inspection request
   } finally { release(); if (captured) await handled; }
 });
 
+for (const priorSnapshot of [false, true]) test(`menu refreshes ${priorSnapshot ? 'an old' : 'an absent'} snapshot after a pending reply`, async ({ page }) => {
+  const wire = fixtures(); let captured: GatewayInput | undefined; let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/api/llm/turn', async route => {
+    captured = route.request().postDataJSON() as GatewayInput;
+    await gate;
+    await route.fulfill({ json: wire.final(captured) });
+  });
+  try {
+    await begin(page);
+    if (priorSnapshot) await advanceTo(page, 5);
+    await equipment(page, 'cooling-1'); await radio(page, 'What is known?');
+    await expect.poll(() => !!captured).toBe(true);
+    const dialog = await menu(page, 'Replay and results');
+    await dialog.getByRole('combobox', { name: 'After action section' }).selectOption('outcome');
+    if (priorSnapshot) await expect(dialog).toContainText('T+0:00');
+    else await expect(dialog).toContainText('Open a mission record');
+    release();
+    await expect(dialog).toContainText(priorSnapshot ? 'T+0:05' : 'T+0:00');
+  } finally { release(); }
+});
+
 test('timestamp facts are formatted as metadata rather than equipment readings', async ({ page }) => {
   const wire = fixtures(); let observationId = '';
   await page.route('**/api/llm/turn', async route => {
