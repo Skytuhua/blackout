@@ -99,3 +99,9 @@ Coordinator observed RED for four focused renderer regressions before correction
 The map now fits the available area without rounding its scale down to whole multiples. Nearest-neighbor image rendering is retained; fractional scaling may produce uneven pixel widths. The standalone sample preview no longer reserves empty sidebar/footer regions, and explicitly labels chat and mission as disconnected. The real host still controls its own sidebar layout.
 
 Static atlas-based wall fittings and floor variations add detail without creating equipment, observations, route obstacles, or operating-state claims. Coordinator observed two meaningful RED cases before implementation, then 12 focused map tests and typecheck passed. The isolated production fixture build and 18 browser checks passed, including all eight views at three desktop sizes and three text sizes, room/equipment selection, travel, pause, reduced motion, and no document overflow. Impeccable detector returned `[]`. Art direction and actual integration remain subject to user review; new engine and mission are not connected.
+
+## Host-constrained label correction
+
+The independent review of `f48c3f0` found labels overlapping in simulated 640 x 500 and 908 x 500 host stages at 32px text. These overlaps were reproduced before the fix. Crowded map overlays now yield to the accessible room selector and equipment list; the large standalone preview remains unchanged. The fixture also supports `?layout=host` with a reserved chat sidebar and game-controls footer for integration-like checks.
+
+The production fixture passed 24 browser checks, including the original 72 desktop views and five host-constrained label cases, plus the reserved-sidebar fixture. The focused 12 map tests and typecheck passed. These use synthetic dimensions and data; real host layout and new-engine integration still require verification. Full suite and independent review of this correction are pending.

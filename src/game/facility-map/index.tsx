@@ -18,6 +18,8 @@ export function FacilityMap(props: FacilityMapProps) {
   const fitted = fitMap(box.width, box.height, { width: bounds.width * 16, height: bounds.height * 16 });
   const assets = room ? topology.assets.filter(a => a.roomId === room.id) : [];
   const compact = box.width > 0 && box.width / box.fontSize < 50;
+  const crowdedMap = fitted.width > 0 && fitted.width / box.fontSize < 18;
+  const crowdedRooms = fitted.width > 0 && fitted.width / box.fontSize < 8;
   const pageSize = box.fontSize >= 28 ? 1 : Math.max(1, Math.min(4, Math.floor((box.width - 160) / (box.fontSize * 11))));
   const pages = Math.max(1, Math.ceil(assets.length / pageSize)), page = Math.min(equipmentPage, pages - 1);
 
@@ -63,7 +65,7 @@ export function FacilityMap(props: FacilityMapProps) {
   }
 
   const upstream = topology.connections.find(c => c.fromId === topology.sharedUpstream.id)?.points[0];
-  return <section className="facility-map" aria-label="Public facility map" data-room={room?.id ?? 'overview'} data-art={art} data-compact={compact}>
+  return <section className="facility-map" aria-label="Public facility map" data-room={room?.id ?? 'overview'} data-art={art} data-compact={compact} data-crowded-map={crowdedMap} data-crowded-rooms={crowdedRooms}>
     <nav className="fm-rooms" aria-label="Facility rooms">
       <button type="button" aria-pressed={!room} onClick={() => onSelectRoom(null)}>Overview</button>
       {topology.rooms.map(r => <button key={r.id} type="button" hidden={compact} aria-pressed={r.id === room?.id} onClick={() => onSelectRoom(r.id)}>{r.label}</button>)}

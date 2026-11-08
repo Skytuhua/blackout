@@ -14,6 +14,7 @@ declare global {
   }
 }
 function Fixture() {
+  const hostLayout = new URLSearchParams(window.location.search).get('layout') === 'host';
   const [data, setData] = useState<Partial<FacilityMapProps>>({ view: createFacilityMapFixture() });
   const [mounted, setMounted] = useState(true), [controlled, setControlled] = useState(true);
   const events = window.facilityFixture?.events ?? [];
@@ -32,9 +33,11 @@ function Fixture() {
       setData(previous => ({ ...previous, view }));
     },
   };
-  return <main className="fixture-host">
+  return <main className={`fixture-host${hostLayout ? ' fixture-host-constrained' : ''}`}>
     <header>Map preview - sample data; chat and mission are not connected</header>
     <div className="fixture-stage">{mounted && <FacilityMap {...props} />}</div>
+    {hostLayout && <aside>Reserved chat sidebar</aside>}
+    {hostLayout && <footer>Reserved game controls</footer>}
   </main>;
 }
 createRoot(document.getElementById('root')!).render(<Fixture />);

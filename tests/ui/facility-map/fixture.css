@@ -4,3 +4,7 @@ body { background: #050c20; color: #dceaf2; font: 16px "IBM Plex Sans", sans-ser
 .fixture-host header { grid-column: 1 / -1; }
 .fixture-host header { padding: 12px; background: #102332; }
 .fixture-stage { min-width: 0; min-height: 0; overflow: hidden; }
+
+.fixture-host-constrained { grid-template-columns: minmax(0, 1fr) 360px; grid-template-rows: 44px minmax(0, 1fr) 72px; }
+.fixture-host-constrained header, .fixture-host-constrained footer { grid-column: 1 / -1; }
+.fixture-host-constrained aside, .fixture-host-constrained footer { padding: 12px; background: #102332; }
