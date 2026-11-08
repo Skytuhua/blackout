@@ -186,7 +186,7 @@ try {
       await page.close(); return dimensions;
     });
   }
-  for (const [width, height, font, room] of [[640, 500, 32, 'hall-a'], [908, 500, 32, null], [908, 500, 16, null], [640, 500, 16, 'hall-a'], [640, 500, 32, null]]) {
+  for (const [width, height, font, room] of [[640, 500, 32, 'hall-a'], [908, 500, 32, null], [908, 500, 16, null], [640, 500, 16, 'hall-a'], [640, 500, 32, null], [640, 500, 28, null], [820, 450, 16, null]]) {
     await check(`host-constrained labels do not overlap ${width}x${height} ${font}px ${room ?? 'overview'}`, async () => {
       const page = await open(1280, 720);
       await page.evaluate(({ width, height, font }) => {
@@ -207,6 +207,25 @@ try {
       await page.close();
     });
   }
+  await check('long room labels avoid collisions and remain available in navigation', async () => {
+    const page = await open(1280, 720);
+    await page.evaluate(() => {
+      const stage = document.querySelector('.fixture-stage'); stage.style.width = '820px'; stage.style.height = '450px';
+      const f = window.facilityFixture;
+      f.patch({ view: { ...f.props.view, knownTopology: { ...f.props.view.knownTopology, rooms: f.props.view.knownTopology.rooms.map(r => ({ ...r, label: `Regional ${r.label} equipment facility` })) } } });
+    });
+    await settle(page);
+    const overlaps = await page.evaluate(() => {
+      const labels = [...document.querySelectorAll('.fm-room-label, .fm-upstream-mark')].filter(el => el.getClientRects().length);
+      return labels.flatMap((a, i) => labels.slice(i + 1).filter(b => {
+        const x = a.getBoundingClientRect(), y = b.getBoundingClientRect();
+        return Math.min(x.right, y.right) - Math.max(x.left, y.left) > 1 && Math.min(x.bottom, y.bottom) - Math.max(x.top, y.top) > 1;
+      }).map(b => `${a.textContent}/${b.textContent}`));
+    });
+    assert.deepEqual(overlaps, []);
+    assert.equal(await page.getByRole('button', { name: /Regional Hall A equipment facility/ }).count() + await page.getByRole('option', { name: /Regional Hall A equipment facility/ }).count(), 1);
+    await page.close();
+  });
   await check('host fixture reserves chat and controls without clipping the map', async () => {
     const page = await open(1280, 720);
     await page.goto(`${origin}/tests/ui/facility-map/fixture.html?layout=host`);
