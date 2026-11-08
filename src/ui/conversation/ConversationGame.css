@@ -99,8 +99,6 @@
 /* Textareas reserve trailing caret/padding space beyond a normal div's line box. */
 .conv-game .blackout-editor-measure { height:calc(100% - 1.4em - 14px); }
 .conv-game .blackout-draft > label { font-size:16px; }
-.conv-menu { position:absolute; z-index:20; inset:12px; padding:16px; display:flex; flex-direction:column; gap:10px; min-height:0; border:2px solid var(--conv-wall); background:var(--conv-panel); }
-.conv-menu > button { align-self:flex-start; }
 .conv-welcome { position:absolute; z-index:30; width:min(540px,calc(100% - 32px)); left:50%; top:50%; transform:translate(-50%,-50%); background:var(--conv-panel); border:2px solid var(--conv-wall); padding:24px; display:flex; flex-direction:column; gap:18px; }
 .conv-primary { color:var(--conv-cyan)!important; border-color:var(--conv-cyan)!important; }
 .conv-compact-toolbar, .conv-chat-control { display:none!important; }
