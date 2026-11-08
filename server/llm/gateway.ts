@@ -96,7 +96,7 @@ export class Gateway {
       const params = parameters(state.start, state.history, state.calls + 1);
       // Plan at two UTF-8 bytes per token, including every schema and history item.
       if (Math.ceil(Buffer.byteLength(JSON.stringify(params), 'utf8') / 2) > 6000) throw new Error('input_limit');
-      const reservation = this.budget.reserve(6000, state.start.role === 'debrief' ? 800 : 400, input.runId);
+      const reservation = this.budget.reserve(6000, state.start.role === 'debrief' ? 800 : 400, input.runId, params.model);
       state.calls++; this.providerBusy = true;
       const callController = new AbortController();
       const timeout = setTimeout(() => callController.abort('call_timeout'), state.start.role === 'debrief' ? this.options.debriefTimeoutMs ?? 20000 : this.options.callTimeoutMs ?? 8000);
@@ -133,7 +133,7 @@ export class Gateway {
       } finally { clearTimeout(timeout); state.controller.signal.removeEventListener('abort', close); callController.signal.removeEventListener('abort', onAbort); }
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
-      const allowed = ['budget_exhausted', 'budget_unavailable', 'mission_quota', 'interaction_quota', 'input_limit', 'canceled', 'call_timeout', 'interaction_timeout', 'refusal', 'incomplete_response', 'invalid_evidence', 'invalid_target', 'invalid_action', 'duplicate_call', 'advisory_execution_forbidden'];
+      const allowed = ['budget_exhausted', 'budget_unavailable', 'mission_quota', 'interaction_quota', 'input_limit', 'canceled', 'call_timeout', 'interaction_timeout', 'refusal', 'incomplete_response', 'invalid_evidence', 'invalid_target', 'invalid_action', 'duplicate_call', 'advisory_execution_forbidden', 'invalid_reasoning_effort', 'invalid_model_pricing', 'model_pricing_unconfigured'];
       const status = (error as { status?: number }).status;
       state.reply = this.fallback(input, status === 429 ? 'provider_quota' : allowed.includes(message) ? message : 'malformed_or_unavailable');
       clearTimeout(state.expires);

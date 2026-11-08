@@ -29,15 +29,15 @@ describe('grounding boundary', () => {
 describe('durable allowance', () => {
   it('retains unknown reservations after restart regardless of run IDs', () => {
     const path = join(mkdtempSync(join(tmpdir(), 'blackout-budget-')), 'usage.json');
-    new Budget(path, .0021).reserve(6000, 400);
-    expect(() => new Budget(path, .0021).reserve(6000, 400)).toThrow('budget_exhausted');
+    new Budget(path, .01).reserve(6000, 400);
+    expect(() => new Budget(path, .01).reserve(6000, 400)).toThrow('budget_exhausted');
   });
   it('reconciles known usage and refuses malformed accounting', () => {
     const path = join(mkdtempSync(join(tmpdir(), 'blackout-budget-')), 'usage.json');
-    const budget = new Budget(path, .0021);
+    const budget = new Budget(path, .01);
     const id = budget.reserve(6000, 400);
     budget.reconcile(id, 40, 13);
-    expect(() => new Budget(path, .0021).reserve(6000, 400)).not.toThrow();
+    expect(() => new Budget(path, .01).reserve(6000, 400)).not.toThrow();
     expect(() => budget.reserve(-1, 1)).toThrow();
   });
   it('enforces the mission ceiling for prototype-shaped run IDs', () => {
