@@ -41,7 +41,8 @@ export function withConversationAssignments(threads: ConversationThread[], view:
     const task = crew?.taskId ? view.tasks.find(task => task.id === crew.taskId) : [...view.tasks].reverse().find(task => task.actorId === thread.actorId && task.action !== 'move_crew');
     let assignment: ConversationThread['assignment'] = { taskId: null, label: 'Ready', status: 'ready' };
     if (task) {
-      const target = view.knownTopology.assets.find(asset => asset.id === task.targetId)?.label ?? 'the site';
+      const endpoint = task.action === 'move_crew' ? task.path.at(-1) : undefined;
+      const target = view.knownTopology.assets.find(asset => endpoint ? asset.serviceTile.x === endpoint.x && asset.serviceTile.y === endpoint.y : asset.id === task.targetId)?.label ?? (endpoint ? 'the destination' : 'the site');
       if (task.status === 'traveling') assignment = { taskId: task.id, label: `Walking to ${target}`, status: 'walking' };
       else if (task.status === 'queued' || task.status === 'blocked') assignment = { taskId: task.id, label: task.status === 'queued' ? 'Waiting to start' : 'Task blocked', status: 'working' };
       else if (['working', 'inspecting', 'queued', 'blocked'].includes(task.status)) assignment = { taskId: task.id, label: `${task.action === 'inspect' ? 'Checking' : 'Working on'} ${target}`, status: task.action === 'inspect' ? 'checking' : 'working' };
@@ -73,9 +74,9 @@ export function authorizationMatchesOrigin(authorization: ProposalAuthorization,
 export class ProposalBook {
   private proposals = new Map<string, { authorization: ProposalAuthorization; requestId: string; idempotencyKey: string; taken: boolean }>();
   constructor(private readonly runId: string) {}
-  register(input: ProposalAuthorization) {
+  register(input: ProposalAuthorization, options?: { allowMovement?: boolean }) {
     if (input.runId !== this.runId) throw new Error('Proposal belongs to another run.');
-    if (!conversationPeople.some(person => person.actorId === input.actorId) || !input.id || !input.requestId || !ActionIntentSchema.safeParse(input.intent).success || input.intent.action === 'move_crew') throw new Error('Invalid conversation proposal.');
+    if (!conversationPeople.some(person => person.actorId === input.actorId) || !input.id || !input.requestId || !ActionIntentSchema.safeParse(input.intent).success || input.intent.action === 'move_crew' && (!options?.allowMovement || input.intent.targetId !== input.actorId)) throw new Error('Invalid conversation proposal.');
     if (Object.values(input.expectedEntityVersions).some(version => !Number.isInteger(version) || version < 0)) throw new Error('Invalid proposal versions.');
     const previous = this.proposals.get(input.id);
     if (previous) { if (JSON.stringify(previous.authorization) !== JSON.stringify(input)) throw new Error('Conflicting proposal identity.'); return; }

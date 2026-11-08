@@ -3,7 +3,7 @@ import { ActionRequestSchema, CheckpointSchema, ScenarioSpecSchema } from '../sh
 import { EngineStateSchema, type EngineState } from './state';
 import { advancePhysical, createPhysical } from './systems/physical';
 import { actorIds, evidence, evidenceConditions, isActor, latest, publicSummary, sampleSensors } from './knowledge';
-import { actionPlan, active, advanceTasks, affordances, cancelTask, deliverReports, requiredRole, reserveTask, taskArgumentError, taskResources, workSeconds, type Emit } from './tasks';
+import { actionPlan, active, advanceTasks, affordances, cancelTask, deliverReports, remoteMovementPath, requiredRole, reserveTask, taskArgumentError, taskResources, workSeconds, type Emit } from './tasks';
 import { isWalkablePath, isWalkablePosition, pathMeters, positionAlong, route } from './navigation';
 
 export const ENGINE_VERSION = 'sim-desktop-v2';
@@ -69,7 +69,7 @@ function validateRestoredState(state: EngineState, at: number) {
   if (state.lastSensorAt !== at - at % state.scenario.profile.sensorIntervalSeconds) throw new Error('Invalid checkpoint sensor boundary.');
   const actors = actorIds(state);
   if (state.crew.length !== state.scenario.crew.length || state.crew.some((c, i) => c.id !== state.scenario.crew[i].id || c.role !== state.scenario.crew[i].role || c.speed !== state.scenario.crew[i].speed)) throw new Error('Invalid checkpoint crew identity.');
-  if (state.crew.some((c, i) => c.role === 'remote' ? c.x !== state.scenario.crew[i].x || c.y !== state.scenario.crew[i].y : !isWalkablePosition(state.scenario, c))) throw new Error('Invalid checkpoint crew position.');
+  if (state.crew.some((c, i) => !isWalkablePosition(state.scenario, c) && (c.role !== 'remote' || c.x !== state.scenario.crew[i].x || c.y !== state.scenario.crew[i].y))) throw new Error('Invalid checkpoint crew position.');
   const versionIds = ['site', ...state.scenario.topology.assets.map(a => a.id), ...state.crew.map(c => c.id)].sort();
   if (JSON.stringify(Object.keys(state.entityVersions).sort()) !== JSON.stringify(versionIds) || JSON.stringify(Object.keys(state.mission.evidenceHoldSeconds).sort()) !== JSON.stringify([...actors].sort())) throw new Error('Invalid checkpoint entity versions.');
   const reservations: Record<string, string> = {};
@@ -82,13 +82,14 @@ function validateRestoredState(state: EngineState, at: number) {
     if (taskArgumentError(state, task.intent) || !command || command.actorId !== task.requestedBy || command.at !== pub.startedAt || JSON.stringify(command.intent) !== JSON.stringify(task.intent)) throw new Error('Invalid checkpoint task arguments or accepted command.');
     if (!worker || pub.actorId !== worker.id || !actors.includes(task.requestedBy) || pub.targetId !== task.intent.targetId || pub.action !== task.intent.action || pub.startedAt > at || pub.arrivalAt < pub.startedAt || pub.completesAt !== pub.arrivalAt + task.workSeconds || task.traveledMeters > task.distanceMeters) throw new Error('Invalid checkpoint task identity or time.');
     const moving = task.intent.action === 'move_crew';
-    if (worker.role !== requiredRole(state, task.intent) || (moving ? worker.role === 'remote' || worker.id !== task.intent.targetId || task.requestedBy !== 'player'
+    if (worker.role !== requiredRole(state, task.intent) || (moving ? worker.id !== task.intent.targetId || task.requestedBy !== 'player'
       : worker.role !== 'remote' && task.intent.args.technicianId !== worker.id) || !['player', worker.id].includes(task.requestedBy) || task.workSeconds !== workSeconds(state, pub.action) || JSON.stringify(task.resources) !== JSON.stringify(taskResources(task.intent))) throw new Error('Invalid checkpoint task qualification or duration.');
     const asset = state.scenario.topology.assets.find(a => a.id === pub.targetId);
     const endpoint = task.intent.action === 'move_crew' ? task.intent.args.destination : asset?.serviceTile;
-    if (worker.role !== 'remote' && (!endpoint || !isWalkablePath(state.scenario, pub.path, endpoint))) throw new Error('Invalid checkpoint task path.');
-    if (worker.role === 'remote' && (pub.path.length || task.distanceMeters !== 0 || task.traveledMeters !== 0 || pub.arrivalAt !== pub.startedAt)) throw new Error('Invalid checkpoint remote travel.');
-    if (worker.role !== 'remote' && (Math.abs(pathMeters(state.scenario, pub.path) - task.distanceMeters) > 1e-8 || pub.arrivalAt !== pub.startedAt + Math.ceil(task.distanceMeters / worker.speed))) throw new Error('Invalid checkpoint travel timing.');
+    const physical = worker.role !== 'remote' || moving;
+    if (physical && (!endpoint || !isWalkablePath(state.scenario, pub.path, endpoint))) throw new Error('Invalid checkpoint task path.');
+    if (!physical && (pub.path.length || task.distanceMeters !== 0 || task.traveledMeters !== 0 || pub.arrivalAt !== pub.startedAt)) throw new Error('Invalid checkpoint remote travel.');
+    if (physical && (Math.abs(pathMeters(state.scenario, pub.path) - task.distanceMeters) > 1e-8 || pub.arrivalAt !== pub.startedAt + Math.ceil(task.distanceMeters / worker.speed))) throw new Error('Invalid checkpoint travel timing.');
     if (pub.status === 'completed' && (pub.completesAt > at || pub.progress !== 1 || Math.abs(task.traveledMeters - task.distanceMeters) > 1e-8)) throw new Error('Invalid checkpoint completed task timing or progress.');
     if (active(task)) {
       if (!['active', 'practice'].includes(state.mission.status) || workers.has(worker.id) || worker.taskId !== pub.id || pub.completesAt <= at) throw new Error('Invalid checkpoint worker reservation.');
@@ -100,12 +101,23 @@ function validateRestoredState(state: EngineState, at: number) {
         if (!(resource in state.entityVersions) || reservations[resource]) throw new Error('Invalid checkpoint resource reservation.');
         reservations[resource] = pub.id;
       }
-      if (worker.role !== 'remote') {
+      if (physical) {
         const expectedDistance = Math.min(task.distanceMeters, (at - pub.startedAt) * worker.speed);
         const expectedPosition = positionAlong(state.scenario, pub.path, expectedDistance);
         if (Math.abs(expectedDistance - task.traveledMeters) > 1e-8 || Math.abs(worker.x - expectedPosition.x) > 1e-8 || Math.abs(worker.y - expectedPosition.y) > 1e-8) throw new Error('Invalid checkpoint movement progress.');
       }
     }
+  }
+  for (const worker of state.crew.filter(c => c.role === 'remote')) {
+    let previous = { ...state.scenario.crew.find(c => c.id === worker.id)! };
+    for (const task of state.tasks.filter(t => t.technicianId === worker.id && t.intent.action === 'move_crew')) {
+      if (task.intent.action !== 'move_crew') continue;
+      const expectedPath = remoteMovementPath(state, previous, task.intent.args.destination);
+      if (!expectedPath || JSON.stringify(expectedPath) !== JSON.stringify(task.public.path)) throw new Error('Invalid checkpoint remote movement history.');
+      const position = positionAlong(state.scenario, task.public.path, task.traveledMeters);
+      previous = { ...previous, ...position };
+    }
+    if (Math.abs(worker.x - previous.x) > 1e-8 || Math.abs(worker.y - previous.y) > 1e-8) throw new Error('Invalid checkpoint remote position history.');
   }
   const sorted = (record: Record<string, string>) => JSON.stringify(Object.entries(record).sort());
   if (sorted(reservations) !== sorted(state.reservations) || state.crew.some(c => c.taskId !== null && !workers.has(c.id))) throw new Error('Invalid checkpoint reservations.');

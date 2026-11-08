@@ -6,6 +6,14 @@ const vectors: Record<Direction, Point> = { n: { x: 0, y: -1 }, e: { x: 1, y: 0 
 export const pointKey = (p: Point) => `${p.x},${p.y}`;
 export const terminal = (view: KnowledgeView) => ['success', 'failure'].includes(view.mission.status);
 
+export function onPublicFloor(position: Point, topology: Pick<Topology, 'walkable'>): boolean {
+  if (!Number.isFinite(position.x) || !Number.isFinite(position.y)) return false;
+  const { x, y } = position;
+  if (!Number.isInteger(x) && !Number.isInteger(y)) return false;
+  const has = (px: number, py: number) => topology.walkable.some(p => p.x === px && p.y === py);
+  return has(Math.floor(x), Math.floor(y)) && has(Math.ceil(x), Math.ceil(y));
+}
+
 export function fitWorld(width: number, height: number) {
   const scale = Math.max(1, Math.floor(Math.min(width / 320, height / 192)));
   return { scale, width: scale * 320, height: scale * 192 };

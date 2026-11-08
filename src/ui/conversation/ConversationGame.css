@@ -27,10 +27,13 @@
 .conv-notification[data-level=info] { border-color:var(--conv-cyan); background:#102c39; }
 .conv-map { position:relative; display:flex; flex-direction:column; min-height:0; flex:1; }
 .conv-stage { position:relative; display:flex; flex:1; min-height:0; align-items:center; justify-content:center; }
+.conv-stage > .facility-map { flex: 1; }
+.conv-demo-notice { margin: 4px 12px; color: #f4b860; font-size: 14px; line-height: 1.2; }
 .conv-canvas { flex:none; position:relative; }
 .conv-canvas canvas { display:block; width:100%!important; height:100%!important; image-rendering:pixelated; }
 .conv-map-name { position:absolute; transform:translate(-50%,-100%); pointer-events:none; background:#050c20; color:var(--conv-cyan); font:600 16px/1.2 'Pixelify Sans',sans-serif; padding:1px 3px; }
 .conv-map-caption { margin:4px 12px 0; font-size:16px; display:flex; gap:8px; flex:none; }
+.conv-map-caption[data-demo="true"] { display: flex; }
 .conv-map-caption label { display:flex; align-items:center; gap:8px; }
 .conv-map-caption select { padding:3px 8px; min-height:30px; }
 .conv-map-crew { margin:8px 12px; display:flex; gap:8px; flex:none; }

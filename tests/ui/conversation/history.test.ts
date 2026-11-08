@@ -24,6 +24,10 @@ describe('whole conversation history', () => {
     const text = 'I can check the controls.';
     expect(entryPresentation({ kind: 'live', text, sections: [{ id: 'wire', label: 'Provenance', text: 'Retained exact metadata' }] })).toEqual({ text, reader: false });
   });
+  it('shows the complete allowed model prose budget inline', () => {
+    const text = `${'A'.repeat(180)}\n${'B'.repeat(100)}`;
+    expect(entryPresentation({ kind: 'live', text })).toEqual({ text, reader: false });
+  });
   it('keeps newline-heavy unexpected replies accessible without overflowing the measured window', () => {
     const text = 'One line.\n'.repeat(20);
     expect(entryPresentation({ kind: 'live', text }, true)).toEqual({ reader: false, text: 'A detailed reply is saved in Menu → History.' });

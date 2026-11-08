@@ -7,7 +7,7 @@ import { ConversationMenu } from './ui/conversation-menu';
 import { savedConversations } from './ui/conversation/recorded-history';
 import { reportSections } from './ui/conversation/report-findings';
 import { fallbackCopy } from './ui/conversation/fallback-copy';
-import { CONVERSATION_PROMPT_VERSION } from './llm/conversation-mode';
+import { CONVERSATION_PROMPT_VERSION, usesMovementConversation } from './llm/conversation-mode';
 import { formatObservationFact, formatConversationReply } from './ui/presentation';
 import { directOrderAuthorizationIds } from './llm/natural-conversation';
 import { radioCitations, radioProvenance, radioReceipts, radioReport } from './ui/desktop-copy';
@@ -29,7 +29,7 @@ const ended = (view: KnowledgeView) => ['success', 'failure'].includes(view.miss
 const coolingAlert = (view: KnowledgeView) => latestObservations(view.observations).some(o => o.field === 'running' && o.value === false && o.quality !== 'unknown' && o.observedAt <= view.simTime && o.receivedAt <= view.simTime && view.simTime - o.observedAt <= 10 && view.knownTopology.assets.some(a => a.id === o.assetId && a.kind === 'cooling'));
 const criticalAlert = (view: KnowledgeView) => view.summary.criticalServedFraction !== null && view.summary.criticalServedFraction < 1 && view.summary.observedAt <= view.simTime && view.simTime - view.summary.observedAt <= 10;
 const person = (actorId: string) => conversationPeople.find(actor => actor.actorId === actorId);
-const labelAction = (intent: ActionIntent) => intent.action === 'inspect' ? intent.targetId === 'controller' ? 'Check cooling controls' : intent.args.technicianId === 'jules' ? 'Check power equipment' : 'Check equipment' : intent.action === 'repair_cooling' ? 'Repair the controls' : intent.action === 'pause_batch' ? 'Pause background jobs' : intent.action === 'set_batch_ceiling' || intent.action === 'resume_batch' ? 'Resume background jobs' : intent.action === 'verify_recovery' ? 'Check recovery' : words(intent.action);
+const labelAction = (intent: ActionIntent) => intent.action === 'move_crew' ? 'Walk to destination' : intent.action === 'inspect' ? intent.targetId === 'controller' ? 'Check cooling controls' : intent.args.technicianId === 'jules' ? 'Check power equipment' : 'Check equipment' : intent.action === 'repair_cooling' ? 'Repair the controls' : intent.action === 'pause_batch' ? 'Pause background jobs' : intent.action === 'set_batch_ceiling' || intent.action === 'resume_batch' ? 'Resume background jobs' : intent.action === 'verify_recovery' ? 'Check recovery' : words(intent.action);
 type RadioJob = { controller: AbortController; promise: Promise<CoworkerResult> };
 
 
@@ -134,7 +134,7 @@ export default function App() {
 
   async function applyOrder(originActor: string, intent: ActionIntent, authority?: { requestId: string; idempotencyKey: string; expectedEntityVersions: Record<string, number> }) {
     const client = simulation.current, current = known.current;
-    if (!client || !current || !person(originActor) || replayActive || transitioning.current || hostPending.current || commandPending.current || !['active', 'practice'].includes(current.mission.status) || intent.action === 'move_crew') return null;
+    if (!client || !current || !person(originActor) || replayActive || transitioning.current || hostPending.current || commandPending.current || !['active', 'practice'].includes(current.mission.status) || intent.action === 'move_crew' && (!authority || intent.targetId !== originActor)) return null;
     const sound = gameAudio.current, soundTicket = sound?.capture(); void sound?.audio.unlock();
     const token = generation.current; commandPending.current = true; setBusy(true); setError('');
     try {
@@ -142,7 +142,7 @@ export default function App() {
       if (token !== generation.current) return null;
       await client.observe('player'); if (token !== generation.current) return null;
       sound?.emit(receipt.status === 'rejected' ? 'order-rejected' : 'order-accepted', receipt.requestId, soundTicket);
-      append({ id: crypto.randomUUID(), actorId: originActor, at: receipt.observedAt, kind: 'order', text: receipt.status === 'rejected' ? `That order could not start: ${words(receipt.reason)}.` : receipt.status === 'applied' && intent.action === 'cancel_task' ? 'Current task stopped.' : `${labelAction(intent)} accepted. ${person(originActor)!.name} will report back.`, unread: false, summary: `${labelAction(intent)} ${receipt.status === 'rejected' ? 'could not start' : 'accepted'}.`, sections: [{ id: 'receipt', label: 'Order receipt', text: JSON.stringify(receipt, null, 2) }] }, receipt.evidenceIds);
+      append({ id: crypto.randomUUID(), actorId: originActor, at: receipt.observedAt, kind: 'order', text: receipt.status === 'rejected' ? `That order could not start: ${words(receipt.reason)}.` : receipt.status === 'applied' && intent.action === 'cancel_task' ? 'Current task stopped.' : intent.action === 'move_crew' ? receipt.eta !== null && receipt.eta <= receipt.observedAt ? `${person(originActor)!.name} is already at that location.` : `${person(originActor)!.name} is walking to the destination.` : `${labelAction(intent)} accepted. ${person(originActor)!.name} will report back.`, unread: false, summary: `${labelAction(intent)} ${receipt.status === 'rejected' ? 'could not start' : 'accepted'}.`, sections: [{ id: 'receipt', label: 'Order receipt', text: JSON.stringify(receipt, null, 2) }] }, receipt.evidenceIds);
       return receipt;
     } catch { if (token === generation.current) setError('Could not confirm the order. Check the current assignment before retrying.'); return null; }
     finally { if (token === generation.current) { commandPending.current = false; setBusy(false); settleHostWaiters(); flushPendingSave(); flushDeferredMenuCapture(); } }
@@ -179,11 +179,11 @@ export default function App() {
       const result = await job; recorder.capture(result.recording);
       if (token !== generation.current || controller.signal.aborted) return;
       const allowed = result.authorizations.filter(authorization => authorization.actorId === originActor && authorization.runId === current.runId && authorizationMatchesOrigin(authorization, result.recording));
-      for (const authorization of allowed) proposals.current!.register(authorization);
+      for (const authorization of allowed) proposals.current!.register(authorization, { allowMovement: usesMovementConversation(result.start) });
       sound?.emit('message-received', requestId, soundTicket);
       const answer = result.reply.kind === 'final' ? result.reply.response : null;
       const facts = answer?.facts.flatMap(fact => { if (!('observationId' in fact)) return []; const reading = result.view.observations.find(observation => observation.id === fact.observationId); return reading ? [formatObservationFact(reading, fact.field)] : []; }) ?? [];
-      const text = answer ? (result.start.interactionMode === 'conversation' ? formatConversationReply(answer, result.view) : [...facts, answer.inference, answer.uncertainty].filter(Boolean).join('\n')) || 'I’ve included the available readings in History.' : fallbackCopy(result.reply.kind === 'fallback' ? result.reply.reason : 'unavailable');
+      const text = answer ? (result.start.interactionMode === 'conversation' ? formatConversationReply(answer, result.view, usesMovementConversation(result.start)) : [...facts, answer.inference, answer.uncertainty].filter(Boolean).join('\n')) || 'I’ve included the available readings in History.' : fallbackCopy(result.reply.kind === 'fallback' ? result.reply.reason : 'unavailable');
       append({ id: crypto.randomUUID(), actorId: originActor, at: known.current?.simTime ?? current.simTime, kind: answer ? 'live' : 'fallback', text, summary: text.length <= 260 ? text : `${person(originActor)!.name} sent a detailed reply.`, unread: true, exchangeId: result.start.requestId, proposals: allowed.map(authorization => ({ id: authorization.id, label: labelAction(authorization.intent), assignedName: person(authorization.intent.args.technicianId ?? (['pause_batch', 'resume_batch', 'set_batch_ceiling', 'verify_recovery'].includes(authorization.intent.action) ? 'sam' : originActor))?.name ?? person(originActor)!.name, status: 'ready' })), sections: [{ id: 'reply', label: 'Facts and reply', text: radioReport(result) }, { id: 'citations', label: 'Evidence', text: radioCitations(result) }, { id: 'receipts', label: 'Tool receipts', text: radioReceipts(result) }, { id: 'provenance', label: 'Provenance', text: radioProvenance(result) }] }, answer?.facts.flatMap(fact => 'observationId' in fact ? [fact.observationId] : []) ?? []);
       if (answer && result.start.interactionMode === 'conversation') for (const id of directOrderAuthorizationIds(answer, allowed)) {
         if (token !== generation.current || controller.signal.aborted) break;

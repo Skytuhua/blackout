@@ -11,13 +11,15 @@ test('an actual delivered inspection gets the complete natural reply, with raw e
   engine.step(receipt.eta! + 2 - 10);
   const source = new HostArchive('natural-report-browser').build(engine.exportRecord());
   const prose = "That check is finished. Cooling didn't meet a required start condition.", doubt = "The report doesn't tell us which part caused it.";
+  const capturedProse = 'My controller inspection reported the prerequisite was not ready. The latest site dashboard reports full critical and interactive service, no batch backlog, and no active overload.';
+  const capturedDoubt = 'The controller report is from time 51; the site dashboard readings are from time 65.';
   let calls = 0;
   await page.route('**/api/llm/turn', async route => {
     calls++; const wire = route.request().postDataJSON() as GatewayStart;
-    expect(wire.interactionMode).toBe('conversation'); expect(wire.promptVersion).toBe('coworker-v3');
+    expect(wire.interactionMode).toBe('conversation'); expect(wire.promptVersion).toBe('coworker-v4');
     const evidence = wire.view.observations.filter(o => o.assetId === 'controller' && ['inspection_complete', 'prerequisite_ready'].includes(o.field));
     expect(evidence).toHaveLength(2);
-    await route.fulfill({ json: { kind: 'final', runId: wire.runId, requestId: wire.requestId, actorId: wire.actorId, response: { runId: wire.runId, requestId: wire.requestId, actorId: wire.actorId, speaker: wire.actorId, mode: 'live', requestKind: 'question', facts: evidence.flatMap(o => [{ observationId: o.id, field: 'value' }, { observationId: o.id, field: 'assetId' }]), inference: prose, uncertainty: doubt, proposals: [] } } });
+    await route.fulfill({ json: { kind: 'final', runId: wire.runId, requestId: wire.requestId, actorId: wire.actorId, response: { runId: wire.runId, requestId: wire.requestId, actorId: wire.actorId, speaker: wire.actorId, mode: 'live', requestKind: 'question', facts: calls === 1 ? evidence.flatMap(o => [{ observationId: o.id, field: 'value' }, { observationId: o.id, field: 'assetId' }]) : wire.view.observations.slice(0, 9).map(o => ({ observationId: o.id, field: 'value' })), inference: calls === 1 ? prose : capturedProse, uncertainty: calls === 1 ? doubt : capturedDoubt, proposals: [] } } });
   });
   await page.goto('/');
   await page.evaluate(async serialized => {
@@ -38,6 +40,14 @@ test('an actual delivered inspection gets the complete natural reply, with raw e
   expect(await entry.innerText()).not.toMatch(/prerequisite ready|inspection complete:|asset:|true|false/);
   await expect(page.getByRole('button', { name: 'Read full message', exact: true })).toHaveCount(0);
   expect(calls).toBe(1);
+  await page.getByRole('combobox', { name: 'Equipment context', exact: true }).selectOption('rack-2');
+  await page.getByRole('textbox', { name: 'Message Alex', exact: true }).fill('what do you see?');
+  await page.getByRole('button', { name: 'Send to Alex', exact: true }).click();
+  await expect(page.locator('.conv-history-window > article.conv-entry-live')).toHaveCount(2);
+  await expect(page.locator('.conv-history-window > article.conv-entry-live').last()).toContainText(capturedProse);
+  await expect(page.locator('.conv-history-window > article.conv-entry-live').last()).toContainText(capturedDoubt);
+  await expect(page.locator('.conv-history-window > article.conv-entry-fallback')).toHaveCount(0);
+  expect(calls).toBe(2);
   await page.getByRole('button', { name: 'Menu', exact: true }).click(); await page.getByRole('button', { name: 'Save game', exact: true }).click();
   await expect(page.getByRole('dialog')).toContainText('Mission saved locally');
 });
