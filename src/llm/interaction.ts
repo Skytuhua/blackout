@@ -2,7 +2,7 @@ import type { GatewayInput, GatewayResponse, GatewayStart, KnowledgeView, Public
 import type { SimulationClient } from '../workers/SimulationClient';
 import { procedures } from '../content/procedures';
 import { scopeKnowledge } from './context';
-import { cancelInteraction, continueInteraction, startInteraction, providerCallFor } from './client';
+import { cancelInteraction, continueInteraction, startInteraction, providerCallFor, type GatewayWireObserver } from './client';
 import { executeToolIntent, type ScopedContext } from './tools';
 import type { ProviderCall } from './diagnostics';
 
@@ -28,11 +28,13 @@ export async function runCoworker(input: CoworkerRequest): Promise<CoworkerResul
     const recording: RecordedInteraction | null = turns.length ? structuredClone({ turns, end: { atSimTime, reason: input.signal.aborted ? 'canceled' : reply.kind === 'final' ? 'final' : 'fallback', reply, durationMs } }) : null;
     return { start: context.start, targetId: input.targetId, view, reply, tools, intents, calls, durationMs, recording };
   };
-  const receive = async (wire: GatewayInput, send: () => Promise<GatewayResponse>) => {
-    const turn: RecordedInteraction['turns'][number] = { atSimTime: wire.view.simTime, input: structuredClone(wire), reply: null, call: null, toolResult: null };
-    turns.push(turn);
-    const reply = await send();
-    turn.reply = structuredClone(reply); turn.call = providerCallFor(reply) ?? null;
+  const receive = async (send: (onWire: GatewayWireObserver) => Promise<GatewayResponse>) => {
+    const capture: { turn?: RecordedInteraction['turns'][number] } = {};
+    const reply = await send(wire => {
+      capture.turn = { atSimTime: wire.view.simTime, input: structuredClone(wire), reply: null, call: null, toolResult: null };
+      turns.push(capture.turn);
+    });
+    if (capture.turn) { capture.turn.reply = structuredClone(reply); capture.turn.call = providerCallFor(reply) ?? null; }
     return reply;
   };
   const cancel = () => cancelInteraction(start);
@@ -40,7 +42,7 @@ export async function runCoworker(input: CoworkerRequest): Promise<CoworkerResul
   let complete = false;
   try {
     if (input.signal.aborted) return finish(fallback('canceled'));
-    let reply = await receive(start, () => startInteraction(start, input.signal));
+    let reply = await receive(onWire => startInteraction(start, input.signal, onWire));
     for (let round = 0; round < 3; round++) {
       const call = providerCallFor(reply); if (call && !calls.some(known => known.receiptId === call.receiptId)) calls.push(call);
       if (input.signal.aborted) return finish(fallback('canceled'));
@@ -60,7 +62,7 @@ export async function runCoworker(input: CoworkerRequest): Promise<CoworkerResul
       if (view.runId !== input.runId || view.actorId !== input.actorId) return finish(fallback('stale_run'));
       context.start = { ...start, view: scopeKnowledge(view, [...targets], [...evidenceIds]) };
       const continuation: GatewayInput = { kind: 'continue', runId: start.runId, requestId: start.requestId, actorId: start.actorId, interactionId: intent.interactionId, expectedCallId: intent.callId, result, view: context.start.view };
-      reply = await receive(continuation, () => continueInteraction(continuation, input.signal));
+      reply = await receive(onWire => continueInteraction(continuation, input.signal, onWire));
     }
     return finish(fallback('interaction_quota'));
   } catch { return finish(fallback(input.signal.aborted ? 'canceled' : 'worker_unavailable')); }

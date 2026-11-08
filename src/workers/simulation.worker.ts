@@ -22,7 +22,7 @@ self.onmessage = (event: MessageEvent<unknown>) => {
     } else if (request.kind === 'observe') {
       reply = { kind: 'view', ...identity, view: engine.observe(request.actorId) };
     } else if (request.kind === 'advance') {
-      if (engine.observe('player').mission.status === 'active') {
+      if (['active', 'practice'].includes(engine.observe('player').mission.status)) {
         for (let tick = 0; tick < request.ticks; tick++) {
           const result = engine.step(1);
           // Recorder/replay can continue physical accounting; interactive time stops exactly here.

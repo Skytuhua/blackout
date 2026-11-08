@@ -30,7 +30,7 @@ it('runs the real engine and publishes a command reservation without advancing p
   const reply = send({ kind: 'command', runId: current.runId, request: { schemaVersion: 1, runId: current.runId, requestId: 'inspect', actorId: 'player', idempotencyKey: 'inspect', expectedEntityVersions: current.observedEntityVersions, intent: { action: 'inspect', targetId: 'cooling-1', atSimTime: current.simTime, args: { technicianId: 'alex' } } } } as WorkerRequest);
   expect(reply.kind === 'receipt' && reply.receipt.status).toBe('accepted');
   expect(view()).toMatchObject({ simTime: 10, tasks: [expect.objectContaining({ action: 'inspect', status: 'traveling' })] });
-  expect(send({ kind: 'record', runId: 'worker-run' } as WorkerRequest)).toMatchObject({ kind: 'record', record: { engineVersion: 'sim-02-v1' } });
+  expect(send({ kind: 'record', runId: 'worker-run' } as WorkerRequest)).toMatchObject({ kind: 'record', record: { engineVersion: 'sim-desktop-v2' } });
 });
 
 it('stops interactive advancement at the first terminal tick and keeps recorder state available', () => {

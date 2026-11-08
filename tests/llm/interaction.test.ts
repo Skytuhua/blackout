@@ -44,6 +44,21 @@ it('retains an accepted command acknowledgement when cancellation wins before co
   expect(validateSavedRun({ ...engine.exportRecord(), schemaVersion: 2, lineage: [], interactions: [result.recording] }).interactions).toHaveLength(1);
 });
 
+it('records the post-projection wire after two tools and an intervening sensor update', async () => {
+  const { engine, input } = setup(); const wire: GatewayInput[] = [];
+  vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
+    if (url.endsWith('/cancel')) return new Response('{}');
+    const request = JSON.parse(String(init.body)); wire.push(request);
+    const read = tool(request, `record-${wire.length}`, false);
+    if (wire.length === 2 && read.kind === 'tool_request') return new Response(JSON.stringify({ ...read, intent: { ...read.intent, tool: 'read_procedure', targetId: 'hot-restart-v1' } }));
+    return new Response(JSON.stringify(wire.length === 1 ? read : final(request)));
+  });
+  const result = await runCoworker({ ...input, onTool: async () => { if (wire.length === 1) engine.step(5); } });
+  expect(wire).toHaveLength(3);
+  expect(result.recording?.turns.map(turn => turn.input.view.viewHash)).toEqual(wire.map(turn => turn.view.viewHash));
+  expect(result.recording?.turns.every((turn, index) => JSON.stringify(turn.input) === JSON.stringify(wire[index]))).toBe(true);
+});
+
 it('completes a real engine inspection through gateway continuation without advancing paused time', async () => {
   const { engine, input } = setup(); const requests: GatewayInput[] = [];
   vi.stubGlobal('fetch', async (_url: string, init: RequestInit) => {

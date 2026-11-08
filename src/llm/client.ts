@@ -9,6 +9,7 @@ const evidence = new WeakMap<Lifecycle, Map<string, Observation>>();
 const providerCalls = new WeakMap<GatewayResponse, ProviderCall>();
 export const providerCallFor = (reply: GatewayResponse) => { const call = providerCalls.get(reply); return call && { ...call }; };
 type Identity = Pick<GatewayStart, 'runId' | 'requestId' | 'actorId'>;
+export type GatewayWireObserver = (input: GatewayInput) => void;
 const key = (input: Identity) => JSON.stringify([input.runId, input.requestId, input.actorId]);
 const fallback = (input: GatewayInput, reason: string): GatewayResponse => ({ kind: 'fallback', runId: input.runId, requestId: input.requestId, actorId: input.actorId, mode: 'scripted', reason, message: 'Scripted fallback: use permitted observations and procedures.', facts: [] });
 export function cancelInteraction(input: Identity) {
@@ -17,7 +18,7 @@ export function cancelInteraction(input: Identity) {
   context.lifecycle.closed = true;
   void fetch('/api/llm/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ runId: input.runId, requestId: input.requestId, actorId: input.actorId }), keepalive: true }).catch(() => {});
 }
-async function turn(input: GatewayInput, context: GatewayStart, lifecycle: Lifecycle, signal?: AbortSignal): Promise<GatewayResponse> {
+async function turn(input: GatewayInput, context: GatewayStart, lifecycle: Lifecycle, signal?: AbortSignal, onWire?: GatewayWireObserver): Promise<GatewayResponse> {
   if (signal && signal !== lifecycle.signal) lifecycle.signal = lifecycle.signal ? AbortSignal.any([lifecycle.signal, signal]) : signal;
   const effectiveSignal = lifecycle.signal;
   const cancel = () => cancelInteraction(input);
@@ -32,7 +33,9 @@ async function turn(input: GatewayInput, context: GatewayStart, lifecycle: Lifec
     let seen = evidence.get(lifecycle);
     if (!seen) { seen = new Map(); evidence.set(lifecycle, seen); }
     for (const observation of wire.view.observations) seen.set(observation.id, observation);
-    const response = await fetch('/api/llm/turn', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(wire), signal: effectiveSignal });
+    const body = JSON.stringify(wire);
+    onWire?.(JSON.parse(body) as GatewayInput);
+    const response = await fetch('/api/llm/turn', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal: effectiveSignal });
     const remaining = response.headers.get('X-Blackout-Deadline-Ms');
     if (remaining !== null) {
       if (!/^\d{1,5}$/.test(remaining) || Number(remaining) > 20000) return fallback(input, 'invalid_deadline');
@@ -62,13 +65,13 @@ async function turn(input: GatewayInput, context: GatewayStart, lifecycle: Lifec
   } catch { return fallback(input, effectiveSignal?.aborted ? 'canceled' : 'gateway_unavailable'); }
   finally { if (!toolPending) lifecycle.closed = true; effectiveSignal?.removeEventListener('abort', cancel); }
 }
-export async function startInteraction(input: GatewayStart, signal?: AbortSignal): Promise<GatewayResponse> {
+export async function startInteraction(input: GatewayStart, signal?: AbortSignal, onWire?: GatewayWireObserver): Promise<GatewayResponse> {
   if (!GatewayStartSchema.safeParse(input).success || !validStart(input)) return fallback(input, 'invalid_scope');
   const existing = contexts.get(key(input));
   if (existing) {
     if (JSON.stringify(existing.start) !== JSON.stringify(input)) return fallback(input, 'duplicate_or_busy');
     bindLifecycle(input, existing.lifecycle);
-    return turn(input, input, existing.lifecycle, signal);
+    return turn(input, input, existing.lifecycle, signal, onWire);
   }
   if (contexts.size >= 128) {
     const terminal = [...contexts].find(([, value]) => expired(value.lifecycle));
@@ -76,13 +79,13 @@ export async function startInteraction(input: GatewayStart, signal?: AbortSignal
     contexts.delete(terminal[0]);
   }
   const lifecycle = lifecycleFor(input); lifecycle.signal = signal;
-  contexts.set(key(input), { start: input, lifecycle }); return turn(input, input, lifecycle, signal);
+  contexts.set(key(input), { start: input, lifecycle }); return turn(input, input, lifecycle, signal, onWire);
 }
-export async function continueInteraction(input: GatewayContinue, signal?: AbortSignal): Promise<GatewayResponse> {
+export async function continueInteraction(input: GatewayContinue, signal?: AbortSignal, onWire?: GatewayWireObserver): Promise<GatewayResponse> {
   const entry = contexts.get(key(input));
   if (!entry || !GatewayContinueSchema.safeParse(input).success || input.view.runId !== input.runId || input.view.actorId !== input.actorId) return fallback(input, 'invalid_interaction');
   if (expired(entry.lifecycle)) return fallback(input, 'canceled_or_expired');
-  return turn(input, { ...entry.start, view: input.view }, entry.lifecycle, signal);
+  return turn(input, { ...entry.start, view: input.view }, entry.lifecycle, signal, onWire);
 }
 export { executeToolIntent } from './tools';
 export { renderFacts } from './validation';

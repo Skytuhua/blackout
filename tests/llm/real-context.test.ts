@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { initialize } from '../../src/sim/engine';
 import { hotRestart } from '../../src/content/scenarios/hot-restart';
+import { successfulPolicy } from '../sim/mission-policy';
 import { procedures } from '../../src/content/procedures';
 import type { GatewayStart, ToolIntent } from '../../src/shared/contracts';
 import { startInteraction, continueInteraction } from '../../src/llm/client';
@@ -77,16 +78,9 @@ it('scope preserves source freshness and selected evidence without mutating engi
 it.each([[75, false], [331, false], [75, true]] as const)('real mission t%s completes bounded calls with newer sensor readings: %s', async (at, advanceSensors) => {
   const engine = initialize(hotRestart, `real-context-${at}`);
   if (at === 331) {
-    // Reuse the recorded successful command schedule; policy decisions have separate simulation coverage.
-    for (const [time, action, target, args] of [
-      [10, 'pause_batch', 'site', {}], [10, 'inspect', 'controller', { technicianId: 'alex' }],
-      [43, 'repair_cooling', 'controller', { technicianId: 'alex' }], [163, 'independent_reading', 'rack-1', { technicianId: 'alex' }],
-      [255, 'set_batch_ceiling', 'site', { ceiling: 30 }], [319, 'verify_recovery', 'site', {}],
-    ] as const) {
-      engine.step(time - engine.observe('player').simTime);
-      expect(engine.applyCommand(actionRequest(engine, action, target, args)).status).toBe('accepted');
-    }
-    engine.step(12); expect(engine.observe('player').mission.status).toBe('success');
+    // Exercise the real terminal history without coupling gateway limits to the old floor plan's ETAs.
+    successfulPolicy(engine);
+    expect(engine.observe('player').mission.status).toBe('success');
   } else engine.step(at);
   const input: GatewayStart = { ...missionStart(), runId: `real-context-${at}`, view: scopeKnowledge(engine.observe('alex'), ['cooling-1']) };
   const factId = input.view.observations.find(o => o.assetId === 'cooling-1')!.id;

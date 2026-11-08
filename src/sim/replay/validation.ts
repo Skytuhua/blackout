@@ -12,7 +12,7 @@ export class ReplayDataError extends Error {
 function version(input: unknown) {
   if (input && typeof input === 'object') {
     const v = input as Record<string, unknown>;
-    if (v.schemaVersion !== undefined && v.schemaVersion !== 1 || typeof v.engineVersion === 'string' && v.engineVersion !== ENGINE_VERSION) throw new ReplayDataError('VERSION_MISMATCH', 'Requires schema 1 / sim-02-v1.');
+    if (v.schemaVersion !== undefined && v.schemaVersion !== 1 || typeof v.engineVersion === 'string' && v.engineVersion !== ENGINE_VERSION) throw new ReplayDataError('VERSION_MISMATCH', `Requires schema 1 / ${ENGINE_VERSION}.`);
   }
 }
 
