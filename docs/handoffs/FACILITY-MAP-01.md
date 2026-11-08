@@ -107,3 +107,9 @@ The independent review of `f48c3f0` found labels overlapping in simulated 640 x 
 The production fixture passed 24 browser checks, including the original 72 desktop views and five host-constrained label cases, plus the reserved-sidebar fixture. The focused 12 map tests and typecheck passed. These use synthetic dimensions and data; real host layout and new-engine integration still require verification. Full suite and independent review of this correction are pending.
 
 Full suite at `d7cd20f` completed with 354/355 passing; one unrelated LLM retention test hit its 5-second timeout under concurrent load. Immediately rerunning `tests/llm/corrections.test.ts` by itself passed 11/11. No timeout or LLM code was changed. Independent host-label re-review remains pending.
+
+## Measured map-label placement
+
+Independent re-review found that the first width-to-font cutoff still allowed collisions at other host sizes and with longer names. The map now checks actual rendered label rectangles after layout, places non-overlapping labels in order, and hides labels that collide or extend beyond the map. Room and equipment controls remain the accessible fallback. Placement is recomputed on render, resize-driven layout and font loading.
+
+The long-name browser regression was observed failing before the change. The rebuilt production fixture passed 27 checks, including the reviewed host cases, a long-name collision case, navigation fallback and the previous 72 desktop layouts. The 12 focused map tests and typecheck passed. These remain synthetic fixture checks; actual integrated host and mission acceptance are pending.
