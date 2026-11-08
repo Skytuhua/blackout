@@ -6,6 +6,13 @@ import { request } from '../sim/mission-policy';
 import { recordedRun } from './fixtures';
 
 describe('frozen engine saved records', () => {
+  it('accepts engine records whose optional command arguments were explicitly undefined', () => {
+    const engine = initialize(hotRestart, 'optional-args');
+    engine.applyCommand(request(engine, 'pause_batch', 'site', { technicianId: undefined, ceiling: undefined }));
+    engine.step(5);
+    expect(replay.validateRunRecord(engine.exportRecord()).runId).toBe('optional-args');
+    expect(replay.verifyReplay(engine.exportRecord(), 'optional-replay').matches).toBe(true);
+  });
   it('validates engine, content, identity, histories and actual restore structure', () => {
     const record = recordedRun();
     expect(replay.validateRunRecord(record)).toEqual(record);

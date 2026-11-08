@@ -3,7 +3,7 @@ import * as replay from '../../src/sim/replay';
 import { ComparisonResultSchema } from '../../src/shared/schemas';
 import { initialize } from '../../src/sim/engine';
 import { hotRestart } from '../../src/content/scenarios/hot-restart';
-import { successfulPolicy } from '../sim/mission-policy';
+import { request, successfulPolicy } from '../sim/mission-policy';
 import { recordedRun } from './fixtures';
 
 it('moves one existing cap, removes its old instance and conserves equal-horizon batch accounting', () => {
@@ -41,6 +41,52 @@ it('stops at the exact first invalid retained action with equal-prefix ledgers o
   expect(result).not.toHaveProperty('alternative');
 });
 
+it('remaps a retained cancel to the moved task and reports its changed physical completion', () => {
+  const engine = initialize(hotRestart, 'cancel-baseline'); engine.step(20);
+  const cap = engine.applyCommand(request(engine, 'pause_batch', 'site')); engine.step(1);
+  engine.applyCommand(request(engine, 'cancel_task', 'site', { taskId: cap.taskId! })); engine.step(79);
+  const record = engine.exportRecord();
+  const result = replay.compareEarlierCap(record, { commandSequence: record.commands[0].sequence, earlierAt: 5, branchRunId: 'cancel-alternative' });
+  expect(result.status).toBe('unsupported');
+  if (result.status !== 'unsupported') throw new Error('Moved cap should already have completed');
+  expect(result.reason).toBe('TASK_NOT_ACTIVE');
+  expect(result.firstInvalidAction).toEqual(record.commands[1]);
+  expect(result.supportedHorizon).toBe(21);
+});
+
+it('keeps earlier same-boundary accepted commands in both unsupported prefix timelines', () => {
+  const engine = initialize(hotRestart, 'same-tick'); engine.step(10);
+  engine.applyCommand(request(engine, 'inspect', 'controller', { technicianId: 'alex' }));
+  engine.applyCommand(request(engine, 'verify_recovery', 'site')); engine.step(10);
+  engine.applyCommand(request(engine, 'pause_batch', 'site')); engine.step(80);
+  const record = engine.exportRecord();
+  const result = replay.compareEarlierCap(record, { commandSequence: record.commands[2].sequence, earlierAt: 9, branchRunId: 'same-tick-alt' });
+  expect(result.status).toBe('unsupported');
+  if (result.status !== 'unsupported') throw new Error('Expected remote worker conflict');
+  for (const ledger of [result.validPrefix.baseline, result.validPrefix.alternative]) {
+    expect(ledger.timeline.some(e => e.type === 'task.reserved' && e.simTime === 10 && e.payload.action === 'inspect')).toBe(true);
+  }
+});
+
+it('retains terminal-state validation when earlier recovery invalidates a later accepted action', () => {
+  const engine = initialize(hotRestart, 'terminal-baseline'); successfulPolicy(engine, 290);
+  engine.applyCommand(request(engine, 'verify_recovery', 'site'));
+  engine.step(29);
+  engine.applyCommand(request(engine, 'verify_recovery', 'site'));
+  engine.step(12);
+  expect(engine.observe('player').mission.status).toBe('success');
+  const record = engine.exportRecord();
+  const cap = record.commands.find(c => c.intent.action === 'set_batch_ceiling')!;
+  const result = replay.compareEarlierCap(record, { commandSequence: cap.sequence, earlierAt: 220, branchRunId: 'earlier-terminal' });
+  expect(result.status).toBe('unsupported');
+  if (result.status !== 'unsupported') throw new Error('Earlier successful terminal state must reject the later command');
+  expect(result.reason).toBe('MISSION_ENDED');
+  expect(result.firstInvalidAction).toEqual(record.commands.at(-1));
+  expect(result.supportedHorizon).toBe(319);
+  expect(result.validPrefix.alternative.timeline.some(e => e.type === 'mission.success' && e.simTime < 319)).toBe(true);
+  expect(result.validPrefix.alternative.horizon).toBe(319);
+}, 30000);
+
 it('uses real totals, peak and protection events through a terminal physical continuation', () => {
   const engine = initialize(hotRestart, 'idle'); engine.step(600);
   const record = engine.exportRecord();
@@ -51,6 +97,7 @@ it('uses real totals, peak and protection events through a terminal physical con
   expect(ledger.batchArrivals).toBe(144000);
   expect(ledger.batchCompleted + ledger.batchBacklog).toBe(ledger.batchArrivals);
   expect(ledger.protectionEvents.filter(e => e.type === 'thermal_trip')).toHaveLength(8);
+  expect(ledger.protectionEvents.filter(e => e.type === 'thermal_throttle')).toHaveLength(8);
   expect(ledger.telemetry).toHaveLength(601);
   expect(ledger.peakTemperatureC).toBe(Math.max(...record.telemetry.map(t => t.hottestTemperatureC)));
   expect(replay.verifyReplay(record, 'idle-replay').matches).toBe(true);

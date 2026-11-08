@@ -1,0 +1,149 @@
+{
+  "base": "2cf2c351fec184268481bf3e364e3879b052ba8b",
+  "engineVersion": "sim-02-v1",
+  "contentVersion": "hot-restart-v1",
+  "verification": {
+    "matches": true,
+    "originalHash": "replay-v1-eaaed8d707d4f606",
+    "replayHash": "replay-v1-eaaed8d707d4f606",
+    "canonicalScope": "Full authoritative engine state, accepted domain commands and non-transport events; not just terminal ledgers",
+    "rejectedAttempts": 0
+  },
+  "checkpoints": {
+    "traveling": {
+      "at": 1,
+      "hash": "replay-v1-49eb54cc997dfe5f"
+    },
+    "pendingReport": {
+      "at": 43,
+      "hash": "replay-v1-25b3bdf0a91012b1"
+    }
+  },
+  "complete": {
+    "status": "complete",
+    "policy": "Earlier batch cap, with the same subsequent accepted commands and external disturbances.",
+    "schedule": "external-e52772830a618f47",
+    "baseline": {
+      "schemaVersion": 1,
+      "runId": "evidence-mission",
+      "engineVersion": "sim-02-v1",
+      "scenarioId": "hot-restart",
+      "horizon": 600,
+      "criticalDemand": 96000,
+      "criticalDelivered": 96000,
+      "interactiveDemand": 52800,
+      "interactiveDelivered": 52800,
+      "batchArrivals": 144000,
+      "batchCompleted": 85200,
+      "batchBacklog": 58800,
+      "batchDelayUnitSeconds": 27312600,
+      "peakTemperatureC": 28.61999999999974,
+      "conservationResidual": 0,
+      "protectionCount": 0,
+      "terminalEvents": [
+        {
+          "at": 331,
+          "type": "mission.success",
+          "reason": "RECOVERY_VERIFIED"
+        }
+      ],
+      "samples": 601
+    },
+    "alternative": {
+      "schemaVersion": 1,
+      "runId": "evidence-earlier",
+      "engineVersion": "sim-02-v1",
+      "scenarioId": "hot-restart",
+      "horizon": 600,
+      "criticalDemand": 96000,
+      "criticalDelivered": 96000,
+      "interactiveDemand": 52800,
+      "interactiveDelivered": 52800,
+      "batchArrivals": 144000,
+      "batchCompleted": 82800,
+      "batchBacklog": 61200,
+      "batchDelayUnitSeconds": 28733400,
+      "peakTemperatureC": 28.473098021860224,
+      "conservationResidual": 0,
+      "protectionCount": 0,
+      "terminalEvents": [
+        {
+          "at": 331,
+          "type": "mission.success",
+          "reason": "RECOVERY_VERIFIED"
+        }
+      ],
+      "samples": 601
+    }
+  },
+  "unsupported": {
+    "status": "unsupported",
+    "reason": "WORKER_BUSY",
+    "supportedHorizon": 10,
+    "offendingOriginalCommand": {
+      "at": 10,
+      "sequence": 18,
+      "intent": {
+        "action": "verify_recovery",
+        "targetId": "site",
+        "atSimTime": 10,
+        "args": {}
+      },
+      "actorId": "player",
+      "receipt": {
+        "schemaVersion": 1,
+        "runId": "original",
+        "requestId": "request-9",
+        "actorId": "player",
+        "status": "accepted",
+        "reason": "TASK_RESERVED",
+        "taskId": "task-18",
+        "eta": 20,
+        "evidenceIds": [],
+        "observedAt": 10
+      }
+    },
+    "baseline": {
+      "schemaVersion": 1,
+      "runId": "original",
+      "engineVersion": "sim-02-v1",
+      "scenarioId": "hot-restart",
+      "horizon": 10,
+      "criticalDemand": 1600,
+      "criticalDelivered": 1600,
+      "interactiveDemand": 800,
+      "interactiveDelivered": 800,
+      "batchArrivals": 2400,
+      "batchCompleted": 2400,
+      "batchBacklog": 0,
+      "batchDelayUnitSeconds": 0,
+      "peakTemperatureC": 24,
+      "conservationResidual": 0,
+      "protectionCount": 0,
+      "terminalEvents": [],
+      "samples": 11
+    },
+    "alternative": {
+      "schemaVersion": 1,
+      "runId": "evidence-unsupported",
+      "engineVersion": "sim-02-v1",
+      "scenarioId": "hot-restart",
+      "horizon": 10,
+      "criticalDemand": 1600,
+      "criticalDelivered": 1600,
+      "interactiveDemand": 800,
+      "interactiveDelivered": 800,
+      "batchArrivals": 2400,
+      "batchCompleted": 2400,
+      "batchBacklog": 0,
+      "batchDelayUnitSeconds": 0,
+      "peakTemperatureC": 24,
+      "conservationResidual": 0,
+      "protectionCount": 0,
+      "terminalEvents": [],
+      "samples": 11
+    },
+    "hasFullAlternative": false
+  },
+  "evidenceBoundary": "Headless engine trace. Native IndexedDB proof is browser-evidence.json; no provider calls or application replay integration."
+}
