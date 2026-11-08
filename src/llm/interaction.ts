@@ -6,16 +6,25 @@ import { cancelInteraction, continueInteraction, startInteraction, providerCallF
 import { executeToolIntent, type ScopedContext } from './tools';
 import type { ProviderCall } from './diagnostics';
 import { validAction } from './validation';
+import { conciseCoworkerResponse, projectCoworkerContext } from './conversation-policy';
+import { CONVERSATION_PROMPT_VERSION, usesConversationPolicy } from './conversation-mode';
 
 export type CoworkerResult = { start: GatewayStart; targetId: string | null; view: KnowledgeView; reply: Exclude<GatewayResponse, { kind: 'tool_request' }>; tools: PublicToolResult[]; intents: ToolIntent[]; calls: ProviderCall[]; durationMs: number; recording: RecordedInteraction | null; authorizations: ProposalAuthorization[] };
-export type CoworkerRequest = { simulation: Pick<SimulationClient, 'observe' | 'command'>; runId: string; requestId?: string; actorId: string; targetId: string | null; message: string; signal: AbortSignal; interactionMode?: 'advisory'; getSimTime?: () => number; onTool?: (intent: ToolIntent, result: PublicToolResult) => Promise<void> };
+export type CoworkerRequest = { simulation: Pick<SimulationClient, 'observe' | 'command'>; runId: string; requestId?: string; actorId: string; targetId: string | null; message: string; signal: AbortSignal; interactionMode?: 'advisory'; promptVersion?: string; getSimTime?: () => number; onTool?: (intent: ToolIntent, result: PublicToolResult) => Promise<void> };
 
 export async function runCoworker(input: CoworkerRequest): Promise<CoworkerResult> {
   const began = performance.now();
   let view = await input.simulation.observe(input.actorId);
   const role = view.crew.find(c => c.id === input.actorId)?.role;
   if (!role || view.runId !== input.runId || view.actorId !== input.actorId) throw new Error('stale_or_invalid_actor');
-  const start: GatewayStart = { kind: 'start', runId: input.runId, requestId: input.requestId ?? crypto.randomUUID(), actorId: input.actorId, role, message: input.message, view: scopeKnowledge(view, input.targetId ? [input.targetId] : []), procedures: procedures.filter(p => view.allowedProcedureIds.includes(p.id)), promptVersion: 'coworker-v1', ...(input.interactionMode ? { interactionMode: input.interactionMode } : {}) };
+  const focusTargets = input.targetId ? [input.targetId] : [];
+  if (input.promptVersion === CONVERSATION_PROMPT_VERSION && role === 'remote') {
+    focusTargets.push(...view.knownTopology.assets.filter(asset => asset.kind === 'cooling').map(asset => asset.id));
+    const hottest = view.observations.filter(observation => observation.field.includes('temperature') && typeof observation.value === 'number').sort((a, b) => Number(b.value) - Number(a.value))[0];
+    if (hottest) focusTargets.push(hottest.assetId);
+  }
+  const original: GatewayStart = { kind: 'start', runId: input.runId, requestId: input.requestId ?? crypto.randomUUID(), actorId: input.actorId, role, message: input.message, view: scopeKnowledge(view, focusTargets), procedures: procedures.filter(p => view.allowedProcedureIds.includes(p.id)), promptVersion: input.promptVersion ?? 'coworker-v1', ...(input.interactionMode ? { interactionMode: input.interactionMode } : {}) };
+  const start = usesConversationPolicy(original) ? projectCoworkerContext(original) : original;
   const context: ScopedContext = { start, simulation: input.simulation, signal: input.signal };
   const tools: PublicToolResult[] = [], intents: ToolIntent[] = [];
   const calls: ProviderCall[] = [];
@@ -32,7 +41,7 @@ export async function runCoworker(input: CoworkerRequest): Promise<CoworkerResul
     proposals.add(key);
     authorizations.push(structuredClone({ id: `${start.requestId}:proposal:${authorizations.length + 1}`, runId: wire.runId, actorId: wire.actorId, requestId: wire.requestId, intent, expectedEntityVersions: wire.view.observedEntityVersions }));
   };
-  const targets = new Set(input.targetId ? [input.targetId] : []);
+  const targets = new Set(focusTargets);
   const evidenceIds = new Set<string>();
   const fallback = (reason: string): CoworkerResult['reply'] => ({ kind: 'fallback', runId: start.runId, requestId: start.requestId, actorId: start.actorId, mode: 'scripted', reason, message: 'Use permitted observations and procedures.', facts: [] });
   const finish = (reply: CoworkerResult['reply']): CoworkerResult => {
@@ -61,6 +70,7 @@ export async function runCoworker(input: CoworkerRequest): Promise<CoworkerResul
       const call = providerCallFor(reply); if (call && !calls.some(known => known.receiptId === call.receiptId)) calls.push(call);
       if (input.signal.aborted) return finish(fallback('canceled'));
       if (reply.kind !== 'tool_request') {
+        if (reply.kind === 'final' && usesConversationPolicy(start) && (!originatingWire || !conciseCoworkerResponse({ ...context.start, view: originatingWire.view }, reply.response))) { complete = true; return finish(fallback('unsafe_narrative')); }
         if (reply.kind === 'final') for (const proposal of reply.response.proposals) retainProposal(proposal, originatingWire);
         complete = true; return finish(reply);
       }
@@ -79,7 +89,8 @@ export async function runCoworker(input: CoworkerRequest): Promise<CoworkerResul
       view = await input.simulation.observe(input.actorId);
       if (input.signal.aborted) return finish(fallback('canceled'));
       if (view.runId !== input.runId || view.actorId !== input.actorId) return finish(fallback('stale_run'));
-      context.start = { ...start, view: scopeKnowledge(view, [...targets], [...evidenceIds]) };
+      const fresh = { ...start, view: scopeKnowledge(view, [...targets], [...evidenceIds]) };
+      context.start = usesConversationPolicy(start) ? { ...projectCoworkerContext(fresh), procedures: start.procedures } : fresh;
       const continuation: GatewayInput = { kind: 'continue', runId: start.runId, requestId: start.requestId, actorId: start.actorId, interactionId: intent.interactionId, expectedCallId: intent.callId, result, view: context.start.view };
       reply = await receive(onWire => continueInteraction(continuation, input.signal, onWire));
     }

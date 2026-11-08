@@ -4,6 +4,8 @@ import { DesktopReplayView } from './ui/debrief/DesktopReplayView';
 import { ConversationMenu } from './ui/conversation-menu';
 import { savedConversations } from './ui/conversation/recorded-history';
 import { fallbackCopy } from './ui/conversation/fallback-copy';
+import { CONVERSATION_PROMPT_VERSION } from './llm/conversation-mode';
+import { formatObservationFact } from './ui/presentation';
 import { radioCitations, radioProvenance, radioReceipts, radioReport, observationText } from './ui/desktop-copy';
 import { SimulationClient } from './workers/SimulationClient';
 import { hotRestart, practiceScenario } from './content/scenarios/hot-restart';
@@ -126,7 +128,7 @@ export default function App() {
     const token = generation.current, controller = new AbortController(), requestId = crypto.randomUUID(), targetId = selected.current ?? (originActor === 'alex' ? 'controller' : originActor === 'jules' ? 'distribution' : null);
     append({ id: `question:${requestId}`, actorId: originActor, at: current.simTime, kind: 'player', text: message, unread: false });
     updateThreads(previous => updateConversation(setConversationDraft(previous, originActor, ''), originActor, thread => ({ ...thread, busy: true })));
-    const job = runCoworker({ simulation: client, runId: current.runId, requestId, actorId: originActor, targetId, message, signal: controller.signal, interactionMode: 'advisory', getSimTime: () => known.current?.runId === current.runId ? known.current.simTime : current.simTime });
+    const job = runCoworker({ simulation: client, runId: current.runId, requestId, actorId: originActor, targetId, message, signal: controller.signal, interactionMode: 'advisory', promptVersion: CONVERSATION_PROMPT_VERSION, getSimTime: () => known.current?.runId === current.runId ? known.current.simTime : current.simTime });
     jobs.current.set(originActor, { controller, promise: job }); syncClock();
     try {
       const result = await job; recorder.capture(result.recording);
@@ -134,7 +136,8 @@ export default function App() {
       const allowed = result.authorizations.filter(authorization => authorization.actorId === originActor && authorization.runId === current.runId && authorizationMatchesOrigin(authorization, result.recording));
       for (const authorization of allowed) proposals.current!.register(authorization);
       const answer = result.reply.kind === 'final' ? result.reply.response : null;
-      const text = answer ? [answer.inference, answer.uncertainty].filter(Boolean).join('\n') || 'I’ve included the available readings in History.' : fallbackCopy(result.reply.kind === 'fallback' ? result.reply.reason : 'unavailable');
+      const facts = answer?.facts.flatMap(fact => { if (!('observationId' in fact)) return []; const reading = result.view.observations.find(observation => observation.id === fact.observationId); return reading ? [formatObservationFact(reading, fact.field)] : []; }) ?? [];
+      const text = answer ? [...facts, answer.inference, answer.uncertainty].filter(Boolean).join('\n') || 'I’ve included the available readings in History.' : fallbackCopy(result.reply.kind === 'fallback' ? result.reply.reason : 'unavailable');
       append({ id: crypto.randomUUID(), actorId: originActor, at: known.current?.simTime ?? current.simTime, kind: answer ? 'live' : 'fallback', text, summary: text.length <= 260 ? text : `${person(originActor)!.name} sent a detailed reply.`, unread: true, exchangeId: result.start.requestId, proposals: allowed.map(authorization => ({ id: authorization.id, label: labelAction(authorization.intent), assignedName: person(authorization.intent.args.technicianId ?? (['pause_batch', 'resume_batch', 'set_batch_ceiling', 'verify_recovery'].includes(authorization.intent.action) ? 'sam' : originActor))?.name ?? person(originActor)!.name, status: 'ready' })), sections: [{ id: 'reply', label: 'Facts and reply', text: radioReport(result) }, { id: 'citations', label: 'Evidence', text: radioCitations(result) }, { id: 'receipts', label: 'Tool receipts', text: radioReceipts(result) }, { id: 'provenance', label: 'Provenance', text: radioProvenance(result) }] }, answer?.facts.flatMap(fact => 'observationId' in fact ? [fact.observationId] : []) ?? []);
     } catch { if (token === generation.current) append({ id: crypto.randomUUID(), actorId: originActor, at: known.current?.simTime ?? current.simTime, kind: 'fallback', text: 'I couldn’t finish that reply. Suggested orders still work.', unread: true }); }
     finally { if (jobs.current.get(originActor)?.promise === job) jobs.current.delete(originActor); if (token === generation.current) { updateThreads(previous => updateConversation(previous, originActor, thread => ({ ...thread, busy: false }))); syncClock(); } }
