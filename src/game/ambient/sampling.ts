@@ -67,8 +67,8 @@ export function sampleAmbient(view: KnowledgeView, animationClockSeconds: number
     if (!view.knownTopology.assets.some(a => a.id === task.targetId)) continue;
     const step = reducedMotion ? 0 : Math.floor(phase(animationClockSeconds, 1, crew.id) * 2);
     // A two-pixel hand/tool mark stays inside the existing 12x16 actor frame.
-    pixel('tool', crew.id, crew.x * 16 + 11, crew.y * 16 + 9 - step, 2, 0xf4b860);
-    pixel('tool', crew.id, crew.x * 16 + 12, crew.y * 16 + 8 - step, 1, 0x92a8b7);
+    pixel('tool', crew.id, crew.x * 16 + 11, crew.y * 16 + 9 - step, 2, 0xffce15);
+    pixel('tool', crew.id, crew.x * 16 + 12, crew.y * 16 + 8 - step, 1, 0xafb4d8);
   }
 
   const assetIds = new Set<string>();
@@ -79,14 +79,14 @@ export function sampleAmbient(view: KnowledgeView, animationClockSeconds: number
     const x = asset.x * 16, y = asset.y * 16;
     if (asset.kind === 'cooling' && asset.width >= 2 && asset.height >= 2 && latestPositive(view, asset.id, ['running', 'state'], o => o.field === 'running' ? o.value === true : o.value === 'running')) {
       const step = reducedMotion ? 0 : Math.floor(phase(animationClockSeconds, 1.5, asset.id) * 2);
-      pixel('airflow', asset.id, x + 11, y + 26 + step, 2, 0x45d5e8);
-      pixel('airflow', asset.id, x + 19, y + 27 + step, 2, 0x45d5e8);
+      pixel('airflow', asset.id, x + 11, y + 26 + step, 2, 0x03deee);
+      pixel('airflow', asset.id, x + 19, y + 27 + step, 2, 0x03deee);
     }
     if (asset.kind === 'rack' && asset.width >= 1 && asset.height >= 2
       && latestPositive(view, asset.id, ['power_state'], o => o.value === 'running')
       && latestPositive(view, asset.id, ['batch_processing_rate'], o => typeof o.value === 'number' && Number.isFinite(o.value) && o.value > 0)) {
       const step = reducedMotion ? 0 : Math.floor(phase(animationClockSeconds, 2, asset.id) * 1.5);
-      pixel('rack', asset.id, x + (step === 1 ? 10 : 5), y + 11 + step * 5, 1, 0xdceaf2);
+      pixel('rack', asset.id, x + (step === 1 ? 10 : 5), y + 11 + step * 5, 1, 0x8ef2ee);
     }
   }
   return sample;

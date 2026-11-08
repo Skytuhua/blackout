@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import type { KnowledgeView, Observation, PublicTask } from '../../src/shared/contracts';
 import { sampleAmbient, MAX_AMBIENT_PIXELS, MAX_AMBIENT_CREW } from '../../src/game/ambient';
 import { fixture, observation, workingView } from './fixtures';
@@ -89,6 +90,11 @@ describe('fresh scoped evidence drives equipment', () => {
 });
 
 describe('bounded presentation samples', () => {
+  it('reuses the committed sprite palette without adding world colors', () => {
+    const { palette } = JSON.parse(readFileSync(new URL('../../public/assets/source/sprites.json', import.meta.url), 'utf8')) as { palette: string[] };
+    const colors = new Set(palette.map(color => Number.parseInt(color.slice(1), 16)));
+    expect(sampleAmbient(workingView(), 1.3).pixels.every(p => colors.has(p.color))).toBe(true);
+  });
   it('staggered idle posture is infrequent, at most one native pixel, and never moves a busy or remote crew', () => {
     const view = fixture(), alex: number[] = [], jules: number[] = [];
     for (let i = 0; i < 120; i++) {
