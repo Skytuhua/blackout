@@ -14,10 +14,11 @@ export class StorageError extends Error {
   constructor(public readonly code: 'UNAVAILABLE' | 'BLOCKED' | 'VERSION_MISMATCH' | 'FAILED', detail: string) { super(`${code}: ${detail}`); this.name = 'StorageError'; }
 }
 
-export interface SavedRunSummary { runId: string; scenarioId: string; simTime: number }
+export interface SavedRunSummary { runId: string; scenarioId: string; simTime: number; unavailableReason?: string }
 export interface RunStore {
   saveRun(record: RunRecord | SavedRunRecord): Promise<void>;
   loadRun(runId: string): Promise<SavedRunRecord | null>;
+  exportRun(runId: string): Promise<string | null>;
   listRuns(): Promise<SavedRunSummary[]>;
   removeRun(runId: string): Promise<void>;
   saveCheckpoint(checkpoint: Checkpoint): Promise<void>;
@@ -69,15 +70,38 @@ export async function openRunStore(databaseName = 'blackout-local-runs'): Promis
     if ((decoded as RunRecord | Checkpoint).runId !== runId) throw new ReplayDataError('IDENTITY_MISMATCH', 'Stored key and run identity differ.');
     return decoded;
   }
+  function unavailable(runId: string, value: unknown, code: ReplayDataError['code']): SavedRunSummary {
+    let metadata: unknown;
+    try { metadata = typeof value === 'string' ? JSON.parse(value) : null; } catch { metadata = null; }
+    const object = (input: unknown): Record<string, unknown> => input !== null && typeof input === 'object' && !Array.isArray(input) ? input as Record<string, unknown> : {};
+    const scenarioId = object(object(metadata).scenario).id;
+    const simTime = object(object(metadata).finalCheckpoint).simTime;
+    return {
+      runId,
+      scenarioId: typeof scenarioId === 'string' && scenarioId.length > 0 && scenarioId.length <= 120 && !/[\u0000-\u001f\u007f]/.test(scenarioId) ? scenarioId : 'Unknown scenario',
+      simTime: typeof simTime === 'number' && Number.isSafeInteger(simTime) && simTime >= 0 ? simTime : 0,
+      unavailableReason: `${code}: Stored run cannot resume with this build.`,
+    };
+  }
   async function list(store: 'runs' | 'checkpoints'): Promise<SavedRunSummary[]> {
     const entries = await transact(store, 'readonly', s => s.getAllKeys());
     const summaries: SavedRunSummary[] = [];
     for (const key of entries) {
-      if (typeof key !== 'string') throw new ReplayDataError('CORRUPT', 'Invalid local run key.');
       if (store === 'runs') {
-        const record = await load(store, key, deserializeRun);
-        if (record) summaries.push({ runId: key, scenarioId: record.scenario.id, simTime: record.finalCheckpoint.simTime });
+        const value: unknown = await transact(store, 'readonly', s => s.get(key));
+        if (value === undefined) continue;
+        if (typeof key !== 'string') { summaries.push(unavailable('[invalid local run key]', value, 'CORRUPT')); continue; }
+        try {
+          if (typeof value !== 'string') throw new ReplayDataError('CORRUPT', 'Stored value is not serialized JSON.');
+          const record = deserializeRun(value);
+          if (record.runId !== key) throw new ReplayDataError('IDENTITY_MISMATCH', 'Stored key and run identity differ.');
+          summaries.push({ runId: key, scenarioId: record.scenario.id, simTime: record.finalCheckpoint.simTime });
+        } catch (error) {
+          if (!(error instanceof ReplayDataError)) throw error;
+          summaries.push(unavailable(key, value, error.code));
+        }
       } else {
+        if (typeof key !== 'string') throw new ReplayDataError('CORRUPT', 'Invalid local run key.');
         const checkpoint = await load(store, key, deserializeCheckpoint);
         if (checkpoint) summaries.push({ runId: key, scenarioId: (checkpoint.state.scenario as RunRecord['scenario']).id, simTime: checkpoint.simTime });
       }
@@ -87,6 +111,12 @@ export async function openRunStore(databaseName = 'blackout-local-runs'): Promis
   return {
     async saveRun(record) { const text = serializeRun(record); await transact('runs', 'readwrite', s => s.put(text, record.runId)); },
     loadRun: runId => load('runs', runId, deserializeRun),
+    async exportRun(runId) {
+      const value: unknown = await transact('runs', 'readonly', s => s.get(runId));
+      if (value === undefined) return null;
+      if (typeof value !== 'string') throw new ReplayDataError('CORRUPT', 'Stored value is not serialized JSON.');
+      return value;
+    },
     listRuns: () => list('runs'),
     async removeRun(runId) { await transact('runs', 'readwrite', s => s.delete(runId)); },
     async saveCheckpoint(checkpoint) { const text = serializeCheckpoint(checkpoint); await transact('checkpoints', 'readwrite', s => s.put(text, checkpoint.runId)); },

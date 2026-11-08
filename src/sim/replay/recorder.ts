@@ -1,4 +1,4 @@
-import type { RecordedCommand, RunRecord, SimulationEngine } from '../../shared/contracts';
+import type { KnowledgeView, RecordedCommand, RunRecord, SimulationEngine } from '../../shared/contracts';
 import { restore } from '../engine';
 import { canonicalCheckpoint, deterministicHash } from './canonical';
 import { validateRunRecord } from './validation';
@@ -43,6 +43,22 @@ export function replayRun(input: RunRecord, runId: string) {
   // A recorded t=0 explicit boundary can exist without commands or physical steps.
   if (source.finalCheckpoint.state.boundaryConsumed === true) engine.step(0);
   return { record: engine.exportRecord(), rejectedAttempts: source.commands.filter(c => c.receipt.status === 'rejected'), dialogue: structuredClone(source.dialogue) };
+}
+
+/** Replay a validated prefix for one actor. Checkpoint/truth data stays inside the recorder. */
+export function replayViewAt(input: RunRecord, runId: string, at: number, actorId = 'player'): KnowledgeView {
+  const source = validateRunRecord(input);
+  if (!runId || runId.length > 120 || runId === source.runId) throw new Error('REPLAY_IDENTITY: Supply a new run identity.');
+  if (!Number.isInteger(at) || at < 0 || at > source.finalCheckpoint.simTime) throw new Error('REPLAY_TIME: Cursor must be a whole second inside the recorded horizon.');
+  const engine = restore(source.initialCheckpoint, runId), taskIds = new Map<string, string>();
+  for (const [index, command] of acceptedCommands(source).filter(command => command.at <= at).entries()) {
+    advanceTo(engine, command.at);
+    const receipt = reissue(engine, command, taskIds, index);
+    if (receipt.status !== command.receipt.status || receipt.reason !== command.receipt.reason || ('eta' in receipt && receipt.eta !== command.receipt.eta)) throw new Error(`REPLAY_DIVERGED: command ${command.sequence}: ${receipt.reason}`);
+  }
+  advanceTo(engine, at);
+  if (at === source.finalCheckpoint.simTime && source.finalCheckpoint.state.boundaryConsumed === true) engine.step(0);
+  return engine.observe(actorId);
 }
 
 export function verifyReplay(input: RunRecord, runId: string) {
