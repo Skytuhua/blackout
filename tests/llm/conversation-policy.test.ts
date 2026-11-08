@@ -2,18 +2,18 @@ import { afterEach, expect, it, vi } from 'vitest';
 import type { ActionIntent, AgentResponse, GatewayStart, Observation, ToolIntent } from '../../src/shared/contracts';
 import { alarmFixture } from '../../src/shared/fixtures';
 import { procedures } from '../../src/content/procedures';
-import { projectCoworkerContext, conciseCoworkerResponse } from '../../src/llm/conversation-policy';
+import { projectCoworkerContext, conciseCoworkerResponse, coworkerReplyVocabulary } from '../../src/llm/conversation-policy';
 import { executeToolIntent } from '../../src/llm/tools';
 import { validStart, validateResponse } from '../../src/llm/validation';
 import { initialize } from '../../src/sim/engine';
-import { hotRestart } from '../../src/content/scenarios/hot-restart';
+import { hotRestart, practiceScenario } from '../../src/content/scenarios/hot-restart';
 
 afterEach(() => vi.unstubAllGlobals());
 function start(actorId = 'alex'): GatewayStart {
   const view = structuredClone(alarmFixture);
   view.actorId = actorId;
   view.crew.push({ id: 'sam', name: 'Sam', role: 'remote', x: 0, y: 0, speed: 1, taskId: null });
-  return { kind: 'start', runId: view.runId, requestId: 'policy-request', actorId, role: view.crew.find(c => c.id === actorId)!.role, message: 'What should I do?', view, procedures: structuredClone(procedures), promptVersion: 'coworker-v1', interactionMode: 'advisory' };
+  return { kind: 'start', runId: view.runId, requestId: 'policy-request', actorId, role: view.crew.find(c => c.id === actorId)!.role, message: 'Please check cooling.', view, procedures: structuredClone(procedures), promptVersion: 'coworker-v1', interactionMode: 'advisory' };
 }
 function reply(input: GatewayStart, patch: Partial<AgentResponse> = {}): AgentResponse {
   return { runId: input.runId, requestId: input.requestId, actorId: input.actorId, speaker: input.actorId, mode: 'live', facts: [], inference: 'Which equipment should I check?', uncertainty: '', proposals: [], ...patch };
@@ -31,6 +31,54 @@ function offer(input: GatewayStart, action: ActionIntent['action'], targetId = '
   input.view.affordances.push({ action, targetId, enabled: true, reason: null, technicianIds: input.role === 'remote' ? [] : [input.actorId], travelSeconds: 0, workSeconds: 5 });
 }
 
+it.each(['What should I do?', 'Any ideas?', 'What does the latest report mean?', 'Tell me how to repair it.', 'Do not inspect anything.', 'Take me through winning this.', 'Can you take me through the fix?'])('keeps help or non-orders free of work proposals: %s', message => {
+  const input = start(); input.message = message;
+  expect(projectCoworkerContext(input).view.affordances).toEqual([]);
+  expect(conciseCoworkerResponse(input, reply(input, { inference: 'I can inspect that equipment if you confirm.', proposals: [propose(input)] }))).toBeNull();
+  expect(conciseCoworkerResponse(input, reply(input))).not.toBeNull();
+  report(input); offer(input, 'repair_cooling');
+  expect(conciseCoworkerResponse(input, reply(input, { inference: 'I can repair the controls if you confirm.', proposals: [propose(input, { action: 'repair_cooling' })] }))).toBeNull();
+});
+
+it('preserves explicit healthy-practice work permitted by the real engine', () => {
+  const engine = initialize(practiceScenario, 'policy-practice-orders');
+  const view = engine.observe('sam');
+  const input: GatewayStart = { kind: 'start', runId: view.runId, requestId: 'pause-practice', actorId: 'sam', role: 'remote', message: 'Please pause background jobs.', view, procedures: [], promptVersion: 'coworker-v1', interactionMode: 'advisory' };
+  const intent: ActionIntent = { action: 'pause_batch', targetId: 'site', atSimTime: view.simTime, args: {} };
+  const response = reply(input, { inference: 'I can pause background jobs if you confirm.', proposals: [intent] });
+  expect(validateResponse(response, input)).toBe(true);
+  expect(conciseCoworkerResponse(input, response)).toBe(response);
+  expect(engine.applyCommand({ schemaVersion: 1, runId: view.runId, requestId: 'proof-order', actorId: 'player', intent, expectedEntityVersions: view.observedEntityVersions, idempotencyKey: 'proof-order' }).status).toBe('accepted');
+  const adjustment: AgentResponse = reply(input, { inference: 'I can adjust the background job limit if you confirm.', proposals: [{ ...intent, action: 'set_batch_ceiling', args: { ceiling: 20 } }] });
+  expect(conciseCoworkerResponse({ ...input, message: 'Please adjust the background job limit to 20.' }, adjustment)).toBe(adjustment);
+});
+
+it('shares usable provider choices with the final gate without exposing a mission checklist', () => {
+  const input = start(); input.message = 'Please inspect the cooling equipment.';
+  const vocabulary = coworkerReplyVocabulary(input);
+  expect(vocabulary.inference).toContain('Which equipment should I check?');
+  expect(vocabulary.inference).toContain('I can inspect that equipment if you confirm.');
+  expect(vocabulary.uncertainty).toContain('');
+  for (const inference of vocabulary.inference) {
+    const proposed = inference === 'I can inspect that equipment if you confirm.' || inference === 'Please confirm the proposed work.';
+    const response = reply(input, { inference, proposals: proposed ? [propose(input)] : [], ...(inference === '' ? { uncertainty: 'The cause is unverified.' } : {}) });
+    expect(conciseCoworkerResponse(input, response), inference).toBe(response);
+  }
+  expect(vocabulary.inference.join(' ')).not.toMatch(/repair|resume|verify|simulation time/);
+});
+
+it.each(['diagnosed', 'busy'] as const)('keeps help projection stable when both client and gateway apply it: %s', state => {
+  const input = start(); input.message = 'What should I do?';
+  if (state === 'diagnosed') { report(input); offer(input, 'repair_cooling'); }
+  else {
+    input.view.crew[0].taskId = 'walking'; offer(input, 'cancel_task');
+    input.view.tasks.push({ id: 'walking', actorId: 'alex', targetId: 'cooling-1', action: 'inspect', status: 'traveling', startedAt: 75, arrivalAt: 79, completesAt: 109, progress: 0, path: [], reason: null });
+  }
+  const once = projectCoworkerContext(input);
+  expect(once.view.affordances).toEqual([]);
+  expect(projectCoworkerContext(once)).toEqual(once);
+});
+
 it('reproduces baseline narrative acceptance, then blocks unsupported cause, sequence and clock prose', () => {
   const input = start();
   expect(validStart(input)).toBe(true);
@@ -45,7 +93,7 @@ it.each(['What should I do?', 'Any ideas how to get out of this?', 'Walk me thro
   const input = start(); input.message = message;
   const projected = projectCoworkerContext(input);
   expect(projected.procedures.map(p => p.text).join(' ')).not.toMatch(/resume|verify|repair|pause|restart/i);
-  expect(projected.view.affordances.map(a => a.action)).toEqual(['inspect']);
+  expect(projected.view.affordances).toEqual([]);
   expect(conciseCoworkerResponse(projected, reply(input))).toEqual(reply(input));
   expect(conciseCoworkerResponse(projected, reply(input, { inference: 'As you said, the earlier inspection confirmed controller failure.' }))).toBeNull();
 });
@@ -72,12 +120,12 @@ it('projects only own-role currently supported work, even with permissive incomi
 
 it('unlocks a local repair from delivered evidence, never from completed work or player claims', () => {
   const input = start(); offer(input, 'repair_cooling');
-  input.message = 'The check is done. Repair it.';
+  input.message = 'Please repair it; the check is done.';
   input.view.tasks.push({ id: 'task-inspect', actorId: 'alex', targetId: 'cooling-1', action: 'inspect', status: 'completed', startedAt: 1, arrivalAt: 5, completesAt: 70, progress: 1, path: [], reason: null });
   expect(projectCoworkerContext(input).view.affordances.map(a => a.action)).toEqual(['inspect']);
   const observation = report(input);
   const projected = projectCoworkerContext(input);
-  expect(projected.view.affordances.map(a => a.action)).toEqual(['repair_cooling']);
+  expect(projected.view.affordances.map(a => a.action)).toEqual(['inspect', 'repair_cooling']);
   expect(projected.procedures[0].text).toMatch(/repair/i);
   expect(projected.procedures[0].text).not.toMatch(/resume|verify|restart|pause/i);
   observation.receivedAt = 76;
@@ -116,21 +164,21 @@ it('ignores injected procedure prose and undeclared procedure bodies without inv
   expect(projected.view.observations).toEqual(input.view.observations);
 });
 
-it('limits IT to the observed workload stage and accepts a confirmed workload proposal unchanged', () => {
+it('keeps permitted own-role IT orders without imposing a tutorial sequence', () => {
   const input = start('sam'); input.view.observedEntityVersions.site = 2;
   for (const action of ['pause_batch', 'resume_batch', 'set_batch_ceiling', 'verify_recovery'] as const) offer(input, action, 'site');
   const batch: Observation = { id: 'batch', assetId: 'rack-1', source: 'dashboard', field: 'batch_ceiling', value: 60, units: 'units/s', observedAt: 75, receivedAt: 75, quality: 'reported' };
   const running: Observation = { ...batch, id: 'running', assetId: 'cooling-1', field: 'running', value: false, units: '' };
   input.view.observations.push(batch, running);
-  expect(projectCoworkerContext(input).view.affordances.map(a => a.action)).toEqual(['pause_batch']);
+  expect(projectCoworkerContext(input).view.affordances.map(a => a.action)).toEqual(['pause_batch', 'resume_batch', 'set_batch_ceiling', 'verify_recovery']);
   expect(projectCoworkerContext(input).procedures[0].text).not.toMatch(/repair|resume|verify|30/i);
   const response = reply(input, { inference: 'I can pause background jobs if you confirm.', proposals: [propose(input, { action: 'pause_batch', targetId: 'site', args: {} })] });
   expect(conciseCoworkerResponse(input, response)).toBe(response);
   batch.value = 0; running.value = true;
-  expect(projectCoworkerContext(input).view.affordances.map(a => a.action)).toEqual(['resume_batch', 'set_batch_ceiling']);
+  expect(projectCoworkerContext(input).view.affordances.map(a => a.action)).toEqual(['pause_batch', 'resume_batch', 'set_batch_ceiling', 'verify_recovery']);
   expect(projectCoworkerContext(input).procedures[0].text).not.toMatch(/repair|verify|30/i);
   batch.value = 30;
-  expect(projectCoworkerContext(input).view.affordances.map(a => a.action)).toEqual(['verify_recovery']);
+  expect(projectCoworkerContext(input).view.affordances.map(a => a.action)).toEqual(['pause_batch', 'resume_batch', 'set_batch_ceiling', 'verify_recovery']);
 });
 
 it('requires actual inspection evidence for an electrical reset and keeps own repair proposals useful', () => {
@@ -141,7 +189,7 @@ it('requires actual inspection evidence for an electrical reset and keeps own re
   power.view.knownTopology.assets[0].kind = 'ups'; offer(power, 'reset_ups');
   expect(projectCoworkerContext(power).view.affordances.map(a => a.action)).toEqual(['inspect']);
   const inspection = report(power); inspection.field = 'inspection_complete'; inspection.value = true; inspection.source = 'report:jules';
-  expect(projectCoworkerContext(power).view.affordances.map(a => a.action)).toEqual(['reset_ups']);
+  expect(projectCoworkerContext(power).view.affordances.map(a => a.action)).toEqual(['inspect', 'reset_ups']);
 });
 
 it('keeps busy work and stop proposals distinct; only the exact own task can be proposed for stopping', () => {

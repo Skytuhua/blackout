@@ -16,18 +16,20 @@ function reported(start: GatewayStart, o: Observation | undefined): o is Observa
   return !!o && usable(o, start) && o.source.startsWith('report:') && start.view.messages.some(m => m.at <= start.view.simTime && m.mode === 'system' && m.evidenceIds.includes(o.id));
 }
 
+function explicitWorkRequest(message: string): boolean {
+  const text = message.trim().replaceAll('\u2019', "'");
+  // This only limits proposal offers; it never parses an action or authorizes work.
+  if (/\b(?:don't|do not|never)\b|\b(?:without|no)\s+(?:any\s+)?(?:work|working|proposals?|orders?|actions?)\b|\btake me through\b/i.test(text)) return false;
+  return /^(?:please\s+)?(?:(?:can|could|would|will)\s+you\s+(?:please\s+)?|(?:i(?:'d| would)? like|i want)\s+you\s+to\s+)?(?:go\s+(?:and\s+)?)?(?:inspect|check|repair|fix|pause|resume|stop|cancel|verify|set|adjust|take)\b/i.test(text);
+}
+
 function ownAffordances(start: GatewayStart): GatewayStart['view']['affordances'] {
   const { view, actorId, role } = start;
   const worker = view.crew.find(c => c.id === actorId);
   const busy = worker?.taskId !== null || view.tasks.some(t => t.actorId === actorId && active(t.status));
   if (!worker || worker.role !== role || !['active', 'practice'].includes(view.mission.status)) return [];
-  const running = view.knownTopology.assets.filter(a => a.kind === 'cooling');
-  const coolingRunning = running.length > 0 && running.every(a => currentField(start, a.id, 'running')?.value === true);
-  const ceilings = view.knownTopology.assets.filter(a => a.kind === 'rack').map(a => currentField(start, a.id, 'batch_ceiling'));
-  const paused = ceilings.length > 0 && ceilings.every(o => o?.value === 0);
-  const admitted = ceilings.length > 0 && ceilings.every(o => typeof o?.value === 'number' && o.value > 0);
   const diagnosis = (target: string) => {
-    const o = currentField(start, target, 'prerequisite_ready');
+    const o = currentField(start, target, 'prerequisite_ready') ?? currentField(start, 'controller', 'prerequisite_ready');
     return reported(start, o) && o.value === false;
   };
   const available = view.affordances.filter(a => a.enabled && Object.hasOwn(view.observedEntityVersions, a.targetId) && (!a.technicianIds.length || a.technicianIds.includes(actorId)));
@@ -37,42 +39,41 @@ function ownAffordances(start: GatewayStart): GatewayStart['view']['affordances'
     const kind = view.knownTopology.assets.find(asset => asset.id === a.targetId)?.kind;
     if (role === 'remote') {
       if (a.targetId !== 'site' && kind !== 'rack') return false;
-      if (a.action === 'verify_recovery') return a.targetId === 'site' && coolingRunning && admitted;
-      if (a.action === 'resume_batch' || a.action === 'set_batch_ceiling') return coolingRunning && paused;
-      return a.action === 'pause_batch' && !paused && !coolingRunning;
+      return a.action === 'verify_recovery' ? a.targetId === 'site' : ['pause_batch', 'resume_batch', 'set_batch_ceiling'].includes(a.action);
     }
     if (!a.technicianIds.includes(actorId)) return false;
     if (role === 'electrical') {
       if (!kind || !['ups', 'distribution', 'generator'].includes(kind)) return false;
       const inspection = currentField(start, a.targetId, 'inspection_complete');
-      const reset = kind === 'ups' && reported(start, inspection) && inspection.value === true && available.some(other => other.targetId === a.targetId && other.action === 'reset_ups');
-      return reset ? a.action === 'reset_ups' : a.action === 'inspect';
+      return a.action === 'inspect' || a.action === 'reset_ups' && kind === 'ups' && reported(start, inspection) && inspection.value === true;
     }
     if (role !== 'facilities' || !kind || !['cooling', 'controller', 'rack'].includes(kind)) return false;
-    const repair = diagnosis(a.targetId) && available.some(other => other.targetId === a.targetId && other.action === 'repair_cooling');
-    return repair ? a.action === 'repair_cooling' : a.action === 'inspect' || a.action === 'independent_reading' && kind === 'rack';
+    return a.action === 'repair_cooling' && diagnosis(a.targetId) || a.action === 'inspect' || a.action === 'independent_reading' && kind === 'rack';
   }).map(a => ({ ...a, technicianIds: a.technicianIds.length ? [actorId] : [] }));
 }
 
 function procedureText(start: GatewayStart): string {
-  const actions = start.view.affordances.map(a => a.action);
-  if (actions.includes('cancel_task')) return 'Keep the current assignment unless the player explicitly confirms stopping it.';
-  if (start.role === 'facilities') return actions.includes('repair_cooling')
+  const fields = start.view.knownTopology.assets;
+  const hasReport = (field: string, value: Observation['value']) => fields.some(asset => {
+    const o = currentField(start, asset.id, field);
+    return reported(start, o) && o.value === value;
+  });
+  if (start.view.crew.find(c => c.id === start.actorId)?.taskId || start.view.tasks.some(t => t.actorId === start.actorId && active(t.status))) return 'Keep the current assignment unless the player explicitly confirms stopping it.';
+  if (start.role === 'facilities') return hasReport('prerequisite_ready', false)
     ? 'Cooling: a delivered inspection supports proposing a repair of the inspected equipment. Work requires player confirmation.'
     : 'Cooling: request a check of known cooling equipment or a current reading. The cause stays unverified until a report arrives. Work requires player confirmation.';
-  if (start.role === 'electrical') return actions.includes('reset_ups')
+  if (start.role === 'electrical') return hasReport('inspection_complete', true)
     ? 'Power: the delivered inspection supports proposing an allowed reset of the inspected power unit. Work requires player confirmation.'
     : 'Power: request a check of known power equipment or a current reading. Do not name a cause without a delivered report. Work requires player confirmation.';
-  if (actions.includes('resume_batch') || actions.includes('set_batch_ceiling')) return 'IT: cooling is reported running and background jobs are paused. Propose only a permitted workload adjustment; work requires player confirmation.';
-  if (actions.includes('verify_recovery')) return 'IT: propose a permitted recovery check using current readings. Work requires player confirmation; a proposal does not establish recovery.';
-  return 'IT: ask for current workload readings or propose a permitted pause of background jobs. Deferred work is retained. Work requires player confirmation.';
+  return 'IT: use current workload readings. Only an explicit work request can receive a permitted proposal for player confirmation. A proposal does not establish recovery; deferred work is retained.';
 }
 
 export function projectCoworkerContext(start: GatewayStart): GatewayStart {
   const projected = structuredClone(start);
   if (start.interactionMode !== 'advisory') return projected;
   // Preserve the exact evidence/view identity: this narrows disclosure, never authority.
-  projected.view.affordances = validStart(start) ? ownAffordances(start) : [];
+  const available = validStart(start) ? ownAffordances(start) : [];
+  projected.view.affordances = explicitWorkRequest(start.message) ? available : [];
   projected.procedures = validStart(start) && ['facilities', 'electrical', 'remote'].includes(start.role)
     ? projected.procedures.filter(p => p.id === 'hot-restart-v1').map(p => ({ id: p.id, text: procedureText(projected) })) : [];
   return projected;
@@ -91,6 +92,20 @@ const workText: Partial<Record<ActionIntent['action'], string>> = {
 };
 const historical = 'These are earlier readings; please check the latest report.';
 const uncertainties = ['', 'The cause is unverified.', 'The cause remains unverified.', 'The cause is still unverified.', 'Inspection needed.', 'I need a current reading before I can advise.', historical];
+
+export function coworkerReplyVocabulary(start: GatewayStart): { inference: string[]; uncertainty: string[] } {
+  if (start.interactionMode !== 'advisory' || !validStart(start) || !['facilities', 'electrical', 'remote'].includes(start.role)) return { inference: [], uncertainty: [] };
+  const inference = ['', 'Which equipment should I check?', 'What would you like me to check?', 'Please share the latest report.', 'Please check the latest readings.', 'I need a current reading before I can advise.', 'The cause is still unverified.', 'The cause is unverified.', 'The cause remains unverified.'];
+  const available = ownAffordances(start);
+  if (start.view.observations.some(o => reported(start, o) && ['inspection_complete', 'prerequisite_ready'].includes(o.field))) inference.push('The inspection report is available.');
+  if (available.some(a => a.action === 'inspect')) inference.push(start.role === 'facilities' ? 'A cooling inspection would help.' : 'A power inspection would help.');
+  if (start.view.tasks.some(t => t.actorId === start.actorId && active(t.status))) inference.push("I'm still on my current assignment.");
+  if (explicitWorkRequest(start.message)) {
+    const work = available.map(a => workText[a.action]).filter((text): text is string => !!text);
+    if (work.length) inference.push(...work, 'Please confirm the proposed work.');
+  }
+  return { inference: [...new Set(inference)], uncertainty: [...uncertainties] };
+}
 
 function legalProposal(start: GatewayStart, action: ActionIntent): boolean {
   const { args } = action;
@@ -115,16 +130,14 @@ export function conciseCoworkerResponse(start: GatewayStart, response: AgentResp
     if (superseded && response.uncertainty !== historical) return null;
   }
   // shortcut: authored English only; add reviewed evidence-bound phrases when dialogue needs grow.
-  const allowed = ['', 'Which equipment should I check?', 'What would you like me to check?', 'Please share the latest report.', 'Please check the latest readings.', 'I need a current reading before I can advise.', 'The cause is still unverified.', 'The cause is unverified.', 'The cause remains unverified.'];
+  const vocabulary = coworkerReplyVocabulary(start);
+  let allowed = vocabulary.inference.filter(text => !Object.values(workText).includes(text) && text !== 'Please confirm the proposed work.');
   if (response.proposals.length) {
-    allowed.length = 0;
-    allowed.push(workText[response.proposals[0].action]!, 'Please confirm the proposed work.');
+    allowed = [workText[response.proposals[0].action]!, 'Please confirm the proposed work.'];
   } else {
-    if (response.facts.some(f => 'observationId' in f && reported(start, start.view.observations.find(o => o.id === f.observationId)) && ['inspection_complete', 'prerequisite_ready'].includes(start.view.observations.find(o => o.id === f.observationId)!.field))) allowed.push('The inspection report is available.');
-    if (projected.view.affordances.some(a => a.action === 'inspect')) allowed.push(start.role === 'facilities' ? 'A cooling inspection would help.' : 'A power inspection would help.');
-    if (start.view.tasks.some(t => t.actorId === start.actorId && active(t.status))) allowed.push("I'm still on my current assignment.");
+    if (!response.facts.some(f => 'observationId' in f && reported(start, start.view.observations.find(o => o.id === f.observationId)) && ['inspection_complete', 'prerequisite_ready'].includes(start.view.observations.find(o => o.id === f.observationId)!.field))) allowed = allowed.filter(text => text !== 'The inspection report is available.');
   }
   const size = response.inference.length + response.uncertainty.length + response.facts.reduce((sum, fact) => sum + String(factValue(fact, start)).length + 32, 0);
-  if (!allowed.includes(response.inference) || !uncertainties.includes(response.uncertainty) || size > 260 || !size) return null;
+  if (!allowed.includes(response.inference) || !vocabulary.uncertainty.includes(response.uncertainty) || size > 260 || !size) return null;
   return response;
 }
