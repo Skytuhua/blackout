@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
-import { hotRestart } from '../../src/content/scenarios/hot-restart';
+import { hotRestart, practiceScenario } from '../../src/content/scenarios/hot-restart';
 import type { KnowledgeView } from '../../src/shared/contracts';
 import type { WorkerReply, WorkerRequest } from '../../src/workers/protocol';
 
@@ -31,6 +31,17 @@ it('runs the real engine and publishes a command reservation without advancing p
   expect(reply.kind === 'receipt' && reply.receipt.status).toBe('accepted');
   expect(view()).toMatchObject({ simTime: 10, tasks: [expect.objectContaining({ action: 'inspect', status: 'traveling' })] });
   expect(send({ kind: 'record', runId: 'worker-run' } as WorkerRequest)).toMatchObject({ kind: 'record', record: { engineVersion: 'sim-desktop-v2' } });
+});
+
+it('advances practice beyond the incident deadline and starts a fresh run that rejects old callbacks', () => {
+  expect(send({ kind: 'initialize', runId: 'worker-practice', spec: practiceScenario } as WorkerRequest)).toMatchObject({ kind: 'initialized', view: { simTime: 0, mission: { status: 'practice' } } });
+  const current = view('worker-practice');
+  expect(send({ kind: 'command', runId: current.runId, request: { schemaVersion: 1, runId: current.runId, requestId: 'move-practice', actorId: 'player', idempotencyKey: 'move-practice', expectedEntityVersions: current.observedEntityVersions, intent: { action: 'move_crew', targetId: 'alex', atSimTime: 0, args: { destination: { x: 6, y: 5 } } } } } as WorkerRequest)).toMatchObject({ kind: 'receipt', receipt: { status: 'accepted', eta: 3 } });
+  send({ kind: 'advance', runId: 'worker-practice', ticks: 600 } as WorkerRequest);
+  expect(send({ kind: 'advance', runId: 'worker-practice', ticks: 10 } as WorkerRequest)).toMatchObject({ kind: 'advanced', view: { simTime: 610, mission: { status: 'practice' }, tasks: [expect.objectContaining({ status: 'completed' })] } });
+  expect(start('fresh-incident')).toMatchObject({ simTime: 0, tasks: [], crew: hotRestart.crew, mission: { status: 'active' } });
+  expect(send({ kind: 'advance', runId: 'worker-practice', ticks: 1 } as WorkerRequest)).toMatchObject({ kind: 'error', code: 'stale_run' });
+  expect(view('fresh-incident').simTime).toBe(0);
 });
 
 it('stops interactive advancement at the first terminal tick and keeps recorder state available', () => {

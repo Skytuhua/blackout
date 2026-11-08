@@ -5,7 +5,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { initialize } from '../../src/sim/engine';
 import { hotRestart } from '../../src/content/scenarios/hot-restart';
-import { successfulPolicy } from '../sim/mission-policy';
 import { procedures } from '../../src/content/procedures';
 import type { GatewayStart, ToolIntent } from '../../src/shared/contracts';
 import { startInteraction, continueInteraction } from '../../src/llm/client';
@@ -15,7 +14,7 @@ import { appendFreshView, initialHistory, parameters } from '../../server/llm/ad
 import { Gateway } from '../../server/llm/gateway';
 import { Budget } from '../../server/llm/budget';
 import { createDemoServer } from '../../server/index';
-import { request as actionRequest } from '../sim/mission-policy';
+import { successfulPolicy } from '../sim/mission-policy';
 import { validateResponse } from '../../src/llm/validation';
 
 afterEach(() => vi.unstubAllGlobals());
@@ -75,14 +74,13 @@ it('scope preserves source freshness and selected evidence without mutating engi
   expect(scopeKnowledge(input.view, ['cooling-1'], [sample.id]).observations).toContainEqual(sample);
 });
 
-it.each([[75, false], [336, false], [75, true]] as const)('real mission t%s completes bounded calls with newer sensor readings: %s', async (at, advanceSensors) => {
-  const engine = initialize(hotRestart, `real-context-${at}`);
-  if (at === 336) {
-    // Exercise the real terminal history without coupling gateway limits to the old floor plan's ETAs.
+it.each([['mid-incident', false], ['recovered', false], ['mid-incident', true]] as const)('real mission %s completes bounded calls with newer sensor readings: %s', async (phase, advanceSensors) => {
+  const engine = initialize(hotRestart, `real-context-${phase}`);
+  if (phase === 'recovered') {
     successfulPolicy(engine);
     expect(engine.observe('player').mission.status).toBe('success');
-  } else engine.step(at);
-  const input: GatewayStart = { ...missionStart(), runId: `real-context-${at}`, view: scopeKnowledge(engine.observe('alex'), ['cooling-1']) };
+  } else engine.step(75);
+  const input: GatewayStart = { ...missionStart(), runId: `real-context-${phase}`, view: scopeKnowledge(engine.observe('alex'), ['cooling-1']) };
   const factId = input.view.observations.find(o => o.assetId === 'cooling-1')!.id;
   const planned: number[] = []; const wireBytes: number[] = []; let calls = 0;
   const gateway = new Gateway({ mode: 'live', keyConfigured: true, budget: new Budget(join(mkdtempSync(join(tmpdir(), 'blackout-context-')), 'usage.json')), transport: async params => {

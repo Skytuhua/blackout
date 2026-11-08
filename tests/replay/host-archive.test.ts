@@ -99,7 +99,7 @@ it('deduplicates exact captures and messages while rejecting conflicting and wro
   expect(saved.dialogue.filter(row => row.id === 'host-question')).toEqual([hostMessage()]);
 });
 
-it('retains unknown model provenance, validates build content and rejects practice and incompatible records', async () => {
+it('retains unknown model provenance, validates build content and supports exact healthy practice records', async () => {
   const HostArchive = await archiveType(); const engine = initialize(hotRestart, 'no-provider');
   const archive = new HostArchive('no-provider');
   expect(archive.build(engine.exportRecord()).provenance).toEqual(engine.exportRecord().provenance);
@@ -107,7 +107,8 @@ it('retains unknown model provenance, validates build content and rejects practi
   engine.step(10); const corrupt = engine.exportRecord(); corrupt.events.length = 0;
   expect(() => archive.build(corrupt)).toThrow(/HISTORY/);
   expect(() => archive.build({ ...bad, engineVersion: 'sim-01-v1' })).toThrow(/VERSION/);
-  expect(() => new HostArchive('practice').build(initialize(practiceScenario, 'practice').exportRecord())).toThrow(/VERSION/);
+  const practice = initialize(practiceScenario, 'practice').exportRecord();
+  expect(new HostArchive('practice').build(practice)).toMatchObject({ scenario: practiceScenario, interactions: [], lineage: [], provenance: practice.provenance });
 });
 
 it('preserves source provenance when a resumed run has not observed a new model or prompt', async () => {

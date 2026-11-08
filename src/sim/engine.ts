@@ -56,6 +56,7 @@ export function initialize(spec: ScenarioSpec, runId: string): SimulationEngine 
 function validateRestoredState(state: EngineState, at: number) {
   validateTopology(state.scenario);
   if ((state.scenario.mode === 'practice') !== (state.mission.status === 'practice')) throw new Error('Invalid checkpoint mission mode.');
+  if (state.mission.status === 'practice' && (state.mission.reason !== null || state.mission.heldAt !== null || state.mission.stabilitySeconds !== 0 || state.mission.criticalLossSeconds !== 0 || Object.values(state.mission.evidenceHoldSeconds).some(s => s !== 0))) throw new Error('Practice cannot contain mission outcome progress.');
   const matches = (kind: string, actual: { id: string }[]) => JSON.stringify(state.scenario.topology.assets.filter(a => a.kind === kind).map(a => a.id)) === JSON.stringify(actual.map(a => a.id));
   for (const physical of [state.physical, state.initialPhysical]) {
     if (!matches('rack', physical.racks) || !matches('ups', physical.ups) || !matches('cooling', physical.cooling) || physical.ups.some(u => u.energyKwh > state.scenario.profile.upsEnergyKwh)) throw new Error('Checkpoint physical identity or energy mismatch.');
@@ -267,7 +268,7 @@ function createEngine(state: EngineState, runId: string, initialTime: number): S
       const objective = (id: string, label: string, met: boolean): KnowledgeView['objectives'][number] => ({ id, label, state: met ? 'complete' : 'awaiting_verification' });
       const view: KnowledgeView = {
         schemaVersion: 1, runId, actorId, simTime, viewHash: 'pending', knownTopology: spec.topology, crew: state.crew,
-        observations: evidence(state, actorId), tasks: state.tasks.map(t => t.public), messages: state.messages.filter(m => m.actorIds.includes(actorId)).map(m => m.message), allowedProcedureIds: ['hot-restart-v1'], observedEntityVersions: state.entityVersions,
+        observations: evidence(state, actorId), tasks: state.tasks.map(t => t.public), messages: state.messages.filter(m => m.actorIds.includes(actorId)).map(m => m.message), allowedProcedureIds: spec.mode === 'practice' ? [] : ['hot-restart-v1'], observedEntityVersions: state.entityVersions,
         affordances: affordances(state, actorId, simTime), objectives: spec.mode === 'practice' ? [] : [
           objective('prerequisite', 'Verify the cooling prerequisite is restored', conditions.prerequisite),
           objective('service', 'Critical demand fully served with no overload', conditions.service),

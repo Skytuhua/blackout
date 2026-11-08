@@ -4,6 +4,7 @@ import type { Point, SimulationEngine } from '../../src/shared/contracts';
 import { CheckpointSchema, KnowledgeViewSchema, RunRecordSchema } from '../../src/shared/schemas';
 import { initialize, restore } from '../../src/sim/engine';
 import { route } from '../../src/sim/navigation';
+import { validateRunRecord, verifyReplay } from '../../src/sim/replay';
 import type { EngineState } from '../../src/sim/state';
 import { latest, request } from './mission-policy';
 
@@ -42,6 +43,7 @@ describe('desktop crew destination travel', () => {
     expect(engine.observe('player').observations).toEqual(idle.observe('player').observations);
     expect(engine.observe('player').messages).toEqual(idle.observe('player').messages);
     expect(state(engine).pendingReports).toEqual([]);
+    expect(verifyReplay(engine.exportRecord(), 'move-replayed').matches).toBe(true);
     expect(engine.exportRecord().events.some(e => e.type === 'task.applied' && e.payload.action === 'move_crew')).toBe(false);
     expect(engine.applyCommand(request(engine, 'repair_cooling', 'controller', { technicianId: 'alex' })).reason).toBe('INSPECTION_REQUIRED');
   });
@@ -66,6 +68,7 @@ describe('desktop crew destination travel', () => {
     expect(alex(engine)).toMatchObject({ x: hotRestart.crew[0].x, y: hotRestart.crew[0].y, taskId: null });
     expect(engine.observe('player').tasks.map(t => t.status)).toEqual(['canceled', 'completed']);
     expect(() => restore(engine.snapshot(), 'finished-moves')).not.toThrow();
+    expect(verifyReplay(engine.exportRecord(), 'canceled-replayed').matches).toBe(true);
   });
 
   it('restores an in-flight destination path and rejects equipment-service endpoint substitution', () => {
@@ -86,6 +89,7 @@ describe('desktop crew destination travel', () => {
     expect(engine.observe('player').tasks[0]).toMatchObject({ status: 'completed', arrivalAt: 0, completesAt: 0 });
     expect(alex(engine).taskId).toBeNull();
     expect(() => restore(engine.snapshot(), 'same-cell-restored')).not.toThrow();
+    expect(verifyReplay(engine.exportRecord(), 'same-cell-replayed').matches).toBe(true);
   });
 
   it.each(['alex', 'jules', 'sam'])('denies movement to model actor %s and publishes movement only to the player', actor => {
@@ -175,6 +179,8 @@ describe('explicit healthy practice', () => {
     expect(engine.applyCommand(request(engine, 'repair_cooling', 'controller', { technicianId: 'alex' })).reason).toBe('NO_REPAIR_REQUIRED');
     expect(move(engine).status).toBe('accepted');
     expect(() => restore(engine.snapshot(), 'practice-restored')).not.toThrow();
+    expect(() => validateRunRecord(engine.exportRecord())).not.toThrow();
+    expect(verifyReplay(engine.exportRecord(), 'practice-replayed').matches).toBe(true);
   });
 
   it('cannot become a timed incident or publish success/failure from a forged practice mission checkpoint', () => {
@@ -209,5 +215,33 @@ describe('explicit healthy practice', () => {
     expect(checkpoint).toMatchObject({ schemaVersion: 1, engineVersion: 'sim-desktop-v2', scenarioVersion: 'practice-layout-v2' });
     expect(record).toMatchObject({ schemaVersion: 1, engineVersion: 'sim-desktop-v2' });
     expect(() => restore({ ...checkpoint, engineVersion: 'sim-02-v1' }, 'old')).toThrow('Unsupported engine version');
+  });
+});
+
+
+describe('reconciled practice and retained movement validation', () => {
+  it('does not offer an incident solution procedure in healthy practice', () => {
+    expect(initialize(practiceScenario, 'practice-procedures').observe('alex').allowedProcedureIds).toEqual([]);
+  });
+
+  it.each(['reason', 'heldAt', 'stabilitySeconds', 'criticalLossSeconds', 'evidenceHoldSeconds'] as const)('rejects forged practice outcome progress in %s', field => {
+    const engine = initialize(practiceScenario, `practice-forged-${field}`); engine.step(10);
+    const checkpoint = engine.snapshot();
+    const mission = (checkpoint.state as unknown as EngineState).mission;
+    if (field === 'reason') mission.reason = 'forged';
+    else if (field === 'evidenceHoldSeconds') mission.evidenceHoldSeconds.player = 1;
+    else mission[field] = 1;
+    expect(() => restore(checkpoint, 'practice-rejected')).toThrow(/Practice/);
+  });
+
+  it.each(['traveling', 'completed', 'canceled'] as const)('rejects a forged destination path for a %s retained move', status => {
+    const engine = initialize(hotRestart, `endpoint-${status}`);
+    const receipt = move(engine);
+    if (status === 'completed') engine.step(receipt.eta!);
+    if (status === 'canceled') engine.applyCommand(request(engine, 'cancel_task', 'alex', { taskId: receipt.taskId! }));
+    const checkpoint = engine.snapshot();
+    expect(() => restore(checkpoint, 'endpoint-valid')).not.toThrow();
+    (checkpoint.state as unknown as EngineState).tasks[0].public.path.at(-1)!.y--;
+    expect(() => restore(checkpoint, 'endpoint-invalid')).toThrow(/path/);
   });
 });

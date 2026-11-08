@@ -1,6 +1,6 @@
 import type { Checkpoint, RunRecord } from '../../shared/contracts';
 import { CheckpointSchema, RunRecordSchema } from '../../shared/schemas';
-import { hotRestart } from '../../content/scenarios/hot-restart';
+import { hotRestart, practiceScenario } from '../../content/scenarios/hot-restart';
 import { ENGINE_VERSION, initialize, restore } from '../engine';
 import { EngineStateSchema } from '../state';
 import { canonicalJson, orderedEvents } from './canonical';
@@ -22,7 +22,7 @@ export function validateCheckpoint(input: unknown): Checkpoint {
   try {
     const checkpoint = CheckpointSchema.parse(input);
     const state = EngineStateSchema.parse(checkpoint.state);
-    if (checkpoint.scenarioVersion !== hotRestart.contentVersion || canonicalJson(state.scenario) !== canonicalJson(hotRestart)) throw new ReplayDataError('VERSION_MISMATCH', 'Unsupported scenario content, seed or procedure identity.');
+    if (![hotRestart, practiceScenario].some(spec => checkpoint.scenarioVersion === spec.contentVersion && canonicalJson(state.scenario) === canonicalJson(spec))) throw new ReplayDataError('VERSION_MISMATCH', 'Unsupported scenario content, seed or procedure identity.');
     if (state.commands.some(c => c.receipt.runId !== checkpoint.runId || c.receipt.actorId !== c.actorId || c.receipt.observedAt !== c.at)) throw new ReplayDataError('IDENTITY_MISMATCH', 'Checkpoint command identity mismatch.');
     restore(checkpoint, checkpoint.runId);
     const totals = state.physical.totals;
@@ -42,7 +42,7 @@ export function validateRunRecord(input: unknown): RunRecord {
   try {
     const record = RunRecordSchema.parse(input);
     const first = validateCheckpoint(record.initialCheckpoint); const last = validateCheckpoint(record.finalCheckpoint);
-    if ([first, last].some(c => c.runId !== record.runId || c.engineVersion !== record.engineVersion) || canonicalJson(record.scenario) !== canonicalJson(hotRestart) || record.provenance.procedureVersion !== record.scenario.procedureVersion) throw new ReplayDataError('IDENTITY_MISMATCH', 'Record, checkpoint or procedure identity mismatch.');
+    if ([first, last].some(c => c.runId !== record.runId || c.engineVersion !== record.engineVersion || canonicalJson(c.state.scenario) !== canonicalJson(record.scenario)) || record.provenance.procedureVersion !== record.scenario.procedureVersion) throw new ReplayDataError('IDENTITY_MISMATCH', 'Record, checkpoint or procedure identity mismatch.');
     if (canonicalJson(first) !== canonicalJson(initialize(record.scenario, record.runId).snapshot())) throw new ReplayDataError('IDENTITY_MISMATCH', 'Initial checkpoint must be the declared engine initial state.');
     const state = EngineStateSchema.parse(last.state);
     const equal = (a: unknown, b: unknown) => canonicalJson(a) === canonicalJson(b);
