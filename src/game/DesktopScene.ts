@@ -1,6 +1,6 @@
 import * as Phaser from 'phaser';
 import type { DesktopGameProps, Point } from '../shared/contracts';
-import { indicatorState, readingStatus } from '../ui/presentation';
+import { freshRunning, indicatorState, readingStatus } from '../ui/presentation';
 import { Commander, nearbyAsset, pointKey, routePosition, terminal, type Direction } from './desktop-world';
 import { atlasFrame } from './atlas-frame';
 
@@ -21,6 +21,8 @@ export class DesktopScene extends Phaser.Scene {
   private equipment = new Map<string, Phaser.GameObjects.Image>();
   private badges = new Map<string, Phaser.GameObjects.Image>();
   private workers = new Map<string, Phaser.GameObjects.Image>();
+  private workerPose = new Map<string, Point>();
+  private workerFacing = new Map<string, Direction>();
   private fans: Phaser.GameObjects.Image[] = [];
   private commanderSprite!: Phaser.GameObjects.Image;
   private marks!: Phaser.GameObjects.Graphics;
@@ -49,7 +51,7 @@ export class DesktopScene extends Phaser.Scene {
   }
   setView(state: DesktopSceneState) {
     const reset = state.view.runId !== this.state.view.runId;
-    if (reset) { this.commander.clear(); this.commander = new Commander(state.view.knownTopology); this.clock = 0; this.eventsOut.pose(this.commander.position); }
+    if (reset) { this.commander.clear(); this.commander = new Commander(state.view.knownTopology); this.clock = 0; this.workerPose.clear(); this.workerFacing.clear(); this.eventsOut.pose(this.commander.position); }
     if (reset || state.view.simTime !== this.state.view.simTime) this.presentationTime = state.view.simTime;
     if (reset || state.paused || terminal(state.view) || state.session === 'welcome') this.clearKeys();
     this.state = state;
@@ -74,12 +76,17 @@ export class DesktopScene extends Phaser.Scene {
     const asset = nearbyAsset(this.state.view, this.commander.position);
     if (asset) this.eventsOut.asset(asset.id);
   }
-  diagnostics() { return { objects: this.children.length, pointerListeners: this.input.listenerCount('pointerdown'), equipment: this.equipment.size, crew: this.workers.size, atlas: this.hasAtlas, position: { ...this.commander.position }, clock: this.clock }; }
+  diagnostics() { return { objects: this.children.length, pointerListeners: this.input.listenerCount('pointerdown'), equipment: this.equipment.size, crew: this.workers.size, atlas: this.hasAtlas, position: { ...this.commander.position }, clock: this.clock, fanFrames: this.fans.map(f => f.frame.name) }; }
   private sprite(x: number, y: number, frame: string, fallback: string) {
     const safeFrame = atlasFrame(frame, this.availableFrames);
     return this.add.image(x, y, safeFrame ? 'facility-v2' : `desktop-legacy-${fallback}`, safeFrame ?? undefined).setOrigin(0);
   }
-  private frame(sprite: Phaser.GameObjects.Image, name: string) { const safeFrame = atlasFrame(name, this.availableFrames); if (safeFrame) sprite.setTexture('facility-v2', safeFrame); }
+  private frame(sprite: Phaser.GameObjects.Image, name: string) {
+    const safeFrame = atlasFrame(name, this.availableFrames);
+    // Manifest anchors are native pixels. Phaser's atlas parser interprets `anchor`
+    // as a normalized pivot and setTexture reapplies it on every frame change.
+    if (safeFrame) sprite.setTexture('facility-v2', safeFrame).setOrigin(0);
+  }
   private pointer(pointer: Phaser.Input.Pointer) {
     const { view } = this.state, point = { x: Math.floor(pointer.x / 16), y: Math.floor(pointer.y / 16) };
     const crew = view.crew.find(c => { if (c.role === 'remote') return false; const pose = routePosition(c, view.tasks.find(t => t.id === c.taskId), this.presentationTime, view.knownTopology); return Math.abs(pose.x + .5 - pointer.x / 16) < .45 && Math.abs(pose.y + .5 - pointer.y / 16) < .55; });
@@ -97,11 +104,18 @@ export class DesktopScene extends Phaser.Scene {
       const walkable = new Set(topology.walkable.map(pointKey));
       for (let y = 0; y < topology.height; y++) for (let x = 0; x < topology.width; x++) {
         const assetCell = topology.assets.some(a => x >= a.x && x < a.x + a.width && y >= a.y && y < a.y + a.height);
-        const floor = walkable.has(`${x},${y}`) || assetCell;
-        const frame = floor ? `floor_${(x * 7 + y * 3) % 3}` : `wall_${y === 0 || y === 7 || y === 11 ? 0 : x === 0 || x === 19 || x === 7 || x === 14 ? 1 : 2}`;
+        const cartCell = x === 12 && y === 5 && !walkable.has(`${x},${y}`) && this.availableFrames.has('cart');
+        const floor = walkable.has(`${x},${y}`) || assetCell || cartCell;
+        const variant = !assetCell && y === 10 && [5, 10, 16].includes(x) ? 2 : (x * 7 + y * 3) % 11 === 0 ? 1 : 0;
+        const frame = floor ? `floor_${variant}` : `wall_${y === 0 || y === 7 || y === 11 ? 0 : x === 0 || x === 19 || x === 7 || x === 14 ? 1 : 2}`;
         const image = this.hasAtlas ? this.sprite(x * 16, y * 16, frame, 'tiles') : this.add.image(x * 16, y * 16, 'desktop-legacy-tiles', floor ? 0 : 1).setOrigin(0);
         this.terrain.push(image.setDepth(0));
       }
+      const decorate = (frame: string, x: number, y: number, depth = 2) => { if (this.availableFrames.has(frame)) this.terrain.push(this.sprite(x * 16, y * 16, frame, 'tiles').setDepth(depth)); };
+      // Signs/rails and the cart are placed only on already solid public cells.
+      [4, 11, 17].forEach((x, i) => { if (!walkable.has(`${x},7`)) decorate(`fixture_${i + 1}`, x, 7); });
+      if (!walkable.has('12,5')) decorate('cart', 12, 5, 4);
+      for (let x = 9; x <= 13; x++) decorate('infra_1', x, 1, 2);
     }
     for (const [id, image] of this.equipment) if (!topology.assets.some(a => a.id === id)) { image.destroy(); this.equipment.delete(id); this.badges.get(id)?.destroy(); this.badges.delete(id); }
     for (const asset of topology.assets) {
@@ -110,7 +124,7 @@ export class DesktopScene extends Phaser.Scene {
       image.setPosition(asset.x * 16, asset.y * 16).setDepth(4).setDisplaySize(asset.width * 16, asset.height * 16);
       if (this.availableFrames.has('badge_unknown') && !this.badges.has(asset.id)) this.badges.set(asset.id, this.sprite(asset.x * 16 + asset.width * 16 - 8, asset.y * 16, 'badge_unknown', 'rack').setDepth(7));
     }
-    for (const [id, image] of this.workers) if (!view.crew.some(c => c.id === id && c.role !== 'remote')) { image.destroy(); this.workers.delete(id); }
+    for (const [id, image] of this.workers) if (!view.crew.some(c => c.id === id && c.role !== 'remote')) { image.destroy(); this.workers.delete(id); this.workerPose.delete(id); this.workerFacing.delete(id); }
     for (const crew of view.crew.filter(c => c.role !== 'remote')) if (!this.workers.has(crew.id)) this.workers.set(crew.id, this.sprite(0, 0, `${crew.role}_s_idle`, 'technician').setDepth(15));
   }
   update(_time: number, delta: number) {
@@ -128,15 +142,18 @@ export class DesktopScene extends Phaser.Scene {
       const observations = view.observations.filter(o => o.assetId === asset.id), state = indicatorState(observations, view.simTime);
       const stale = observations.length > 0 && observations.every(o => readingStatus(o, view.simTime) === 'stale');
       const badge = this.badges.get(asset.id); if (badge) this.frame(badge, `badge_${stale ? 'stale' : state === 'attention' ? 'warning' : state}`);
-      if (!this.hasAtlas) { this.marks.fillStyle(state === 'active' ? 0x45d5e8 : state === 'attention' ? 0xf4b860 : 0x92a8b7); this.marks.fillRect(asset.x * 16 + 3, asset.y * 16 + 3, 2, 2); }
-      if (asset.kind === 'generator') this.frame(this.equipment.get(asset.id)!, `generator_${state === 'active' && !reducedMotion ? Math.floor(this.clock * 4) % 3 : 0}`);
+      this.marks.fillStyle(state === 'active' ? 0x03deee : state === 'attention' ? 0xffce15 : 0x696993);
+      if (asset.kind === 'rack') { for (let row = 0; row < 3; row++) { this.marks.fillRect(asset.x * 16 + 4, asset.y * 16 + 11 + row * 5, 3, 2); this.marks.fillRect(asset.x * 16 + 9, asset.y * 16 + 11 + row * 5, 3, 2); } }
+      else this.marks.fillRect(asset.x * 16 + 4, asset.y * 16 + 4, 3, 2);
+      if (asset.kind === 'generator') this.frame(this.equipment.get(asset.id)!, `generator_${freshRunning(observations, view.simTime) && !reducedMotion ? Math.floor(this.clock * 4) % 3 : 0}`);
       if (asset.id === this.state.selectedAssetId) { this.marks.lineStyle(1, 0x45d5e8); this.marks.strokeRect(asset.x * 16 - 1, asset.y * 16 - 1, asset.width * 16 + 2, asset.height * 16 + 2); }
     }
-    this.fans.forEach((fan, i) => { const asset = view.knownTopology.assets.filter(a => a.kind === 'cooling')[i]; const active = asset && indicatorState(view.observations.filter(o => o.assetId === asset.id), view.simTime) === 'active'; this.frame(fan, `fan_${active && !reducedMotion ? Math.floor(this.clock * 6) % 4 : 0}`); });
+    this.fans.forEach((fan, i) => { const asset = view.knownTopology.assets.filter(a => a.kind === 'cooling')[i]; const active = asset && freshRunning(view.observations.filter(o => o.assetId === asset.id), view.simTime); this.frame(fan, `fan_${active && !reducedMotion ? Math.floor(this.clock * 6) % 4 : 0}`); });
     for (const crew of view.crew.filter(c => c.role !== 'remote')) {
       const task = view.tasks.find(t => t.id === crew.taskId), pose = reducedMotion ? crew : routePosition(crew, task, this.presentationTime, view.knownTopology), image = this.workers.get(crew.id)!;
-      const dx = pose.x * 16 + 2 - image.x, dy = pose.y * 16 - image.y;
-      const facing = Math.abs(dx) > Math.abs(dy) ? dx < 0 ? 'w' : 'e' : dy < 0 ? 'n' : 's';
+      const previous = this.workerPose.get(crew.id) ?? pose, dx = pose.x - previous.x, dy = pose.y - previous.y;
+      const facing: Direction = Math.abs(dx) + Math.abs(dy) > 1e-6 ? Math.abs(dx) > Math.abs(dy) ? dx < 0 ? 'w' : 'e' : dy < 0 ? 'n' : 's' : this.workerFacing.get(crew.id) ?? 's';
+      this.workerPose.set(crew.id, { x: pose.x, y: pose.y }); this.workerFacing.set(crew.id, facing);
       const moving = task?.status === 'traveling' && crew.taskId === task.id;
       const working = task && ['working', 'inspecting'].includes(task.status) && crew.taskId === task.id && this.presentationTime >= task.arrivalAt;
       this.frame(image, `${crew.role}_${facing}_${reducedMotion ? 'idle' : moving ? `walk${walkFrame}` : working ? `work${workFrame}` : 'idle'}`);

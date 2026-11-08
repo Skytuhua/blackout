@@ -4,8 +4,9 @@ import type { DesktopGameProps, Point } from '../shared/contracts';
 import type { DesktopScene } from './DesktopScene';
 import { fitWorld, moveCrewIntent } from './desktop-world';
 
-const scenes = new WeakMap<HTMLElement, DesktopScene>();
-export const desktopSceneFor = (element: HTMLElement) => scenes.get(element);
+const sceneKey = Symbol.for('blackout.desktop.scene');
+const sceneHost = (element: HTMLElement) => element as unknown as Record<symbol, DesktopScene | undefined>;
+export const desktopSceneFor = (element: HTMLElement) => sceneHost(element)[sceneKey];
 
 export function DesktopMap(props: DesktopGameProps) {
   const stage = useRef<HTMLDivElement>(null), host = useRef<HTMLDivElement>(null);
@@ -25,12 +26,14 @@ export function DesktopMap(props: DesktopGameProps) {
     const focus = (event: FocusEvent) => { scene.current?.focusWorld(event.target === element); };
     const key = (event: KeyboardEvent) => {
       if (document.activeElement !== element || event.altKey || event.metaKey || event.ctrlKey || event.isComposing) return;
-      if (!['w', 'a', 's', 'd', 'e', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key) || (event.repeat && event.key === 'e')) return;
-      event.preventDefault(); scene.current?.handleKey(event.key, event.type === 'keydown');
+      const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+      if (!['w', 'a', 's', 'd', 'e', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(key) || (event.repeat && key === 'e')) return;
+      event.preventDefault(); scene.current?.handleKey(key, event.type === 'keydown');
     };
     const blur = () => { clear(); scene.current?.focusWorld(false); };
+    const refocus = () => scene.current?.focusWorld(document.activeElement === element);
     const refresh = () => scene.current?.setView(state());
-    window.addEventListener('blur', blur); document.addEventListener('visibilitychange', visibility); document.addEventListener('focusin', focus);
+    window.addEventListener('blur', blur); window.addEventListener('focus', refocus); document.addEventListener('visibilitychange', visibility); document.addEventListener('focusin', focus);
     element.addEventListener('keydown', key); element.addEventListener('keyup', key); element.addEventListener('blur', clear); media.addEventListener('change', refresh);
     const atlasReady = fetch('/assets/facility-v2.json').then(async response => response.ok && response.headers.get('content-type')?.includes('json') ? Boolean((await response.json()).frames?.floor_0) : false).catch(() => false);
     void Promise.all([import('phaser'), import('./DesktopScene'), atlasReady]).then(([Phaser, module, ready]) => {
@@ -48,13 +51,13 @@ export function DesktopMap(props: DesktopGameProps) {
         moved: () => latest.current.onTutorialEvent('commander_moved'), pose: setPosition,
         art: ready => setArt(ready ? 'atlas' : 'fallback'),
       }, ready);
-      scenes.set(element, scene.current);
+      sceneHost(element)[sceneKey] = scene.current;
       game = new Phaser.Game({ type: Phaser.CANVAS, parent: element, width: 320, height: 192, pixelArt: true, roundPixels: true, scene: scene.current, banner: false, audio: { noAudio: true }, input: { keyboard: false }, render: { antialias: false } });
     });
     return () => {
-      disposed = true; observer.disconnect(); window.removeEventListener('blur', blur); document.removeEventListener('visibilitychange', visibility); document.removeEventListener('focusin', focus);
+      disposed = true; observer.disconnect(); window.removeEventListener('blur', blur); window.removeEventListener('focus', refocus); document.removeEventListener('visibilitychange', visibility); document.removeEventListener('focusin', focus);
       element.removeEventListener('keydown', key); element.removeEventListener('keyup', key); element.removeEventListener('blur', clear); media.removeEventListener('change', refresh);
-      scenes.delete(element); scene.current = null; game?.destroy(true);
+      delete sceneHost(element)[sceneKey]; scene.current = null; game?.destroy(true);
     };
   }, []);
   useEffect(() => { scene.current?.setView({ ...props, reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches }); }, [props]);
