@@ -214,7 +214,7 @@ export default function App() {
     return () => clearInterval(timer);
   }, [replayPlaying, replayActive, source, speed]);
   async function compare(sequence: number, earlierAt: number) {
-    if (!source || busy || hostPending.current) return; const token = generation.current, request = sourceGeneration.current; hostPending.current = true; setBusy(true); setError('');
+    if (!source || busy || hostPending.current || jobs.current.size) return; const token = generation.current, request = sourceGeneration.current; hostPending.current = true; setBusy(true); setError('');
     try {
       let client = replayClient.current;
       if (!client) { client = new SimulationClient(); replayClient.current = client; await client.initialize(source.scenario); }
@@ -228,11 +228,11 @@ export default function App() {
   const options = conversationOrders(shown);
   const displayedThreads = withConversationAssignments(replayActive && source ? savedConversations(source, shown) : threads, shown).map(thread => ({ ...thread, suggestedOrders: options.filter(order => order.actorId === thread.actorId).map(({ intent: _intent, ...order }) => order) }));
   const coolingStopped = shown.observations.some(observation => observation.field === 'running' && observation.value === false && observation.quality !== 'unknown' && observation.observedAt <= shown.simTime && observation.receivedAt <= shown.simTime && shown.simTime - observation.observedAt <= 10 && shown.knownTopology.assets.some(asset => asset.id === observation.assetId && asset.kind === 'cooling'));
-  const replayContent = <DesktopReplayView compactMenu saved={saved} ledger={ledger} comparison={comparison} cursor={cursor} playing={replayPlaying} busy={busy} active={replayActive} canSave={session === 'mission'} notice={notice} error={error}
+  const replayContent = <>{jobs.current.size > 0 && <p role="status">Wait for the reply before reviewing this run.</p>}<DesktopReplayView compactMenu saved={saved} ledger={ledger} comparison={comparison} cursor={cursor} playing={replayPlaying} busy={busy || jobs.current.size > 0} active={replayActive} canSave={session === 'mission'} notice={notice} error={error}
     caps={source?.commands.filter(command => ['accepted', 'applied'].includes(command.receipt.status) && ['pause_batch', 'set_batch_ceiling'].includes(command.intent.action)).map(command => ({ sequence: command.sequence, at: command.at, label: words(command.intent.action) })) ?? []}
     dialogue={source?.dialogue ?? []} transcript={source ? JSON.stringify(source.interactions, null, 2) : ''}
     onSave={() => void capture(true)} onRefresh={() => void refreshSaves()} onReview={id => void reviewSaved(id, false)} onResume={id => void reviewSaved(id, true)} onExport={id => void exportSaved(id)}
-    onReplay={() => { if (source) void activateReplay(source); }} onReturn={() => { closeReplay(); setMenuOpen(false); menuOpenRef.current = false; }} onSeek={at => void seek(at)} onToggle={() => setReplayPlaying(value => !value)} onCompare={(sequence, at) => void compare(sequence, at)} />;
+    onReplay={() => { if (source) void activateReplay(source); }} onReturn={() => { closeReplay(); setMenuOpen(false); menuOpenRef.current = false; }} onSeek={at => void seek(at)} onToggle={() => setReplayPlaying(value => !value)} onCompare={(sequence, at) => void compare(sequence, at)} /></>;
   const readEntries = (id: string, ids: string[]) => { if (!replayActive) updateThreads(previous => markConversationRead(previous, id, ids)); };
   const openEntry = (id: string, entryId: string) => { if (!displayedThreads.find(thread => thread.actorId === id)?.entries.some(entry => entry.id === entryId)) return; setReader({ actorId: id, entryId }); readEntries(id, [entryId]); };
   const setGuidance = (enabled: boolean) => { guideEnabled.current = enabled; setGuidanceEnabled(enabled); syncClock(); };
