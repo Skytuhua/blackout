@@ -18,7 +18,7 @@ it('executes inspection once through command with observed versions and returns 
   let commands = 0;
   const simulation = { observe: async () => alarmFixture, command: async (request: import('../../src/shared/contracts').ActionRequest) => {
     commands++;
-    expect(request.expectedEntityVersions).toEqual({ 'cooling-1': 1 });
+    expect(request.expectedEntityVersions).toEqual(alarmFixture.observedEntityVersions);
     return { schemaVersion: 1 as const, runId: start.runId, requestId: start.requestId, actorId: 'player', status: 'accepted' as const, reason: 'queued', taskId: 'task', eta: 109, evidenceIds: [], observedAt: 75 };
   } };
   const inspection: ToolIntent = { ...intent, callId: 'inspection', tool: 'inspect_asset', action: { action: 'inspect', targetId: 'cooling-1', atSimTime: 75, args: { technicianId: 'alex' } } };

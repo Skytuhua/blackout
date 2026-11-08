@@ -2,7 +2,8 @@ import OpenAI from 'openai';
 import type { Response, ResponseCreateParamsNonStreaming, ResponseInput } from 'openai/resources/responses/responses';
 import { z } from 'zod';
 import { AgentResponseSchema, ActionIntentSchema, ToolIntentSchema } from '../../src/shared/schemas';
-import type { GatewayStart, ToolIntent, AgentResponse } from '../../src/shared/contracts';
+import type { GatewayStart, ToolIntent, AgentResponse, Observation, PublicToolResult } from '../../src/shared/contracts';
+import { latestObservations } from '../../src/llm/context';
 export type Transport = (params: ResponseCreateParamsNonStreaming, signal: AbortSignal) => Promise<Response>;
 export type History = ResponseInput;
 // Provider-only strict schemas make optional action arguments explicitly nullable.
@@ -23,12 +24,26 @@ export function officialTransport(): Transport {
 }
 export function initialHistory(start: GatewayStart): History {
   const { view, ...context } = start;
-  return [{ role: 'user', content: JSON.stringify({ ...context, view: { runId: view.runId, actorId: view.actorId, simTime: view.simTime, viewHash: view.viewHash, assets: view.knownTopology.assets.map(a => ({ id: a.id, kind: a.kind })), crew: view.crew.map(c => ({ id: c.id, role: c.role, taskId: c.taskId })), observations: view.observations, tasks: view.tasks, allowedProcedureIds: view.allowedProcedureIds, observedEntityVersions: view.observedEntityVersions, affordances: view.affordances, messages: view.messages.slice(-4) } }) }];
+  return [{ role: 'user', content: JSON.stringify({ ...context, view: {
+    runId: view.runId, actorId: view.actorId, simTime: view.simTime, viewHash: view.viewHash,
+    assets: view.knownTopology.assets.map(a => [a.id, a.kind]),
+    crew: view.crew.map(c => ({ id: c.id, role: c.role, taskId: c.taskId })),
+    ...observationRows(latestObservations(view.observations)),
+    taskFields: ['id', 'actorId', 'targetId', 'action', 'status', 'startedAt', 'arrivalAt', 'completesAt', 'progress', 'reason'],
+    tasks: view.tasks.map(t => [t.id, t.actorId, t.targetId, t.action, t.status, t.startedAt, t.arrivalAt, t.completesAt, t.progress, t.reason]),
+    allowedProcedureIds: view.allowedProcedureIds, observedEntityVersions: view.observedEntityVersions,
+    affordances: view.affordances.filter(a => a.enabled), messages: view.messages.slice(-4), mission: view.mission,
+  } }) }];
+}
+function observationRows(observations: Observation[]) {
+  return { observationFields: ['id', 'assetId', 'field', 'value', 'units', 'observedAt', 'receivedAt', 'source', 'quality'], observations: observations.map(o => [o.id, o.assetId, o.field, o.value, o.units, o.observedAt, o.receivedAt, o.source, o.quality]) };
 }
 export function appendFreshView(history: History, start: GatewayStart): History {
   const initial = initialHistory(start)[0] as { content: string };
   // Only the latest continuation snapshot is needed; provider items stay exact.
-  return [...history.filter((item, index) => index === 0 || !('role' in item && item.role === 'user')), { role: 'user', content: JSON.stringify({ view: JSON.parse(initial.content).view }) }];
+  const original = JSON.parse((history[0] as { content: string }).content);
+  delete original.view;
+  return [{ role: 'user', content: JSON.stringify(original) }, ...history.slice(1).filter(item => !('role' in item && item.role === 'user')), { role: 'user', content: JSON.stringify({ view: JSON.parse(initial.content).view }) }];
 }
 export function parameters(start: GatewayStart, input: History, calls: number): ResponseCreateParamsNonStreaming {
   return { model: process.env.OPENAI_MODEL ?? 'gpt-5.6-luna', reasoning: { effort: 'none' }, store: false, parallel_tool_calls: false,
@@ -60,4 +75,8 @@ export function decode(response: Response, start: GatewayStart, interactionId: s
   return AgentResponseSchema.parse(parsed);
 }
 export function appendOutput(history: History, response: Response): History { return [...history, ...response.output] as History; }
-export function appendToolResult(history: History, callId: string, output: unknown): History { return [...history, { type: 'function_call_output', call_id: callId, output: JSON.stringify(output) }]; }
+export function appendToolResult(history: History, callId: string, output: PublicToolResult): History {
+  const { status, reason, receipt, procedureText, observations } = output;
+  // Observation tuples use the columns already supplied in the current view.
+  return [...history, { type: 'function_call_output', call_id: callId, output: JSON.stringify({ status, reason, receipt, procedureText, observations: observationRows(observations).observations }) }];
+}
