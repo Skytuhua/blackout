@@ -56,7 +56,6 @@ function DemoConversationMap(props: ConversationGameProps) {
   const runId = props.view.runId;
   return <section className="conv-map" aria-label="Facility world">
     <NearbyEquipment {...props} />
-    <p className="conv-demo-notice" role="note">{projection.notice}</p>
     <div className="conv-stage">
       <FacilityMap view={projection.view} demo={projection} selectedRoomId={roomId} selectedAssetId={props.selectedAssetId}
         selectedActorId={props.selectedActorId} paused={props.paused} speed={props.speed} reducedMotion={false}

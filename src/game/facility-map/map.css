@@ -15,9 +15,10 @@
 }
 .facility-map *, .facility-map *::before, .facility-map *::after { box-sizing: border-box; }
 .facility-map[data-demo="true"] { grid-template-rows: auto minmax(0, 1fr); }
+.fm-map-controls { display: flex; gap: 4px; padding: 4px 8px; border-bottom: 1px solid var(--fm-border); }
+.fm-map-controls button { min-width: 44px; text-align: center; }
+.fm-map-hint { align-self: center; margin-left: 4px; }
 .fm-demo-unavailable { position: absolute; pointer-events: none; }
-.fm-demo-room-label { position: absolute; left: 50%; transform: translate(-50%, -120%); white-space: nowrap; padding: 1px 4px; color: #dceaf2; background: #07111b; border: 1px solid #345063; font-size: .75rem; }
-.facility-map[data-compact="true"] .fm-demo-room-label { display: none; }
 .fm-demo-description { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .facility-map ::selection { color: var(--fm-ground); background: var(--fm-cyan); }
 .facility-map button, .facility-map select { font: inherit; color: inherit; background: var(--fm-panel); border: 1px solid var(--fm-border); border-radius: 3px; }
@@ -41,6 +42,9 @@
 .fm-toolbar select { min-height: 44px; max-width: 13em; padding: 4px; }
 .fm-topology-note { color: var(--fm-muted); font-size: .875rem; }
 .fm-stage { position: relative; min-width: 0; min-height: 0; display: grid; place-items: center; overflow: hidden; }
+.facility-map[data-demo="true"] .fm-stage { touch-action: none; }
+.facility-map[data-demo="true"] .fm-world canvas { cursor: grab; }
+.facility-map[data-demo="true"] .fm-world canvas:active { cursor: grabbing; }
 .fm-world { position: relative; flex: none; }
 .fm-world canvas { width: 100%; height: 100%; display: block; image-rendering: pixelated; cursor: pointer; }
 .fm-room-label, .fm-crew-label, .fm-upstream-mark { position: absolute; pointer-events: none; white-space: nowrap; transform: translate(-50%, -100%); font-size: .875rem; line-height: 1.2; padding: 2px 4px; color: var(--fm-ink); background: var(--fm-ground); }
