@@ -6,10 +6,11 @@ import type { FacilityMapProps } from '../../../src/shared/facility-map';
 
 let pending: Map<number, FrameRequestCallback>, nextId: number, now: number;
 let frames: string[];
+let painted: { name: string; x: number; y: number }[];
 const frameNames = new Map(Object.entries(atlas.frames).map(([name, { frame }]) => [[frame.x, frame.y, frame.w, frame.h].join(','), name]));
 function canvas() {
   const context = new Proxy({ drawImage(image: { atlas?: boolean }, ...args: number[]) {
-    if (image.atlas && args.length === 8) frames.push(frameNames.get(args.slice(0, 4).join(',')) ?? '');
+    if (image.atlas && args.length === 8) { const name = frameNames.get(args.slice(0, 4).join(',')) ?? ''; frames.push(name); painted.push({ name, x: args[4], y: args[5] }); }
   } }, { get: (target, key) => key in target ? Reflect.get(target, key) : () => {} });
   return { width: 0, height: 0, dataset: {} as Record<string, string>, getContext: () => context };
 }
@@ -27,7 +28,7 @@ function reading(id: string, value: boolean, observedAt: number, receivedAt: num
   return { id, assetId: 'cooling-a-1', source: 'test', field: 'running', value, units: '', quality: 'reported' as const, observedAt, receivedAt };
 }
 beforeEach(() => {
-  pending = new Map(); nextId = 0; now = 1000; frames = [];
+  pending = new Map(); nextId = 0; now = 1000; frames = []; painted = [];
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { pending.set(++nextId, callback); return nextId; });
   vi.stubGlobal('cancelAnimationFrame', (id: number) => pending.delete(id));
   vi.stubGlobal('document', { createElement: () => canvas() });
@@ -35,6 +36,18 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('renderer review regressions', () => {
+  it('adds static wall details without decorating travel tiles or equipment', () => {
+    const state = props(); const { renderer } = mount(state);
+    const decorations = painted.filter(p => p.name.startsWith('fixture_') || p.name.startsWith('infra_'));
+    expect(decorations.length).toBeGreaterThan(5);
+    const topology = state.view.knownTopology;
+    for (const p of decorations) {
+      const x = p.x / 16, y = p.y / 16;
+      expect(topology.walkable.some(tile => tile.x === x && tile.y === y)).toBe(false);
+      expect(topology.assets.some(a => x >= a.x && x < a.x + a.width && y >= a.y && y < a.y + a.height)).toBe(false);
+    }
+    renderer.destroy();
+  });
   it('keeps a delivered running fan moving when a newer reading has not arrived', () => {
     const state = props(); state.view.observations = [reading('delivered', true, 19, 19), reading('pending', false, 20, 25)];
     const { renderer } = mount(state); advance();

@@ -33,10 +33,8 @@ function Fixture() {
     },
   };
   return <main className="fixture-host">
-    <header>Synthetic facility map development data · no engine or mission acceptance</header>
+    <header>Map preview - sample data; chat and mission are not connected</header>
     <div className="fixture-stage">{mounted && <FacilityMap {...props} />}</div>
-    <aside>Reserved host sidebar space</aside>
-    <footer>Reserved host progress and nearby-equipment space</footer>
   </main>;
 }
 createRoot(document.getElementById('root')!).render(<Fixture />);

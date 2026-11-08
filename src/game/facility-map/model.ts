@@ -11,7 +11,7 @@ export function roomViewport(topology: FacilityTopology, roomId: string | null):
 
 export function fitMap(width: number, height: number, native: { width: number; height: number }) {
   const ratio = Math.max(0, Math.min(width / native.width, height / native.height));
-  const scale = ratio >= 1 ? Math.floor(ratio) : ratio;
+  const scale = ratio;
   return { scale, width: native.width * scale, height: native.height * scale };
 }
 

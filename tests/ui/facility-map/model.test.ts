@@ -3,9 +3,12 @@ import { createFacilityMapFixture } from '../../../src/shared/facility-map-fixtu
 import { assetEvidence, fitMap, roomViewport, PresentationClock } from '../../../src/game/facility-map/model';
 
 describe('map presentation boundaries', () => {
-  it('fits both dimensions at integer scales, falling back below native without overflow', () => {
-    expect(fitMap(1000, 600, { width: 768, height: 448 })).toEqual({ scale: 1, width: 768, height: 448 });
-    expect(fitMap(1600, 1000, { width: 768, height: 448 }).scale).toBe(2);
+  it('uses available map space while preserving aspect ratio and avoiding overflow', () => {
+    const fitted = fitMap(1000, 600, { width: 768, height: 448 });
+    expect(fitted.width).toBeCloseTo(1000);
+    expect(fitted.height).toBeLessThanOrEqual(600);
+    expect(fitted.scale).toBeCloseTo(1000 / 768);
+    expect(fitMap(1600, 1000, { width: 768, height: 448 }).scale).toBeCloseTo(1600 / 768);
     const tiny = fitMap(400, 100, { width: 768, height: 448 });
     expect(tiny.width).toBeLessThanOrEqual(400);
     expect(tiny.height).toBeLessThanOrEqual(100);
