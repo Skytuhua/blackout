@@ -1,0 +1,52 @@
+{
+  "assetSet": "Blackout desktop facility v2",
+  "baseCommit": "8b1f4242bbdf38db0633f8fca39bf555bc2d20da",
+  "mode": "built-in image_gen",
+  "authorship": "New AI-generated raster art prompted and conditioned for Blackout. Source images are retained verbatim. Native pixel cleanup, palette restriction, frame assembly and animation derivation are explicitly disclosed.",
+  "rightsStatement": "Generated for this project using user-provided visual references. No third-party asset pack or license claim is included; this record does not assert exclusivity or event eligibility.",
+  "generations": [
+    {
+      "id": "masters-01",
+      "original": "source/generated-masters-original.png",
+      "prompt": "source/master-prompt.txt",
+      "tool": "image_gen.imagegen",
+      "transparentBackground": true,
+      "actualDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "notes": "Requested 1024x1024 source; built-in returned 1254x1254. Runtime exports independently normalize exact dimensions."
+    }
+  ],
+  "references": [
+    {
+      "file": "fadd738f-e94a-4d20-acd2-4bf11953ff76.png",
+      "role": "user-provided style reference; source UI not copied into runtime",
+      "sha256": "49ee82ca460827265bc795b657e96d5a6ba266dc4f4526f2fc4d4e49ff362f4c"
+    },
+    {
+      "file": "fa51ee6b-17a1-4330-9814-3fdd696761b2.png",
+      "role": "user-provided style reference",
+      "sha256": "0dd9045e5e009ad6c816c99ccd8689f863222c3411fc8b634ef59e566878d394"
+    },
+    {
+      "file": "4c1a588d-6ae0-4253-a4f1-c64ae61790fc.png",
+      "role": "user-provided style reference",
+      "sha256": "154a0ba0bc077ffab27e714a77e7df567e74f437bb5eab523937282623798bda"
+    }
+  ],
+  "files": [
+    {
+      "path": "source/generated-masters-original.png",
+      "sha256": "139e56ac27fb9bda9ca2b37d840fe1f3477158b193faa2a2785612b3a111f86a"
+    },
+    {
+      "path": "source/master-prompt.txt",
+      "sha256": "537e3cdb944f0ea8af5e803afa1ff72892e1fb5be014b4801843763a6032be12"
+    }
+  ],
+  "sourceFormat": "source/sprites.json stores one integer palette index per native pixel; -1 is transparent. It is editable without an art application. Original raster is also editable in pixel editors.",
+  "statePolicy": "Chassis indicators are neutral gray. No warning, outage or operation is baked into machine pixels. Named badges are separate overlays for the renderer to select from permitted observations.",
+  "collisionPolicy": "footprint is art extent in logical pixels, not collision truth. Scenario geometry alone controls collision. Fan subparts and decorative infrastructure have null footprints.",
+  "proofBoundary": "Static art exports and offline custody checks. Runtime rendering, observation gating, mission-clock animation and user visual acceptance require coordinator integration and review."
+}

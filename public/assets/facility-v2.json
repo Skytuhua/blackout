@@ -1,0 +1,203 @@
+{
+  "meta": {
+    "image": "facility-v2.png",
+    "width": 512,
+    "height": 512,
+    "palette": [
+      "#050c20",
+      "#0b152b",
+      "#102343",
+      "#163462",
+      "#204679",
+      "#2d5583",
+      "#ea7c2d",
+      "#ef506b",
+      "#343057",
+      "#514071",
+      "#7350a1",
+      "#8950bd",
+      "#ad63dc",
+      "#ca83ef",
+      "#696993",
+      "#8b8fb9",
+      "#afb4d8",
+      "#d8deed",
+      "#ffffff",
+      "#005d7a",
+      "#00a9c4",
+      "#03deee",
+      "#8ef2ee",
+      "#b77720",
+      "#e8a719",
+      "#ffce15",
+      "#ffe46a",
+      "#8b573f",
+      "#d5906d",
+      "#ffd1a1",
+      "#16704b",
+      "#4fa92f"
+    ],
+    "provenance": "source/provenance.json"
+  },
+  "frames": {
+    "floor_0": {
+      "frame": {
+        "x": 2,
+        "y": 2,
+        "w": 16,
+        "h": 16
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": null,
+      "layer": "floor",
+      "durationMs": 0,
+      "source": "source/sprites.json#floor_0"
+    },
+    "wall_0": {
+      "frame": {
+        "x": 36,
+        "y": 2,
+        "w": 16,
+        "h": 16
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": {
+        "width": 16,
+        "height": 16
+      },
+      "layer": "wall",
+      "durationMs": 0,
+      "source": "source/sprites.json#wall_0"
+    },
+    "wall_1": {
+      "frame": {
+        "x": 70,
+        "y": 2,
+        "w": 16,
+        "h": 16
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": {
+        "width": 16,
+        "height": 16
+      },
+      "layer": "wall",
+      "durationMs": 0,
+      "source": "source/sprites.json#wall_1"
+    },
+    "wall_2": {
+      "frame": {
+        "x": 104,
+        "y": 2,
+        "w": 16,
+        "h": 16
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": {
+        "width": 16,
+        "height": 16
+      },
+      "layer": "wall",
+      "durationMs": 0,
+      "source": "source/sprites.json#wall_2"
+    },
+    "rack": {
+      "frame": {
+        "x": 138,
+        "y": 2,
+        "w": 16,
+        "h": 32
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": {
+        "width": 16,
+        "height": 32
+      },
+      "layer": "equipment",
+      "durationMs": 0,
+      "source": "source/sprites.json#rack"
+    },
+    "cooling": {
+      "frame": {
+        "x": 172,
+        "y": 2,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": {
+        "width": 32,
+        "height": 32
+      },
+      "layer": "equipment",
+      "durationMs": 0,
+      "source": "source/sprites.json#cooling"
+    },
+    "fan_0": {
+      "frame": {
+        "x": 206,
+        "y": 2,
+        "w": 16,
+        "h": 16
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": null,
+      "layer": "subpart",
+      "durationMs": 167,
+      "source": "source/sprites.json#fan_0"
+    },
+    "commander_s_idle": {
+      "frame": {
+        "x": 240,
+        "y": 2,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 0,
+      "source": "source/sprites.json#commander_s_idle"
+    },
+    "portrait_commander": {
+      "frame": {
+        "x": 274,
+        "y": 2,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": null,
+      "layer": "portrait",
+      "durationMs": 0,
+      "source": "source/sprites.json#portrait_commander"
+    }
+  }
+}

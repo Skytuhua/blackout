@@ -1,0 +1,45 @@
+{
+  "algorithm": "SHA-256",
+  "files": [
+    {
+      "path": "facility-v2.png",
+      "sha256": "e59813e5f50803a4968f435ef9a548a58ace22bd91abfc5f159b046cc7e4f172"
+    },
+    {
+      "path": "facility-v2.json",
+      "sha256": "19f44119ddb25daf1c8be1c6832c796d6d2f309d329cc8c4db369dd1ec275aa3"
+    },
+    {
+      "path": "source/sprites.json",
+      "sha256": "b45878c818699a4624ef1e3bfd0ff6dc85c86e8e41f787f148918481ecfbf1a5"
+    },
+    {
+      "path": "source/provenance.json",
+      "sha256": "429352d7c08e2c1bc8b6a1397015d9b2308bb7ee6ac1944ec0596b1249259251"
+    },
+    {
+      "path": "review/masters-native.png",
+      "sha256": "1fa9c0ac3629a7d3bc14fbb3af78e38e89108b5b3bc95c78c47ee86f9c49ce75"
+    },
+    {
+      "path": "review/masters-3x.png",
+      "sha256": "4c63b239ef398f002cb285cf58c666f441d125435fa3747c8b35e9adefc5f9e5"
+    },
+    {
+      "path": "review/atlas-contact-native.png",
+      "sha256": "1fa9c0ac3629a7d3bc14fbb3af78e38e89108b5b3bc95c78c47ee86f9c49ce75"
+    },
+    {
+      "path": "review/atlas-contact-3x.png",
+      "sha256": "4c63b239ef398f002cb285cf58c666f441d125435fa3747c8b35e9adefc5f9e5"
+    },
+    {
+      "path": "review/animation-strip-native.png",
+      "sha256": "1559b8cbf4ffa9970af030a7c4762eb30126df9d6d37ff07b8566efaac0ed910"
+    },
+    {
+      "path": "review/animation-strip-3x.png",
+      "sha256": "52bd7a6774b5f04a35b3d9596187ac793ccde839386282ff37dbc1de5527b2f0"
+    }
+  ]
+}
