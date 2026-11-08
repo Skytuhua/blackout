@@ -7,7 +7,7 @@ import { SimulationClient } from './workers/SimulationClient';
 import { hotRestart, practiceScenario } from './content/scenarios/hot-restart';
 import { latestObservations } from './llm/context';
 import { runCoworker, type CoworkerResult } from './llm/interaction';
-import { appendConversationEntry, authorizationMatchesOrigin, conversationPeople, createConversations, markConversationRead, ProposalBook, setConversationDraft, updateConversation, withConversationAssignments } from './shared/conversations';
+import { appendConversationEntry, authorizationMatchesOrigin, conversationPeople, createConversations, hydrateConversationReport, markConversationRead, ProposalBook, setConversationDraft, updateConversation, withConversationAssignments } from './shared/conversations';
 import { conversationOrders } from './shared/conversation-orders';
 import { openRunStore, type RunStore, type SavedRunSummary } from './persistence/runs';
 import { HostArchive } from './persistence/host-archive';
@@ -76,7 +76,7 @@ export default function App() {
   function ingestReports(raw: KnowledgeView) {
     updateThreads(previous => {
       let next = previous;
-      for (const message of raw.messages) if (person(message.speaker)) next = appendConversationEntry(next, { id: message.id, actorId: message.speaker, at: message.at, kind: message.id.startsWith('report-') ? 'report' : 'system', text: message.text, summary: `${person(message.speaker)!.name} has sent a report.`, unread: true, reportId: message.id, sections: [{ id: 'evidence', label: 'Evidence', text: raw.observations.filter(observation => message.evidenceIds.includes(observation.id)).map(observation => observationText(observation, raw.simTime)).join('\n\n') || 'No new reading supplied.' }] });
+      for (const message of raw.messages) if (person(message.speaker)) next = hydrateConversationReport(next, { id: message.id, actorId: message.speaker, at: message.at, kind: message.id.startsWith('report-') ? 'report' : 'system', text: message.text, summary: `${person(message.speaker)!.name} has sent a report.`, unread: true, reportId: message.id, sections: [{ id: 'evidence', label: 'Evidence', text: raw.observations.filter(observation => message.evidenceIds.includes(observation.id)).map(observation => observationText(observation, raw.simTime)).join('\n\n') || 'No new reading supplied.' }] });
       return withConversationAssignments(next, raw);
     });
   }

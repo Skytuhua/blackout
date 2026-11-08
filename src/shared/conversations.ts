@@ -28,6 +28,13 @@ export function markConversationRead(threads: ConversationThread[], actorId: str
     return { ...thread, entries, unread: entries.filter(entry => entry.unread).length };
   });
 }
+export function hydrateConversationReport(threads: ConversationThread[], report: ConversationEntry) {
+  const existing = threads.find(thread => thread.actorId === report.actorId)?.entries.find(entry => entry.id === report.id);
+  if (!existing) return appendConversationEntry(threads, report);
+  const hydrated = { ...existing, text: report.text, sections: report.sections, reportId: report.reportId };
+  if (canonicalJson(hydrated) === canonicalJson(existing)) return threads;
+  return updateConversation(threads, report.actorId, thread => ({ ...thread, entries: thread.entries.map(entry => entry.id === report.id ? hydrated : entry) }));
+}
 export function withConversationAssignments(threads: ConversationThread[], view: KnowledgeView) {
   return threads.map(thread => {
     const crew = view.crew.find(person => person.id === thread.actorId);
