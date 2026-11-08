@@ -11,15 +11,20 @@ export const FacilityRoomSchema = z.strictObject({
   bounds: z.strictObject({ x: integer, y: integer, width: integer.positive(), height: integer.positive() }),
   doors: z.array(tile).min(1),
 });
-export const FacilityAssetSchema = AssetSchema.extend({ roomId: id });
+export const FacilityAssetSchema = AssetSchema.extend({ roomId: id, x: integer, y: integer, width: integer.positive(), height: integer.positive(), serviceTile: tile });
 export const FacilityTopologySchema = TopologySchema.extend({
   width: z.literal(48), height: z.literal(28), assets: z.array(FacilityAssetSchema), rooms: z.array(FacilityRoomSchema),
+  walkable: z.array(tile),
   sharedUpstream: z.strictObject({ id, label: z.string().min(1) }),
   connections: z.array(z.strictObject({ id, kind: z.enum(['power', 'control', 'cooling_supply', 'cooling_return']), fromId: id, toId: id, points: z.array(PointSchema).min(2) })),
 }).superRefine((topology, context) => {
   const problem = (message: string) => context.addIssue({ code: 'custom', message });
   for (const [name, rows] of [['room', topology.rooms], ['asset', topology.assets], ['connection', topology.connections]] as const) if (new Set(rows.map(row => row.id)).size !== rows.length) problem(`Duplicate ${name} ID.`);
   const floor = new Set(topology.walkable.map(p => `${p.x},${p.y}`));
+  if (topology.walkable.some(p => p.x >= topology.width || p.y >= topology.height)) problem('Walkable tile outside site.');
+  const overlaps = (a: { x: number; y: number; width: number; height: number }, b: typeof a) => a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+  for (let i = 0; i < topology.rooms.length; i++) for (let j = 0; j < i; j++) if (overlaps(topology.rooms[i].bounds, topology.rooms[j].bounds)) problem('Room bounds overlap.');
+  for (let i = 0; i < topology.assets.length; i++) for (let j = 0; j < i; j++) if (overlaps(topology.assets[i], topology.assets[j])) problem('Equipment footprints overlap.');
   const ids = new Set([topology.sharedUpstream.id, ...topology.assets.map(a => a.id)]);
   if (ids.size !== topology.assets.length + 1) problem('Shared upstream must have its own ID.');
   for (const room of topology.rooms) {
