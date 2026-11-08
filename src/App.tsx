@@ -168,15 +168,16 @@ export default function App() {
     if (save && jobs.current.size) { pendingSave.current = { generation: token }; setNotice('Waiting for the reply before saving. You can still restart.'); return; }
     const request = ++sourceGeneration.current; hostPending.current = true;
     pauseLive();
+    if (save) setNotice('');
     try {
       await cancelCoworkers(false); if (token !== generation.current || request !== sourceGeneration.current) return;
       setBusy(true);
       const record = recorder.build(await client.record()); if (token !== generation.current || request !== sourceGeneration.current) return;
-      if (save) { await (await getStore()).saveRun(record); if (token !== generation.current || request !== sourceGeneration.current) return; setNotice('Mission saved locally with its original observations, orders and radio transcript.'); }
       setSource(record); setLedger(buildOutcomeLedger(engineRecordOf(record))); setComparison(null);
+      if (save) { await (await getStore()).saveRun(record); if (token !== generation.current || request !== sourceGeneration.current) return; setNotice('Mission saved locally with its original observations, orders and radio transcript.'); }
       if (save) await refreshSaves();
     } catch (problem) { if (token === generation.current && request === sourceGeneration.current) setError(`Could not save or review this run: ${problem instanceof Error ? problem.message : 'storage unavailable'}`); }
-    finally { if (token === generation.current && request === sourceGeneration.current) { hostPending.current = false; setBusy(false); } }
+    finally { if (token === generation.current && request === sourceGeneration.current) { hostPending.current = false; setBusy(false); syncClock(); } }
   }
   async function activateReplay(record: SavedRunRecord) {
     if (pendingSave.current) { setNotice('Wait for the save to finish before opening a saved game.'); return; }
