@@ -3,6 +3,7 @@ import { GatewayStartSchema, GatewayContinueSchema, GatewayResponseSchema } from
 import { validStart, validateResponse } from './validation';
 import { bindLifecycle, lifecycleFor, expired, type Lifecycle } from './lifecycle';
 import { scopeKnowledge } from './context';
+import { usesMovementConversation } from './conversation-mode';
 import { ProviderCallSchema, type ProviderCall } from './diagnostics';
 const contexts = new Map<string, { start: GatewayStart; lifecycle: Lifecycle }>();
 const evidence = new WeakMap<Lifecycle, Map<string, Observation>>();
@@ -32,7 +33,7 @@ async function turn(input: GatewayInput, context: GatewayStart, lifecycle: Lifec
   try {
     const sentAt = performance.now();
     const retainIds = input.kind === 'continue' ? [...input.result.observations.map(o => o.id), ...input.result.receipt?.evidenceIds ?? []] : [];
-    const wire = { ...input, view: scopeKnowledge(input.view, undefined, retainIds) };
+    const wire = { ...input, view: scopeKnowledge(input.view, undefined, retainIds, false, usesMovementConversation(context)) };
     let seen = evidence.get(lifecycle);
     if (!seen) { seen = new Map(); evidence.set(lifecycle, seen); }
     for (const observation of wire.view.observations) seen.set(observation.id, observation);

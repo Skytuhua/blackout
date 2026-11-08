@@ -35,8 +35,9 @@ function contradictsExplicitInstruction(start: GatewayStart, response: AgentResp
 }
 
 /** Model prose stays verbatim. Readings and age labels are separate, scoped evidence. */
-export function naturalReplyText(response: AgentResponse, view: KnowledgeView): string {
+export function naturalReplyText(response: AgentResponse, view: KnowledgeView, proseOnly = false): string {
   const lines = [response.inference, response.uncertainty].filter(Boolean);
+  if (proseOnly) return lines.join('\n');
   const seen = new Set<string>(), ages = new Set<string>();
   const values = new Set(response.facts.flatMap(f => 'observationId' in f && f.field === 'value' ? [f.observationId] : []));
   for (const fact of response.facts) {
@@ -61,31 +62,36 @@ export function naturalNarrativeAllowed(start: GatewayStart, response: AgentResp
   if (!response.requestKind || !response.inference.trim() || response.inference.length > 180 || response.uncertainty.length > 100) return false;
   if (response.requestKind !== 'order' && response.proposals.length) return false;
   if (usesMovementConversation(start) && contradictsExplicitInstruction(start, response)) return false;
-  if (naturalReplyText(response, start.view).length > 260) return false;
+  if (!usesMovementConversation(start) && naturalReplyText(response, start.view).length > 260) return false;
   const text = `${response.inference} ${response.uncertainty}`;
   if (/\b(?:simulation time|engine tick|entity version|checkpoint|scheduled (?:completion|at))\b|\b\d+(?:\.\d+)?\s*(?:°C|kW|kWh|seconds?|minutes?)\b/i.test(text)) return false;
   // A full future recipe stays out of ordinary dialogue; single supported orders remain available.
   if (['pause', 'inspect|check', 'repair|fix', 'resume|restore', 'verify'].filter(verb => new RegExp(`\\b(?:${verb})\\b`, 'i').test(text)).length >= 4) return false;
   const selected = start.view.observations.filter(o => response.facts.some(f => 'observationId' in f && f.observationId === o.id && f.field === 'value'));
+  const supplied = usesMovementConversation(start) ? start.view.observations : selected;
   const reported = (o: Observation) => delivered(o, start.view) && o.source.startsWith('report:') && start.view.messages.some(m => m.mode === 'system' && m.at <= start.view.simTime && m.evidenceIds.includes(o.id));
-  const has = (field: string, value: Observation['value']) => selected.some(o => {
+  const has = (field: string, value: Observation['value'], assets: string[] = []) => (!assets.length ? [null] : assets).every(assetId => supplied.some(o => {
+    if (assetId && o.assetId !== assetId) return false;
     if (o.field !== field || o.value !== value || !reported(o)) return false;
     return !start.view.observations.some(other => other.assetId === o.assetId && other.field === field && delivered(other, start.view) && other.observedAt >= o.observedAt && other.value !== value);
-  });
+  }));
   const running = (assetId: string) => {
     const rows = start.view.observations.filter(o => o.assetId === assetId && ['running', 'state'].includes(o.field) && o.observedAt <= o.receivedAt && o.receivedAt <= start.view.simTime);
     const latest = Math.max(-1, ...rows.map(o => o.observedAt));
     const current = rows.filter(o => o.observedAt === latest);
-    return current.length > 0 && start.view.simTime - latest <= 10 && current.every(o => o.quality !== 'unknown' && (o.field === 'running' ? o.value === true : o.value === 'running')) && selected.some(o => current.some(row => row.id === o.id));
+    return current.length > 0 && start.view.simTime - latest <= 10 && current.every(o => o.quality !== 'unknown' && (o.field === 'running' ? o.value === true : o.value === 'running')) && supplied.some(o => current.some(row => row.id === o.id));
   };
   for (const sentence of text.split(/[;.!?]/)) {
+    const named = start.view.knownTopology.assets.filter(asset => sentence.toLowerCase().includes(asset.label.toLowerCase()) || new RegExp(`\\b${asset.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(sentence));
+    const subjects = start.view.knownTopology.assets.filter(asset => named.includes(asset) || (asset.kind === 'controller' ? /\b(?:controls?|controller)\b/i.test(sentence) : ['ups', 'generator', 'distribution'].includes(asset.kind) && new RegExp(`\\b${asset.kind}\\b`, 'i').test(sentence)));
+    const subjectIds = usesMovementConversation(start) ? subjects.map(asset => asset.id) : [];
     const qualified = /\b(?:does not|doesn't|cannot|can't|not)\s+(?:\w+\s+){0,3}(?:mean|prove|confirm|establish|known|verified)\b/i.test(sentence);
     const conditional = /\b(?:if|when|once)\b/i.test(sentence);
-    if (!qualified && !conditional && /\b(?:check|inspection)\b.{0,35}\b(?:finished|complete|completed|done|ended)\b/i.test(sentence) && !has('inspection_complete', true)) return false;
-    if (!qualified && !conditional && /\bcondition\b.{0,35}\b(?:missing|unmet|not met|wasn't met|was not met)\b/i.test(sentence) && !has('prerequisite_ready', false)) return false;
+    if (!qualified && !conditional && /\b(?:check|inspection)\b.{0,35}\b(?:finished|complete|completed|done|ended)\b/i.test(sentence) && !has('inspection_complete', true, subjectIds)) return false;
+    if (!qualified && !conditional && /\bcondition\b.{0,35}\b(?:missing|unmet|not met|wasn't met|was not met)\b/i.test(sentence) && !has('prerequisite_ready', false, subjectIds)) return false;
     if (!qualified && /\b(?:broken|faulty|defective|(?:controller|pump|fan|supply|controls?)\s+(?:(?:has|have|is|are|was|were)\s+)?failed|(?:control|controller|pump|fan|electrical)\s+(?:fault|failure))\b/i.test(sentence)) {
       const terms = sentence.match(/broken|faulty|defective|failed|fault|failure/gi) ?? [];
-      if (!selected.some(o => reported(o) && typeof o.value === 'string' && terms.every(term => String(o.value).toLowerCase().includes(term.toLowerCase())))) return false;
+      if (!supplied.some(o => reported(o) && typeof o.value === 'string' && terms.every(term => String(o.value).toLowerCase().includes(term.toLowerCase())))) return false;
     }
     if (!qualified && !conditional && /\b(?:repair|fix)\b.{0,25}\b(?:complete|completed|finished|done)\b/i.test(sentence) && !start.view.tasks.some(t => t.actorId === start.actorId && t.action === 'repair_cooling' && t.status === 'completed')) return false;
     if (!qualified && !conditional && /\bcooling(?:\s+(?:unit|train))?(?:\s*\d+)?\s+(?:(?:is|has)\s+)?(?:running|recovered|restarted|working)\b/i.test(sentence)) {
