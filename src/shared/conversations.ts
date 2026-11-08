@@ -43,6 +43,7 @@ export function withConversationAssignments(threads: ConversationThread[], view:
     if (task) {
       const target = view.knownTopology.assets.find(asset => asset.id === task.targetId)?.label ?? 'the site';
       if (task.status === 'traveling') assignment = { taskId: task.id, label: `Walking to ${target}`, status: 'walking' };
+      else if (task.status === 'queued' || task.status === 'blocked') assignment = { taskId: task.id, label: task.status === 'queued' ? 'Waiting to start' : 'Task blocked', status: 'working' };
       else if (['working', 'inspecting', 'queued', 'blocked'].includes(task.status)) assignment = { taskId: task.id, label: `${task.action === 'inspect' ? 'Checking' : 'Working on'} ${target}`, status: task.action === 'inspect' ? 'checking' : 'working' };
       else if (task.status === 'completed') assignment = view.messages.some(message => message.id === `report-${task.id}`) ? { taskId: null, label: 'Report delivered', status: 'delivered' } : { taskId: null, label: 'Report on its way', status: 'report_pending' };
     }

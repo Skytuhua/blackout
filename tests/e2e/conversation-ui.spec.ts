@@ -31,7 +31,7 @@ test('Sam portrait idles, freezes on pause and respects reduced motion without h
   }); expect(transforms[0]).not.toBe(transforms[1]);
   await page.locator('.conv-header').getByRole('button', { name: 'Pause', exact: true }).click();
   await expect(portrait).toHaveCSS('animation-play-state', 'paused');
-  const frozen = await portrait.evaluate(element => element.getAnimations()[0].currentTime); await page.waitForTimeout(100);
+  const frozen = await portrait.evaluate(async element => { const animation = element.getAnimations()[0]; await animation.ready; return animation.currentTime; }); await page.waitForTimeout(100);
   expect(await portrait.evaluate(element => element.getAnimations()[0].currentTime)).toBe(frozen);
   await page.emulateMedia({ reducedMotion: 'reduce' }); await expect(portrait).toHaveCSS('animation-name', 'none');
   await expect(page.locator('.conv-map-crew [data-actor=sam] strong')).toHaveText('Sam');

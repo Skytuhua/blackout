@@ -23,7 +23,7 @@ const words = (value: string) => value.toLowerCase().replaceAll('_', ' ');
 const clock = (at: number) => `${Math.floor(at / 60)}:${String(Math.floor(at % 60)).padStart(2, '0')}`;
 const ended = (view: KnowledgeView) => ['success', 'failure'].includes(view.mission.status);
 const person = (actorId: string) => conversationPeople.find(actor => actor.actorId === actorId);
-const labelAction = (intent: ActionIntent) => intent.action === 'inspect' ? 'Check cooling controls' : intent.action === 'repair_cooling' ? 'Repair the controls' : intent.action === 'pause_batch' ? 'Pause background jobs' : intent.action === 'set_batch_ceiling' || intent.action === 'resume_batch' ? 'Resume background jobs' : intent.action === 'verify_recovery' ? 'Check recovery' : words(intent.action);
+const labelAction = (intent: ActionIntent) => intent.action === 'inspect' ? intent.targetId === 'controller' ? 'Check cooling controls' : intent.args.technicianId === 'jules' ? 'Check power equipment' : 'Check equipment' : intent.action === 'repair_cooling' ? 'Repair the controls' : intent.action === 'pause_batch' ? 'Pause background jobs' : intent.action === 'set_batch_ceiling' || intent.action === 'resume_batch' ? 'Resume background jobs' : intent.action === 'verify_recovery' ? 'Check recovery' : words(intent.action);
 type RadioJob = { controller: AbortController; promise: Promise<CoworkerResult> };
 
 
@@ -31,6 +31,8 @@ export default function App() {
   const simulation = useRef<SimulationClient | null>(null), unsubscribe = useRef<(() => void) | null>(null), known = useRef<KnowledgeView | null>(null);
   const generation = useRef(0), transitioning = useRef(false), commandPending = useRef(false), jobs = useRef(new Map<string, RadioJob>());
   const sourceGeneration = useRef(0), hostPending = useRef(false), listGeneration = useRef(0);
+  const deferredMenuCapture = useRef<{ generation: number; sourceGeneration: number } | null>(null);
+  const pendingSave = useRef<{ generation: number } | null>(null);
   const archive = useRef<HostArchive | null>(null), store = useRef<Promise<RunStore> | null>(null), proposals = useRef<ProposalBook | null>(null);
   const replayClient = useRef<SimulationClient | null>(null), replayGeneration = useRef(0), replayAt = useRef(0), replayPending = useRef(false);
   const sessionRef = useRef<'welcome' | 'practice' | 'mission'>('welcome'), selected = useRef<string | null>(null);
@@ -73,6 +75,7 @@ export default function App() {
   }
   async function begin(next: typeof sessionRef.current, previous?: SavedRunRecord, runImmediately = true) {
     if (transitioning.current) return;
+    pendingSave.current = null;
     transitioning.current = true; const token = ++generation.current; simulation.current?.pause(); closeReplay(); setBusy(true); setPaused(true); setError('');
     try {
       await cancelCoworkers(); if (token !== generation.current) return;
@@ -111,7 +114,7 @@ export default function App() {
       append({ id: crypto.randomUUID(), actorId: originActor, at: receipt.observedAt, kind: 'order', text: receipt.status === 'rejected' ? `That order could not start: ${words(receipt.reason)}.` : receipt.status === 'applied' && intent.action === 'cancel_task' ? 'Current task stopped.' : `${labelAction(intent)} accepted. ${person(originActor)!.name} will report back.`, unread: false, summary: `${labelAction(intent)} ${receipt.status === 'rejected' ? 'could not start' : 'accepted'}.`, sections: [{ id: 'receipt', label: 'Order receipt', text: JSON.stringify(receipt, null, 2) }] }, receipt.evidenceIds);
       return receipt;
     } catch { if (token === generation.current) setError('Could not confirm the order. Check the current assignment before retrying.'); return null; }
-    finally { if (token === generation.current) { commandPending.current = false; setBusy(false); } }
+    finally { if (token === generation.current) { commandPending.current = false; setBusy(false); flushPendingSave(); flushDeferredMenuCapture(); } }
   }
   async function executeProposal(id: string) {
     if (transitioning.current || commandPending.current || hostPending.current || replayActive || !known.current || ended(known.current)) return;
@@ -140,26 +143,45 @@ export default function App() {
       const text = answer ? [...facts, answer.inference, answer.uncertainty].filter(Boolean).join('\n') || 'I’ve included the available readings in History.' : fallbackCopy(result.reply.kind === 'fallback' ? result.reply.reason : 'unavailable');
       append({ id: crypto.randomUUID(), actorId: originActor, at: known.current?.simTime ?? current.simTime, kind: answer ? 'live' : 'fallback', text, summary: text.length <= 260 ? text : `${person(originActor)!.name} sent a detailed reply.`, unread: true, exchangeId: result.start.requestId, proposals: allowed.map(authorization => ({ id: authorization.id, label: labelAction(authorization.intent), assignedName: person(authorization.intent.args.technicianId ?? (['pause_batch', 'resume_batch', 'set_batch_ceiling', 'verify_recovery'].includes(authorization.intent.action) ? 'sam' : originActor))?.name ?? person(originActor)!.name, status: 'ready' })), sections: [{ id: 'reply', label: 'Facts and reply', text: radioReport(result) }, { id: 'citations', label: 'Evidence', text: radioCitations(result) }, { id: 'receipts', label: 'Tool receipts', text: radioReceipts(result) }, { id: 'provenance', label: 'Provenance', text: radioProvenance(result) }] }, answer?.facts.flatMap(fact => 'observationId' in fact ? [fact.observationId] : []) ?? []);
     } catch { if (token === generation.current) append({ id: crypto.randomUUID(), actorId: originActor, at: known.current?.simTime ?? current.simTime, kind: 'fallback', text: 'I couldn’t finish that reply. Suggested orders still work.', unread: true }); }
-    finally { if (jobs.current.get(originActor)?.promise === job) jobs.current.delete(originActor); if (token === generation.current) { updateThreads(previous => updateConversation(previous, originActor, thread => ({ ...thread, busy: false }))); syncClock(); } }
+    finally { if (jobs.current.get(originActor)?.promise === job) jobs.current.delete(originActor); if (token === generation.current) { updateThreads(previous => updateConversation(previous, originActor, thread => ({ ...thread, busy: false }))); syncClock(); flushPendingSave(); flushDeferredMenuCapture(); } }
   }
   useEffect(() => { if (!menuOpen && menuOpener.current?.isConnected) menuOpener.current.focus(); }, [menuOpen]);
-  function toggleMenu() { const open = !menuOpenRef.current; if (open) menuOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; menuOpenRef.current = open; setMenuOpen(open); if (open) { manualPaused.current = true; pauseLive(); void refreshSaves(); if (!replayActive && sessionRef.current === 'mission') void capture(false); } }
+  function flushDeferredMenuCapture() {
+    const pending = deferredMenuCapture.current;
+    if (!pending) return;
+    if (!menuOpenRef.current || pending.generation !== generation.current || pending.sourceGeneration !== sourceGeneration.current || sessionRef.current !== 'mission') { deferredMenuCapture.current = null; return; }
+    if (jobs.current.size || commandPending.current || transitioning.current || hostPending.current || pendingSave.current) return;
+    deferredMenuCapture.current = null; void capture(false);
+  }
+  function toggleMenu() { const open = !menuOpenRef.current; if (open) menuOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; menuOpenRef.current = open; setMenuOpen(open); if (open) { manualPaused.current = true; pauseLive(); void refreshSaves(); if (!replayActive && sessionRef.current === 'mission' && !hostPending.current && !pendingSave.current) { if (jobs.current.size || commandPending.current) deferredMenuCapture.current = { generation: generation.current, sourceGeneration: sourceGeneration.current }; else void capture(false); } } else deferredMenuCapture.current = null; }
+  function flushPendingSave() {
+    const pending = pendingSave.current;
+    if (!pending) return;
+    if (pending.generation !== generation.current || sessionRef.current !== 'mission') { pendingSave.current = null; return; }
+    if (jobs.current.size || commandPending.current || transitioning.current || hostPending.current) return;
+    pendingSave.current = null; deferredMenuCapture.current = null; void capture(true);
+  }
   // Existing save/replay lifecycle follows below; normal UI receives scoped views only.
   async function capture(save: boolean) {
     const client = simulation.current, recorder = archive.current, token = generation.current;
-    if (!client || !recorder || sessionRef.current !== 'mission' || replayActive || commandPending.current || transitioning.current) return;
+    if (!client || !recorder || sessionRef.current !== 'mission' || replayActive || commandPending.current || transitioning.current || hostPending.current) return;
+    if (save && jobs.current.size) { pendingSave.current = { generation: token }; setNotice('Waiting for the reply before saving. You can still restart.'); return; }
     const request = ++sourceGeneration.current; hostPending.current = true;
-    pauseLive(); setBusy(true);
+    pauseLive();
+    setError(previous => previous.startsWith('Could not save or review this run:') ? '' : previous);
+    if (save) setNotice('');
     try {
       await cancelCoworkers(false); if (token !== generation.current || request !== sourceGeneration.current) return;
+      setBusy(true);
       const record = recorder.build(await client.record()); if (token !== generation.current || request !== sourceGeneration.current) return;
-      if (save) { await (await getStore()).saveRun(record); if (token !== generation.current || request !== sourceGeneration.current) return; setNotice('Mission saved locally with its original observations, orders and radio transcript.'); }
       setSource(record); setLedger(buildOutcomeLedger(engineRecordOf(record))); setComparison(null);
+      if (save) { await (await getStore()).saveRun(record); if (token !== generation.current || request !== sourceGeneration.current) return; setNotice('Mission saved locally with its original observations, orders and radio transcript.'); }
       if (save) await refreshSaves();
     } catch (problem) { if (token === generation.current && request === sourceGeneration.current) setError(`Could not save or review this run: ${problem instanceof Error ? problem.message : 'storage unavailable'}`); }
-    finally { if (token === generation.current && request === sourceGeneration.current) { hostPending.current = false; setBusy(false); } }
+    finally { if (token === generation.current && request === sourceGeneration.current) { hostPending.current = false; setBusy(false); syncClock(); } }
   }
   async function activateReplay(record: SavedRunRecord) {
+    if (pendingSave.current) { setNotice('Wait for the save to finish before opening a saved game.'); return; }
     pauseLive(); closeReplay(); const token = ++replayGeneration.current, sessionToken = generation.current; hostPending.current = true; setBusy(true); setError(''); await cancelCoworkers();
     try {
       await cancelCoworkers();
@@ -175,6 +197,7 @@ export default function App() {
     finally { if (token === replayGeneration.current && sessionToken === generation.current) { hostPending.current = false; setBusy(false); } }
   }
   async function reviewSaved(id: string, resume: boolean) {
+    if (pendingSave.current) { setNotice('Wait for the save to finish before opening a saved game.'); return; }
     const token = generation.current, request = ++sourceGeneration.current;
     hostPending.current = true; setBusy(true); setError('');
     try {
@@ -206,7 +229,8 @@ export default function App() {
     return () => clearInterval(timer);
   }, [replayPlaying, replayActive, source, speed]);
   async function compare(sequence: number, earlierAt: number) {
-    if (!source || busy || hostPending.current) return; const token = generation.current, request = sourceGeneration.current; hostPending.current = true; setBusy(true); setError('');
+    if (pendingSave.current) { setNotice('Wait for the save to finish before comparing this run.'); return; }
+    if (!source || busy || hostPending.current || jobs.current.size) return; const token = generation.current, request = sourceGeneration.current; hostPending.current = true; setBusy(true); setError('');
     try {
       let client = replayClient.current;
       if (!client) { client = new SimulationClient(); replayClient.current = client; await client.initialize(source.scenario); }
@@ -219,12 +243,12 @@ export default function App() {
   if (!shown) return <main className="host-loading"><h1>BLACKOUT</h1><p role={error ? 'alert' : 'status'}>{error || 'Opening your shift…'}</p>{error && <button onClick={() => { transitioning.current = false; void begin('welcome'); }}>Retry</button>}</main>;
   const options = conversationOrders(shown);
   const displayedThreads = withConversationAssignments(replayActive && source ? savedConversations(source, shown) : threads, shown).map(thread => ({ ...thread, suggestedOrders: options.filter(order => order.actorId === thread.actorId).map(({ intent: _intent, ...order }) => order) }));
-  const coolingStopped = shown.observations.some(observation => observation.field === 'running' && observation.value === false && shown.simTime - observation.observedAt <= 10);
-  const replayContent = <DesktopReplayView compactMenu saved={saved} ledger={ledger} comparison={comparison} cursor={cursor} playing={replayPlaying} busy={busy} active={replayActive} canSave={session === 'mission'} notice={notice} error={error}
+  const coolingStopped = shown.observations.some(observation => observation.field === 'running' && observation.value === false && observation.quality !== 'unknown' && observation.observedAt <= shown.simTime && observation.receivedAt <= shown.simTime && shown.simTime - observation.observedAt <= 10 && shown.knownTopology.assets.some(asset => asset.id === observation.assetId && asset.kind === 'cooling'));
+  const replayContent = <>{jobs.current.size > 0 && <p role="status">Wait for the reply before reviewing this run.</p>}<DesktopReplayView compactMenu saved={saved} ledger={ledger} comparison={comparison} cursor={cursor} playing={replayPlaying} busy={busy || jobs.current.size > 0} active={replayActive} canSave={session === 'mission'} notice={notice} error={error}
     caps={source?.commands.filter(command => ['accepted', 'applied'].includes(command.receipt.status) && ['pause_batch', 'set_batch_ceiling'].includes(command.intent.action)).map(command => ({ sequence: command.sequence, at: command.at, label: words(command.intent.action) })) ?? []}
     dialogue={source?.dialogue ?? []} transcript={source ? JSON.stringify(source.interactions, null, 2) : ''}
     onSave={() => void capture(true)} onRefresh={() => void refreshSaves()} onReview={id => void reviewSaved(id, false)} onResume={id => void reviewSaved(id, true)} onExport={id => void exportSaved(id)}
-    onReplay={() => { if (source) void activateReplay(source); }} onReturn={() => { closeReplay(); setMenuOpen(false); menuOpenRef.current = false; }} onSeek={at => void seek(at)} onToggle={() => setReplayPlaying(value => !value)} onCompare={(sequence, at) => void compare(sequence, at)} />;
+    onReplay={() => { if (source) void activateReplay(source); }} onReturn={() => { closeReplay(); setMenuOpen(false); menuOpenRef.current = false; }} onSeek={at => void seek(at)} onToggle={() => setReplayPlaying(value => !value)} onCompare={(sequence, at) => void compare(sequence, at)} /></>;
   const readEntries = (id: string, ids: string[]) => { if (!replayActive) updateThreads(previous => markConversationRead(previous, id, ids)); };
   const openEntry = (id: string, entryId: string) => { if (!displayedThreads.find(thread => thread.actorId === id)?.entries.some(entry => entry.id === entryId)) return; setReader({ actorId: id, entryId }); readEntries(id, [entryId]); };
   const setGuidance = (enabled: boolean) => { guideEnabled.current = enabled; setGuidanceEnabled(enabled); syncClock(); };

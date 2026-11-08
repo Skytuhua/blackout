@@ -4,6 +4,8 @@ export function publicTaskProgress(view: KnowledgeView, actorId: string) {
   const active = view.crew.find(crew => crew.id === actorId)?.taskId;
   const task = active ? view.tasks.find(task => task.id === active) : view.tasks.filter(task => task.actorId === actorId && task.action !== 'move_crew').at(-1);
   if (!task || task.status === 'canceled') return null;
+  if (task.status === 'queued') return { phase: 'Waiting to start', percent: 0 };
+  if (task.status === 'blocked') return { phase: 'Blocked', percent: Math.round(task.progress * 100) };
   if (task.status === 'completed') return { phase: view.messages.some(message => message.id === `report-${task.id}`) ? 'Report delivered' : 'Report on the way', percent: 100 };
   if (task.status === 'traveling') return { phase: 'Walking', percent: Math.round(Math.max(0, Math.min(1, (view.simTime - task.startedAt) / Math.max(1, task.arrivalAt - task.startedAt))) * 100) };
   return { phase: task.status === 'inspecting' ? 'Checking' : 'Working', percent: Math.round(Math.max(0, Math.min(1, task.progress)) * 100) };

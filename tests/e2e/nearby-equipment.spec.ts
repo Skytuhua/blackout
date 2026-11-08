@@ -18,7 +18,7 @@ for (const target of ['controller', 'rack-1']) for (const [width, height] of [[1
   await expect(page.locator('.conv-header time')).toHaveText(`${Math.floor(source.finalCheckpoint.simTime / 60)}:${String(source.finalCheckpoint.simTime % 60).padStart(2, '0')}`);
   if (width < 1000) await page.getByRole('button', { name: 'World', exact: true }).click();
   const panel = page.getByRole('complementary', { name: 'Nearby equipment details', exact: true });
-  await expect(panel).toBeVisible(); await expect(panel).toContainText(target === 'controller' ? 'Cooling control' : 'Rack A1'); await expect(panel).toContainText('Alex nearby'); if (target === 'controller' && width > 1000) await expect(panel).toContainText('Controls ready');
+  await expect(panel).toBeVisible(); await expect(panel).toContainText(target === 'controller' ? 'Cooling control' : 'Rack A1'); await expect(panel).toContainText('Alex nearby'); if (target === 'controller' && width > 1000) await expect(panel).toContainText('Start conditions met');
   const panelBox = (await panel.boundingBox())!, world = (await page.getByRole('region', { name: 'Facility world', exact: true }).boundingBox())!;
   expect(panelBox.x + panelBox.width).toBeLessThanOrEqual(world.x + world.width); expect(panelBox.y).toBeGreaterThanOrEqual(world.y); expect(panelBox.y + panelBox.height).toBeLessThan(height);
   const next = panel.getByRole('button', { name: 'Next equipment reading', exact: true });
