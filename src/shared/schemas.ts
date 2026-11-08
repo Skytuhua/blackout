@@ -5,7 +5,7 @@ const number = z.number().finite();
 const seconds = number.nonnegative();
 const version = z.literal(1);
 const object = z.strictObject;
-export const INTEGRATION_CONTRACT_VERSION = 3;
+export const INTEGRATION_CONTRACT_VERSION = 5;
 export const PointSchema = object({ x: number, y: number });
 export const RoleSchema = z.enum(['player', 'facilities', 'electrical', 'remote', 'debrief']);
 export const ActionSchema = z.enum(['inspect', 'independent_reading', 'repair_cooling', 'restart_cooling', 'pause_batch', 'resume_batch', 'set_batch_ceiling', 'verify_recovery', 'cancel_task', 'reset_ups', 'move_crew']);
@@ -73,7 +73,7 @@ export const ComparisonResultSchema = z.discriminatedUnion('status', [
   if (ledgers.some(ledger => ledger.horizon !== result.supportedHorizon)) context.addIssue({ code: 'custom', message: 'Comparison evidence must use the supported equal horizon.' });
 });
 
-export const GatewayStartSchema = object({ kind: z.literal('start'), ...gatewayIdentity, role: RoleSchema, message: z.string().max(1600), view: KnowledgeViewSchema, procedures: z.array(object({ id, text: z.string().max(3000) })).max(4), promptVersion: id, debriefContext: object({ ledger: OutcomeLedgerSchema, comparison: ComparisonResultSchema.nullable() }).optional() });
+export const GatewayStartSchema = object({ kind: z.literal('start'), ...gatewayIdentity, role: RoleSchema, message: z.string().max(1600), view: KnowledgeViewSchema, procedures: z.array(object({ id, text: z.string().max(3000) })).max(4), promptVersion: id, interactionMode: z.literal('advisory').optional(), debriefContext: object({ ledger: OutcomeLedgerSchema, comparison: ComparisonResultSchema.nullable() }).optional() });
 export const GatewayContinueSchema = object({ kind: z.literal('continue'), ...gatewayIdentity, interactionId: id, expectedCallId: id, view: KnowledgeViewSchema, result: PublicToolResultSchema });
 export const GatewayInputSchema = z.discriminatedUnion('kind', [GatewayStartSchema, GatewayContinueSchema]);
 

@@ -1,4 +1,4 @@
-import type { GatewayInput, GatewayResponse, GatewayStart, KnowledgeView, PublicToolResult, RecordedInteraction, ToolIntent } from '../shared/contracts';
+import type { GatewayInput, GatewayResponse, GatewayStart, KnowledgeView, ProposalAuthorization, PublicToolResult, RecordedInteraction, ToolIntent } from '../shared/contracts';
 import type { SimulationClient } from '../workers/SimulationClient';
 import { procedures } from '../content/procedures';
 import { scopeKnowledge } from './context';
@@ -6,8 +6,8 @@ import { cancelInteraction, continueInteraction, startInteraction, providerCallF
 import { executeToolIntent, type ScopedContext } from './tools';
 import type { ProviderCall } from './diagnostics';
 
-export type CoworkerResult = { start: GatewayStart; targetId: string | null; view: KnowledgeView; reply: Exclude<GatewayResponse, { kind: 'tool_request' }>; tools: PublicToolResult[]; intents: ToolIntent[]; calls: ProviderCall[]; durationMs: number; recording: RecordedInteraction | null };
-export type CoworkerRequest = { simulation: Pick<SimulationClient, 'observe' | 'command'>; runId: string; actorId: string; targetId: string | null; message: string; signal: AbortSignal; getSimTime?: () => number; onTool?: (intent: ToolIntent, result: PublicToolResult) => Promise<void> };
+export type CoworkerResult = { start: GatewayStart; targetId: string | null; view: KnowledgeView; reply: Exclude<GatewayResponse, { kind: 'tool_request' }>; tools: PublicToolResult[]; intents: ToolIntent[]; calls: ProviderCall[]; durationMs: number; recording: RecordedInteraction | null; authorizations: ProposalAuthorization[] };
+export type CoworkerRequest = { simulation: Pick<SimulationClient, 'observe' | 'command'>; runId: string; actorId: string; targetId: string | null; message: string; signal: AbortSignal; interactionMode?: 'advisory'; getSimTime?: () => number; onTool?: (intent: ToolIntent, result: PublicToolResult) => Promise<void> };
 
 export async function runCoworker(input: CoworkerRequest): Promise<CoworkerResult> {
   const began = performance.now();
@@ -26,7 +26,7 @@ export async function runCoworker(input: CoworkerRequest): Promise<CoworkerResul
     const durationMs = Math.round(performance.now() - began);
     const atSimTime = Math.max(view.simTime, input.getSimTime?.() ?? 0, ...turns.map(t => t.atSimTime), ...tools.map(t => t.receipt?.observedAt ?? 0));
     const recording: RecordedInteraction | null = turns.length ? structuredClone({ turns, end: { atSimTime, reason: input.signal.aborted ? 'canceled' : reply.kind === 'final' ? 'final' : 'fallback', reply, durationMs } }) : null;
-    return { start: context.start, targetId: input.targetId, view, reply, tools, intents, calls, durationMs, recording };
+    return { start: context.start, targetId: input.targetId, view, reply, tools, intents, calls, durationMs, recording, authorizations: [] };
   };
   const receive = async (send: (onWire: GatewayWireObserver) => Promise<GatewayResponse>) => {
     const capture: { turn?: RecordedInteraction['turns'][number] } = {};
