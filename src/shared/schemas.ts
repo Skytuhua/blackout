@@ -5,7 +5,7 @@ const number = z.number().finite();
 const seconds = number.nonnegative();
 const version = z.literal(1);
 const object = z.strictObject;
-export const INTEGRATION_CONTRACT_VERSION = 2;
+export const INTEGRATION_CONTRACT_VERSION = 5;
 export const PointSchema = object({ x: number, y: number });
 export const RoleSchema = z.enum(['player', 'facilities', 'electrical', 'remote', 'debrief']);
 export const ActionSchema = z.enum(['inspect', 'independent_reading', 'repair_cooling', 'restart_cooling', 'pause_batch', 'resume_batch', 'set_batch_ceiling', 'verify_recovery', 'cancel_task', 'reset_ups', 'move_crew']);
@@ -35,7 +35,7 @@ export const ActionIntentSchema = z.discriminatedUnion('action', [
 export const ActionRequestSchema = object({ schemaVersion: version, runId: id, requestId: id, actorId: id, intent: ActionIntentSchema, expectedEntityVersions: z.record(id, number.int().nonnegative()), idempotencyKey: id });
 export const CommandReceiptSchema = object({ schemaVersion: version, runId: id, requestId: id, actorId: id, status: z.enum(['queued', 'accepted', 'rejected', 'applied']), reason: id, taskId: id.nullable(), eta: seconds.nullable(), evidenceIds: z.array(id), observedAt: seconds });
 export const TaskSchema = object({ id, actorId: id, targetId: id, action: ActionSchema, status: z.enum(['queued', 'traveling', 'inspecting', 'working', 'blocked', 'completed', 'canceled']), startedAt: seconds, arrivalAt: seconds, completesAt: seconds, progress: number.min(0).max(1), path: z.array(PointSchema), reason: z.string().nullable() });
-export const PublicMessageSchema = object({ id, at: seconds, speaker: id, text: z.string().max(3000), evidenceIds: z.array(id), mode: z.enum(['live', 'scripted', 'recorded', 'system']) });
+export const PublicMessageSchema = object({ id, at: seconds, speaker: id, text: z.string().max(3000), evidenceIds: z.array(id), mode: z.enum(['live', 'scripted', 'recorded', 'system']), conversationActorId: id.optional(), conversationKind: z.enum(['player', 'order', 'system', 'live', 'fallback', 'report']).optional() });
 export const AffordanceSchema = object({ action: ActionSchema, targetId: id, enabled: z.boolean(), reason: z.string().nullable(), technicianIds: z.array(id), travelSeconds: seconds.nullable(), workSeconds: seconds });
 export const KnowledgeViewSchema = object({
   schemaVersion: version, runId: id, actorId: id, simTime: seconds, viewHash: id, knownTopology: TopologySchema, observations: z.array(ObservationSchema), tasks: z.array(TaskSchema), crew: z.array(CrewSchema), messages: z.array(PublicMessageSchema), allowedProcedureIds: z.array(id), observedEntityVersions: z.record(id, number.int().nonnegative()), affordances: z.array(AffordanceSchema),
@@ -73,7 +73,7 @@ export const ComparisonResultSchema = z.discriminatedUnion('status', [
   if (ledgers.some(ledger => ledger.horizon !== result.supportedHorizon)) context.addIssue({ code: 'custom', message: 'Comparison evidence must use the supported equal horizon.' });
 });
 
-export const GatewayStartSchema = object({ kind: z.literal('start'), ...gatewayIdentity, role: RoleSchema, message: z.string().max(1600), view: KnowledgeViewSchema, procedures: z.array(object({ id, text: z.string().max(3000) })).max(4), promptVersion: id, debriefContext: object({ ledger: OutcomeLedgerSchema, comparison: ComparisonResultSchema.nullable() }).optional() });
+export const GatewayStartSchema = object({ kind: z.literal('start'), ...gatewayIdentity, role: RoleSchema, message: z.string().max(1600), view: KnowledgeViewSchema, procedures: z.array(object({ id, text: z.string().max(3000) })).max(4), promptVersion: id, interactionMode: z.literal('advisory').optional(), debriefContext: object({ ledger: OutcomeLedgerSchema, comparison: ComparisonResultSchema.nullable() }).optional() });
 export const GatewayContinueSchema = object({ kind: z.literal('continue'), ...gatewayIdentity, interactionId: id, expectedCallId: id, view: KnowledgeViewSchema, result: PublicToolResultSchema });
 export const GatewayInputSchema = z.discriminatedUnion('kind', [GatewayStartSchema, GatewayContinueSchema]);
 

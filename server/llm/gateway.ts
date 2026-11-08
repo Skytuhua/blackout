@@ -120,6 +120,7 @@ export class Gateway {
         state.history = appendOutput(state.history, response);
         const value = decode(response, state.start, interactionId);
         if ('tool' in value) {
+          if (state.start.interactionMode === 'advisory' && value.tool === 'inspect_asset') throw new Error('advisory_execution_forbidden');
           if (state.calls >= 3 || state.start.role === 'debrief') throw new Error('interaction_quota');
           if (state.history.filter(i => 'type' in i && i.type === 'function_call' && i.call_id === value.callId).length !== 1) throw new Error('duplicate_call');
           if (value.tool === 'read_procedure' ? !state.start.procedures.some(p => p.id === value.targetId) : !(value.tool === 'propose_action' && value.action && validAction(value.action, state.start)) && !state.start.view.knownTopology.assets.some(a => a.id === value.targetId)) throw new Error('invalid_target');
@@ -132,7 +133,7 @@ export class Gateway {
       } finally { clearTimeout(timeout); state.controller.signal.removeEventListener('abort', close); callController.signal.removeEventListener('abort', onAbort); }
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
-      const allowed = ['budget_exhausted', 'budget_unavailable', 'mission_quota', 'interaction_quota', 'input_limit', 'canceled', 'call_timeout', 'interaction_timeout', 'refusal', 'incomplete_response', 'invalid_evidence', 'invalid_target', 'invalid_action', 'duplicate_call'];
+      const allowed = ['budget_exhausted', 'budget_unavailable', 'mission_quota', 'interaction_quota', 'input_limit', 'canceled', 'call_timeout', 'interaction_timeout', 'refusal', 'incomplete_response', 'invalid_evidence', 'invalid_target', 'invalid_action', 'duplicate_call', 'advisory_execution_forbidden'];
       const status = (error as { status?: number }).status;
       state.reply = this.fallback(input, status === 429 ? 'provider_quota' : allowed.includes(message) ? message : 'malformed_or_unavailable');
       clearTimeout(state.expires);

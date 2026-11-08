@@ -1,154 +1,248 @@
 import { useEffect, useRef, useState } from 'react';
+import { ConversationGame } from './ui/conversation/ConversationGame';
+import { DesktopReplayView } from './ui/debrief/DesktopReplayView';
+import { PagedText } from './ui/DesktopPaging';
+import { radioCitations, radioProvenance, radioReceipts, radioReport, observationText } from './ui/desktop-copy';
 import { SimulationClient } from './workers/SimulationClient';
-import { hotRestart } from './content/scenarios/hot-restart';
-import { procedures } from './content/procedures';
-import type { ActionIntent, KnowledgeView, PublicMessage } from './shared/contracts';
+import { hotRestart, practiceScenario } from './content/scenarios/hot-restart';
 import { latestObservations } from './llm/context';
-import { OperationalView } from './ui/OperationalView';
 import { runCoworker, type CoworkerResult } from './llm/interaction';
-import { formatObservationFact } from './ui/presentation';
+import { appendConversationEntry, authorizationMatchesOrigin, conversationPeople, createConversations, hydrateConversationReport, markConversationRead, ProposalBook, setConversationDraft, updateConversation, withConversationAssignments } from './shared/conversations';
+import { conversationOrders } from './shared/conversation-orders';
+import { openRunStore, type RunStore, type SavedRunSummary } from './persistence/runs';
+import { HostArchive } from './persistence/host-archive';
+import { engineRecordOf } from './persistence/saved-record';
+import { buildOutcomeLedger } from './sim/replay/ledger';
+import type { ActionIntent, CommandReceipt, ComparisonResult, ConversationEntry, ConversationGameProps, ConversationThread, KnowledgeView, OutcomeLedger, PublicMessage, SavedRunRecord } from './shared/contracts';
 
-const time = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
-const words = (text: string) => text.toLowerCase().replaceAll('_', ' ');
-const actionLabel = (action: ActionIntent['action']) => action === 'inspect' ? 'Inspection' : words(action);
+const words = (value: string) => value.toLowerCase().replaceAll('_', ' ');
+const clock = (at: number) => `${Math.floor(at / 60)}:${String(Math.floor(at % 60)).padStart(2, '0')}`;
+const ended = (view: KnowledgeView) => ['success', 'failure'].includes(view.mission.status);
+const person = (actorId: string) => conversationPeople.find(actor => actor.actorId === actorId);
+const labelAction = (intent: ActionIntent) => intent.action === 'inspect' ? 'Check cooling controls' : intent.action === 'repair_cooling' ? 'Repair the controls' : intent.action === 'pause_batch' ? 'Pause background jobs' : intent.action === 'set_batch_ceiling' || intent.action === 'resume_batch' ? 'Resume background jobs' : intent.action === 'verify_recovery' ? 'Check recovery' : words(intent.action);
+type RadioJob = { controller: AbortController; promise: Promise<CoworkerResult> };
+
+function savedConversations(source?: SavedRunRecord) {
+  let threads = createConversations();
+  for (const message of source?.dialogue ?? []) {
+    const actorId = message.conversationActorId ?? (person(message.speaker) ? message.speaker : null);
+    if (!actorId) continue;
+    threads = appendConversationEntry(threads, { id: message.id, actorId, at: message.at, kind: message.conversationKind ?? (message.id.startsWith('report-') ? 'report' : message.mode === 'live' ? 'live' : 'system'), text: message.text, summary: message.text.length > 260 ? `${person(actorId)?.name} sent a saved message.` : message.text, unread: false, ...(message.id.startsWith('report-') ? { reportId: message.id } : {}) });
+  }
+  for (const interaction of source?.interactions ?? []) {
+    const input = interaction.turns[0].input; if (input.kind !== 'start') continue;
+    const id = `question:${input.requestId}`;
+    if (!threads.find(thread => thread.actorId === input.actorId)?.entries.some(entry => entry.id === id)) threads = appendConversationEntry(threads, { id, actorId: input.actorId, at: interaction.turns[0].atSimTime, kind: 'player', text: input.message, unread: false });
+  }
+  return threads;
+}
 
 export default function App() {
-  const client = useRef<SimulationClient | null>(null);
-  const current = useRef<KnowledgeView | null>(null);
-  const generation = useRef(0);
-  const selected = useRef<string | null>(null);
-  const commandPending = useRef(false);
-  const radioPending = useRef(false);
-  const radioController = useRef<AbortController | null>(null);
-  const [view, setView] = useState<KnowledgeView | null>(null);
-  const [started, setStarted] = useState(false);
-  const [paused, setPaused] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [radioBusy, setRadioBusy] = useState(false);
-  const [speed, setSpeed] = useState<1 | 2 | 4>(1);
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
-  const [tutorial, setTutorial] = useState('Select equipment on the map or from the keyboard list.');
-  const [radio, setRadio] = useState<PublicMessage[]>([]);
-  const [exchange, setExchange] = useState<CoworkerResult | null>(null);
+  const simulation = useRef<SimulationClient | null>(null), unsubscribe = useRef<(() => void) | null>(null), known = useRef<KnowledgeView | null>(null);
+  const generation = useRef(0), transitioning = useRef(false), commandPending = useRef(false), jobs = useRef(new Map<string, RadioJob>());
+  const sourceGeneration = useRef(0), hostPending = useRef(false), listGeneration = useRef(0);
+  const archive = useRef<HostArchive | null>(null), store = useRef<Promise<RunStore> | null>(null), proposals = useRef<ProposalBook | null>(null);
+  const replayClient = useRef<SimulationClient | null>(null), replayGeneration = useRef(0), replayAt = useRef(0), replayPending = useRef(false);
+  const sessionRef = useRef<'welcome' | 'practice' | 'mission'>('welcome'), selected = useRef<string | null>(null);
+  const threadState = useRef<ConversationThread[]>(createConversations()), selectedActor = useRef('alex'), manualPaused = useRef(true), guideEnabled = useRef(true), menuOpenRef = useRef(false);
+  const [view, setView] = useState<KnowledgeView | null>(null), [session, setSession] = useState<typeof sessionRef.current>('welcome');
+  const [paused, setPaused] = useState(true), [speed, setSpeed] = useState<1 | 2 | 4>(1), [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState(''), [error, setError] = useState(''), [assetId, setAssetId] = useState<string | null>(null), [actorId, setActorId] = useState('alex');
+  const [threads, setThreads] = useState<ConversationThread[]>(threadState.current), [reader, setReader] = useState<ConversationGameProps['reader']>(null), [menuOpen, setMenuOpen] = useState(false), [menuTab, setMenuTab] = useState('replay'), [guidanceEnabled, setGuidanceEnabled] = useState(true);
+  const [saved, setSaved] = useState<SavedRunSummary[]>([]), [source, setSource] = useState<SavedRunRecord | null>(null), [ledger, setLedger] = useState<OutcomeLedger | null>(null), [comparison, setComparison] = useState<ComparisonResult | null>(null);
+  const [replayView, setReplayView] = useState<KnowledgeView | null>(null), [replayActive, setReplayActive] = useState(false), [replayPlaying, setReplayPlaying] = useState(false), [cursor, setCursor] = useState(0);
 
-  useEffect(() => {
-    const simulation = new SimulationClient(); client.current = simulation;
-    let disposed = false; const token = ++generation.current;
-    const unsubscribe = simulation.subscribe(raw => {
-      if (disposed) return;
-      current.current = raw;
-      setView({ ...raw, observations: latestObservations(raw.observations), messages: raw.messages.slice(-8), affordances: raw.affordances.map(a => ({ ...a, reason: a.reason ? words(a.reason) : null })) });
-      if (['success', 'failure'].includes(raw.mission.status)) { setPaused(true); radioController.current?.abort(); }
+  function updateThreads(update: (previous: ConversationThread[]) => ConversationThread[]) { const next = update(threadState.current); threadState.current = next; setThreads(next); }
+  function chooseAsset(id: string) { if (id && !known.current?.knownTopology.assets.some(asset => asset.id === id)) return; selected.current = id || null; setAssetId(id || null); }
+  function chooseActor(id: string) { if (!person(id)) return; selectedActor.current = id; setActorId(id); setReader(null); }
+  function append(entry: ConversationEntry, evidenceIds: string[] = [], record = true) {
+    updateThreads(previous => appendConversationEntry(previous, entry));
+    if (record && archive.current) archive.current.message({ id: entry.id, at: entry.at, speaker: entry.kind === 'player' || entry.kind === 'order' ? 'player' : entry.actorId, text: entry.text.slice(0, 3000), evidenceIds, mode: entry.kind === 'live' ? 'live' : entry.kind === 'fallback' ? 'scripted' : 'system', conversationActorId: entry.actorId, conversationKind: entry.kind });
+  }
+  function syncClock() {
+    if (!simulation.current || transitioning.current || replayClient.current && replayActive) return;
+    const stop = manualPaused.current || menuOpenRef.current || sessionRef.current === 'welcome' || !!known.current && ended(known.current) || guideEnabled.current && jobs.current.size > 0;
+    if (stop) simulation.current.pause(); else simulation.current.resume(); setPaused(stop);
+  }
+  async function cancelCoworkers(cancel = true) { const active = [...jobs.current.values()]; if (cancel) active.forEach(job => job.controller.abort()); await Promise.allSettled(active.map(job => job.promise)); }
+  function getStore() { return store.current ??= openRunStore().catch(problem => { store.current = null; throw problem; }); }
+  async function refreshSaves() {
+    const request = ++listGeneration.current, token = generation.current;
+    try { const rows = await (await getStore()).listRuns(); if (request === listGeneration.current && token === generation.current) setSaved(rows); }
+    catch { if (request === listGeneration.current && token === generation.current) setError('Local saves are unavailable. You can still play.'); }
+  }
+  function pauseLive() { simulation.current?.pause(); setPaused(true); }
+  function closeReplay() { sourceGeneration.current++; hostPending.current = false; setBusy(false); replayGeneration.current++; replayClient.current?.dispose(); replayClient.current = null; replayAt.current = 0; replayPending.current = false; setReplayActive(false); setReplayPlaying(false); setReplayView(null); setCursor(0); }
+  function ingestReports(raw: KnowledgeView) {
+    updateThreads(previous => {
+      let next = previous;
+      for (const message of raw.messages) if (person(message.speaker)) next = hydrateConversationReport(next, { id: message.id, actorId: message.speaker, at: message.at, kind: message.id.startsWith('report-') ? 'report' : 'system', text: message.text, summary: `${person(message.speaker)!.name} has sent a report.`, unread: true, reportId: message.id, sections: [{ id: 'evidence', label: 'Evidence', text: raw.observations.filter(observation => message.evidenceIds.includes(observation.id)).map(observation => observationText(observation, raw.simTime)).join('\n\n') || 'No new reading supplied.' }] });
+      return withConversationAssignments(next, raw);
     });
-    void simulation.initialize(hotRestart).catch(() => { if (!disposed && token === generation.current) setError('Could not start the simulation. Retry the mission.'); });
-    const visibility = () => { if (document.hidden) { simulation.pause(); setPaused(true); } };
+  }
+  async function begin(next: typeof sessionRef.current, previous?: SavedRunRecord, runImmediately = true) {
+    if (transitioning.current) return;
+    transitioning.current = true; const token = ++generation.current; simulation.current?.pause(); closeReplay(); setBusy(true); setPaused(true); setError('');
+    try {
+      await cancelCoworkers(); if (token !== generation.current) return;
+      unsubscribe.current?.(); simulation.current?.dispose(); known.current = null; jobs.current.clear(); selected.current = null; commandPending.current = false;
+      setView(null); setAssetId(null); setReader(null); setNotice(''); setSpeed(1); setSource(null); setLedger(null); setComparison(null); setMenuOpen(false); menuOpenRef.current = false;
+      sessionRef.current = next; setSession(next); selectedActor.current = 'alex'; setActorId('alex'); manualPaused.current = !runImmediately || next === 'welcome' || !!previous;
+      const client = new SimulationClient(), runId = crypto.randomUUID(); simulation.current = client; archive.current = new HostArchive(runId, previous); proposals.current = new ProposalBook(runId); updateThreads(() => savedConversations(previous));
+      if (!previous) for (const actor of conversationPeople) append({ id: `intro:${runId}:${actor.actorId}`, actorId: actor.actorId, at: 0, kind: 'system', text: actor.actorId === 'alex' ? 'I handle cooling. Ask me a question or choose an order.' : actor.actorId === 'jules' ? 'I handle power. I’ll report back when my work is finished.' : 'I handle background jobs. Pausing them buys repair time.', unread: false });
+      unsubscribe.current = client.subscribe(raw => {
+        if (token !== generation.current || simulation.current !== client) return;
+        known.current = raw; setView({ ...raw, observations: latestObservations(raw.observations) }); ingestReports(raw);
+        if (ended(raw)) { setPaused(true); jobs.current.forEach(job => job.controller.abort()); }
+      });
+      await client.initialize(next === 'mission' ? hotRestart : practiceScenario, runId);
+      if (previous) await client.restore(previous.finalCheckpoint, runId);
+      if (token !== generation.current) return;
+      if (previous) setNotice('Saved mission resumed paused.');
+    } catch { if (token === generation.current) setError('Could not open this game. Retry a fresh mission; saved data stays preserved.'); }
+    finally { if (token === generation.current) { transitioning.current = false; setBusy(false); syncClock(); } }
+  }
+  useEffect(() => {
+    void begin('welcome');
+    const visibility = () => { if (document.hidden) { manualPaused.current = true; pauseLive(); setReplayPlaying(false); } };
     document.addEventListener('visibilitychange', visibility);
-    return () => { disposed = true; generation.current++; radioController.current?.abort(); unsubscribe(); simulation.dispose(); if (client.current === simulation) client.current = null; document.removeEventListener('visibilitychange', visibility); };
+    return () => { generation.current++; sourceGeneration.current++; listGeneration.current++; transitioning.current = false; jobs.current.forEach(job => job.controller.abort()); unsubscribe.current?.(); simulation.current?.dispose(); replayClient.current?.dispose(); void store.current?.then(storage => storage.close()).catch(() => {}); document.removeEventListener('visibilitychange', visibility); };
   }, []);
 
-  async function retry() {
-    const simulation = client.current; if (!simulation) return;
-    const token = ++generation.current;
-    radioController.current?.abort(); radioController.current = null;
-    simulation.pause(); current.current = null; selected.current = null;
-    commandPending.current = false; radioPending.current = false;
-    setView(null); setStarted(false); setPaused(true); setBusy(false); setRadioBusy(false); setError(''); setNotice(''); setRadio([]); setExchange(null); setSpeed(1);
-    setTutorial('Select equipment on the map or from the keyboard list.'); simulation.setSpeed(1);
-    try { await simulation.initialize(hotRestart); }
-    catch { if (token === generation.current) setError('Could not retry the mission. Reload the page to reconnect.'); }
-  }
-
-  async function dispatch(intent: ActionIntent, proposalVersions?: Record<string, number>) {
-    const simulation = client.current, known = current.current;
-    if (!simulation || !known || commandPending.current || known.mission.status !== 'active') return;
-    const token = generation.current;
-    commandPending.current = true; setBusy(true); setError('');
+  async function applyOrder(originActor: string, intent: ActionIntent, authority?: { requestId: string; idempotencyKey: string; expectedEntityVersions: Record<string, number> }) {
+    const client = simulation.current, current = known.current;
+    if (!client || !current || !person(originActor) || replayActive || transitioning.current || hostPending.current || commandPending.current || !['active', 'practice'].includes(current.mission.status) || intent.action === 'move_crew') return null;
+    const token = generation.current; commandPending.current = true; setBusy(true); setError('');
     try {
-      const receipt = await simulation.command({ schemaVersion: 1, runId: known.runId, requestId: crypto.randomUUID(), actorId: 'player', intent: { ...intent, atSimTime: known.simTime }, expectedEntityVersions: proposalVersions ?? known.observedEntityVersions, idempotencyKey: crypto.randomUUID() });
-      if (token !== generation.current) return;
-      await simulation.observe('player');
-      if (token !== generation.current) return;
-      setNotice(receipt.status === 'rejected' ? `${actionLabel(intent.action)} rejected: ${words(receipt.reason)}. Check the current evidence and available crew.` : `${actionLabel(intent.action)} accepted${receipt.eta === null ? '' : `; work completes at ${time(receipt.eta)}`}. Reports arrive after completion.`);
-      if (intent.action === 'inspect' && receipt.status === 'accepted') setTutorial('Inspection dispatched. The technician must travel and finish the work; wait for the timestamped report before choosing a repair.');
-    } catch { if (token === generation.current) setError('The command could not be confirmed. Refresh the evidence before dispatching again.'); }
+      const receipt = await client.command({ schemaVersion: 1, runId: current.runId, requestId: authority?.requestId ?? crypto.randomUUID(), actorId: 'player', intent, expectedEntityVersions: authority?.expectedEntityVersions ?? current.observedEntityVersions, idempotencyKey: authority?.idempotencyKey ?? crypto.randomUUID() });
+      if (token !== generation.current) return null;
+      await client.observe('player'); if (token !== generation.current) return null;
+      append({ id: crypto.randomUUID(), actorId: originActor, at: receipt.observedAt, kind: 'order', text: receipt.status === 'rejected' ? `That order could not start: ${words(receipt.reason)}.` : receipt.status === 'applied' && intent.action === 'cancel_task' ? 'Current task stopped.' : `${labelAction(intent)} accepted. ${person(originActor)!.name} will report back.`, unread: false, summary: `${labelAction(intent)} ${receipt.status === 'rejected' ? 'could not start' : 'accepted'}.`, sections: [{ id: 'receipt', label: 'Order receipt', text: JSON.stringify(receipt, null, 2) }] }, receipt.evidenceIds);
+      return receipt;
+    } catch { if (token === generation.current) setError('Could not confirm the order. Check the current assignment before retrying.'); return null; }
     finally { if (token === generation.current) { commandPending.current = false; setBusy(false); } }
   }
-
-  async function step() {
-    const simulation = client.current; if (!simulation || commandPending.current) return;
-    const token = generation.current;
-    commandPending.current = true; setBusy(true);
-    try { await simulation.advance(1); }
-    catch { if (token === generation.current) setError('The simulation could not advance. Retry the mission.'); }
-    finally { if (token === generation.current) { commandPending.current = false; setBusy(false); } }
+  async function executeProposal(id: string) {
+    if (transitioning.current || commandPending.current || hostPending.current || replayActive || !known.current || ended(known.current)) return;
+    const token = proposals.current?.take(id); if (!token) return;
+    const originActor = token.authorization.actorId, generationAtStart = generation.current;
+    const status = (value: 'sending' | 'accepted' | 'rejected', reason?: string) => updateThreads(previous => updateConversation(previous, originActor, thread => ({ ...thread, entries: thread.entries.map(entry => ({ ...entry, proposals: entry.proposals?.map(proposal => proposal.id === id ? { ...proposal, status: value, reason } : proposal) })) })));
+    status('sending');
+    const receipt = await applyOrder(originActor, token.authorization.intent, { requestId: token.requestId, idempotencyKey: token.idempotencyKey, expectedEntityVersions: token.authorization.expectedEntityVersions });
+    if (generationAtStart === generation.current) status(receipt && receipt.status !== 'rejected' ? 'accepted' : 'rejected', receipt ? words(receipt.reason) : 'Not confirmed. Check the assignment.');
   }
-
-  async function askCoworker(actorId: string, message: string) {
-    const simulation = client.current; if (!simulation || radioPending.current || current.current?.mission.status !== 'active') return;
-    const token = generation.current, runId = current.current.runId, targetId = selected.current;
-    const controller = new AbortController(); radioController.current = controller;
-    radioPending.current = true; setRadioBusy(true); setError('');
+  async function askCoworker(originActor: string) {
+    const client = simulation.current, current = known.current, recorder = archive.current, message = threadState.current.find(thread => thread.actorId === originActor)?.draft.trim();
+    if (!client || !current || !recorder || !person(originActor) || !message || jobs.current.has(originActor) || replayActive || transitioning.current || hostPending.current || ended(current)) return;
+    const token = generation.current, controller = new AbortController(), requestId = crypto.randomUUID(), targetId = selected.current ?? (originActor === 'alex' ? 'controller' : originActor === 'jules' ? 'distribution' : null);
+    append({ id: `question:${requestId}`, actorId: originActor, at: current.simTime, kind: 'player', text: message, unread: false });
+    updateThreads(previous => updateConversation(setConversationDraft(previous, originActor, ''), originActor, thread => ({ ...thread, busy: true })));
+    const job = runCoworker({ simulation: client, runId: current.runId, requestId, actorId: originActor, targetId, message, signal: controller.signal, interactionMode: 'advisory', getSimTime: () => known.current?.runId === current.runId ? known.current.simTime : current.simTime });
+    jobs.current.set(originActor, { controller, promise: job }); syncClock();
     try {
-      const result = await runCoworker({ simulation, runId, actorId, targetId, message, signal: controller.signal, onTool: async (_intent, tool) => {
-        if (token !== generation.current || controller.signal.aborted) return;
-        await simulation.observe('player');
-        if (token !== generation.current || controller.signal.aborted) return;
-        if (tool.receipt) setNotice(`Coworker inspection ${tool.receipt.status}${tool.receipt.eta === null ? '' : `; work completes at ${time(tool.receipt.eta)}`}. Check crew assignments; completion and reporting take time.`);
-      } });
+      const result = await job; recorder.capture(result.recording);
       if (token !== generation.current || controller.signal.aborted) return;
-      const actorView = result.view;
-      const readings = latestObservations(actorView.observations).filter(o => o.assetId === (targetId ?? 'site')).slice(-4);
-      const text = readings.length ? readings.map(o => `${words(o.field)}: ${String(o.value ?? 'unknown')} ${o.units}; observed ${time(o.observedAt)}, received ${time(o.receivedAt)}.`).join(' ') : 'I have no delivered observations for this equipment yet.';
-      const advice = actorView.crew.find(c => c.id === actorId)?.role === 'remote' ? 'Batch controls preserve backlog. Keep critical demand served and verify recovery after the stability hold.' : 'Check timestamps and dispatch a qualified inspection before deciding on a repair. Task acceptance does not mean work is complete.';
-      const live = result.reply.kind === 'final';
+      const allowed = result.authorizations.filter(authorization => authorization.actorId === originActor && authorization.runId === current.runId && authorizationMatchesOrigin(authorization, result.recording));
+      for (const authorization of allowed) proposals.current!.register(authorization);
       const answer = result.reply.kind === 'final' ? result.reply.response : null;
-      const reply: PublicMessage = { id: crypto.randomUUID(), at: actorView.simTime, speaker: actorId, mode: live ? 'live' : 'scripted', text: (answer ? `Inference: ${answer.inference} Uncertainty: ${answer.uncertainty}. Evidence records are in the latest coworker response.` : `${text} ${advice}`).slice(0, 3000), evidenceIds: answer ? answer.facts.flatMap(f => 'observationId' in f ? [f.observationId] : []) : readings.map(o => o.id) };
-      setExchange(result);
-      setRadio(previous => [...previous, reply].slice(-8));
-    } catch { if (token === generation.current) setError('Coworker evidence is unavailable. Direct inspection and dispatch controls remain available.'); }
-    finally { if (token === generation.current) { radioPending.current = false; setRadioBusy(false); if (radioController.current === controller) radioController.current = null; } }
+      const text = answer ? [answer.inference, answer.uncertainty].filter(Boolean).join('\n') || 'I’ve included the available readings in the details.' : 'The live assistant is unavailable. You can still use suggested orders.';
+      append({ id: crypto.randomUUID(), actorId: originActor, at: known.current?.simTime ?? current.simTime, kind: answer ? 'live' : 'fallback', text, summary: text.length <= 260 ? text : `${person(originActor)!.name} sent a detailed reply.`, unread: true, exchangeId: result.start.requestId, proposals: allowed.map(authorization => ({ id: authorization.id, label: labelAction(authorization.intent), assignedName: person(authorization.intent.args.technicianId ?? (['pause_batch', 'resume_batch', 'set_batch_ceiling', 'verify_recovery'].includes(authorization.intent.action) ? 'sam' : originActor))?.name ?? person(originActor)!.name, status: 'ready' })), sections: [{ id: 'reply', label: 'Facts and reply', text: radioReport(result) }, { id: 'citations', label: 'Evidence', text: radioCitations(result) }, { id: 'receipts', label: 'Tool receipts', text: radioReceipts(result) }, { id: 'provenance', label: 'Provenance', text: radioProvenance(result) }] }, answer?.facts.flatMap(fact => 'observationId' in fact ? [fact.observationId] : []) ?? []);
+    } catch { if (token === generation.current) append({ id: crypto.randomUUID(), actorId: originActor, at: known.current?.simTime ?? current.simTime, kind: 'fallback', text: 'I couldn’t finish that reply. Suggested orders still work.', unread: true }); }
+    finally { if (jobs.current.get(originActor)?.promise === job) jobs.current.delete(originActor); if (token === generation.current) { updateThreads(previous => updateConversation(previous, originActor, thread => ({ ...thread, busy: false }))); syncClock(); } }
   }
-
-  const terminal = view && ['success', 'failure'].includes(view.mission.status);
-  const answer = exchange?.reply.kind === 'final' ? exchange.reply.response : null;
-  const facts = answer ? answer.facts.flatMap(selector => {
-    if (!('observationId' in selector)) return [];
-    const observation = exchange!.view.observations.find(o => o.id === selector.observationId);
-    return observation ? [{ observation, field: selector.field }] : [];
-  }) : exchange ? latestObservations(exchange.view.observations).filter(o => o.assetId === (exchange.targetId ?? 'site')).slice(-4).map(observation => ({ observation, field: 'value' as const })) : [];
-  if (!started) return <main className="mission-briefing">
-    <h1>BLACKOUT</h1><h2>Hot Restart</h2><p>{hotRestart.description}</p>
-    <p>Keep critical service running. Use timestamped observations, qualified technicians and workload controls to diagnose the incident and recover the hall.</p>
-    <ul><li>Eight cohosted racks, two field technicians and one remote operator.</li><li>Travel, work and delayed reports take simulation time. Pausing batch retains its backlog.</li><li>Restore sustainable service, hold recovery for 60 seconds, then receive a fresh final verification.</li></ul>
-    <p className="mission-mode">Coworkers use the local gateway with labeled scripted fallback. The complete mission works without a model connection.</p>
-    <button disabled={!view} onClick={() => { if (view) { setStarted(true); setPaused(false); client.current?.resume(); } }}>Start mission</button>
-    {!view && !error && <p role="status">Connecting simulation…</p>}{error && <><p role="alert">{error}</p><button onClick={() => void retry()}>Retry mission</button></>}
-    <footer>Fictional training model. No live facility connection.</footer>
-  </main>;
-
-  return <>
-    <section className="mission-controls" aria-label="Mission controls">
-      <div className="mission-playback"><button disabled={!!terminal || busy} onClick={() => { if (paused) client.current?.resume(); else client.current?.pause(); setPaused(!paused); }}>{paused ? 'Resume simulation' : 'Pause simulation'}</button>
-        <button disabled={!paused || !!terminal || busy} onClick={() => void step()}>Step 1 second</button>
-        <label>Simulation speed<select value={speed} disabled={!!terminal} onChange={e => { const next = Number(e.target.value) as 1 | 2 | 4; setSpeed(next); client.current?.setSpeed(next); }}><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select></label>
-        <span>{terminal ? 'Mission ended' : paused ? 'Paused' : 'Running'}{busy ? ' · Confirming command…' : ''}</span>
-        <button className="mission-retry" onClick={() => void retry()}>Retry mission</button></div>
-      <p className="mission-guidance">{tutorial}</p>
-      <details><summary>Training procedure</summary><p>{procedures[0].text}</p></details>
-      <p role="status" aria-live="polite">{notice}</p>{error && <p role="alert">{error}</p>}
-      <p className="mission-radio-scope">Coworkers may inspect selected equipment. Repairs and workload proposals require your confirmation.</p>
-      {radioBusy && <div className="mission-radio-pending"><p role="status">Coworker reviewing permitted evidence…</p><button onClick={() => { radioController.current?.abort(); setNotice('Coworker request canceled. Check crew assignments for any inspection already accepted.'); }}>Cancel coworker request</button></div>}
-      {exchange && <a href="#coworker-response">Latest coworker response</a>}
-    </section>
-    {view && <OperationalView view={{ ...view, messages: [...view.messages, ...radio] }} onAction={intent => void dispatch(intent)} onInspect={id => { selected.current = id; setTutorial('Check when each reading was observed and received. Choose an inspection, review travel/work time and select a qualified technician before dispatch.'); }} onAskCoworker={(actor, message) => void askCoworker(actor, message)} />}
-    {exchange && <section className="coworker-response" id="coworker-response" aria-label="Coworker response">
-      <h2>Coworker response</h2><p>{answer ? 'Live coworker' : 'Scripted fallback'} · {view?.crew.find(c => c.id === exchange.start.actorId)?.name ?? exchange.start.actorId}{exchange.reply.kind === 'fallback' ? ` · ${words(exchange.reply.reason)}` : ''}</p>
-      <h3>Evidence from records</h3>{facts.length ? <><ul>{facts.map(({ observation, field }, index) => <li key={`${observation.id}-${field}`}><a href={`#coworker-source-${index}`}>{formatObservationFact(observation, field)}</a></li>)}</ul><div className="coworker-sources">{facts.map(({ observation }, index) => <p id={`coworker-source-${index}`} key={`${observation.id}-${index}`}><strong>{observation.id}</strong> · {observation.source} · {observation.quality} · observed {time(observation.observedAt)}, received {time(observation.receivedAt)}</p>)}</div></> : <p>No factual readings were cited. Unverified statements remain inference.</p>}
-      {answer ? <><h3>Inference</h3><p>{answer.inference}</p><h3>Uncertainty</h3><p>{answer.uncertainty}</p></> : <p>Check timestamps, inspect before repair, and wait for delivered reports. Direct dispatch remains available.</p>}
-      {exchange.tools.length > 0 && <><h3>Inspection receipts</h3><ul>{exchange.tools.map((tool, index) => <li key={tool.callId}>{words(exchange.intents[index].tool)}: {tool.status} · {words(tool.receipt?.reason ?? tool.reason)}{tool.receipt?.eta === null || tool.receipt?.eta === undefined ? '' : ` · task completes at ${time(tool.receipt.eta)}`}</li>)}</ul></>}
-      {answer && answer.proposals.length > 0 && <><h3>Proposals awaiting confirmation</h3><p>Conditions are checked again when you confirm. If they have changed, ask the coworker for an updated proposal.</p>{answer.proposals.map((proposal, index) => <button key={index} disabled={busy || !!terminal || !view?.affordances.some(a => a.action === proposal.action && a.targetId === proposal.targetId && a.enabled)} onClick={() => void dispatch(proposal, exchange.start.view.observedEntityVersions)}>Confirm {words(proposal.action)} for {view?.knownTopology.assets.find(a => a.id === proposal.targetId)?.label ?? proposal.targetId}</button>)}</>}
-      <details><summary>Response provenance</summary><p>{exchange.calls.length ? `Observed model: ${exchange.calls.at(-1)!.model}. ${exchange.calls.length} provider call receipt(s).` : 'No provider model identity was supplied.'} Total interaction: {(exchange.durationMs / 1000).toFixed(1)} seconds. Prompt: {exchange.start.promptVersion}.</p></details>
-    </section>}
-  </>;
+  function toggleMenu() { const open = !menuOpenRef.current; menuOpenRef.current = open; setMenuOpen(open); if (open) { manualPaused.current = true; pauseLive(); void refreshSaves(); if (!replayActive && sessionRef.current === 'mission') void capture(false); } }
+  // Existing save/replay lifecycle follows below; normal UI receives scoped views only.
+  async function capture(save: boolean) {
+    const client = simulation.current, recorder = archive.current, token = generation.current;
+    if (!client || !recorder || sessionRef.current !== 'mission' || replayActive || commandPending.current || transitioning.current) return;
+    const request = ++sourceGeneration.current; hostPending.current = true;
+    pauseLive(); setBusy(true);
+    try {
+      await cancelCoworkers(false); if (token !== generation.current || request !== sourceGeneration.current) return;
+      const record = recorder.build(await client.record()); if (token !== generation.current || request !== sourceGeneration.current) return;
+      if (save) { await (await getStore()).saveRun(record); if (token !== generation.current || request !== sourceGeneration.current) return; setNotice('Mission saved locally with its original observations, orders and radio transcript.'); }
+      setSource(record); setLedger(buildOutcomeLedger(engineRecordOf(record))); setComparison(null);
+      if (save) await refreshSaves();
+    } catch (problem) { if (token === generation.current && request === sourceGeneration.current) setError(`Could not save or review this run: ${problem instanceof Error ? problem.message : 'storage unavailable'}`); }
+    finally { if (token === generation.current && request === sourceGeneration.current) { hostPending.current = false; setBusy(false); } }
+  }
+  async function activateReplay(record: SavedRunRecord) {
+    pauseLive(); closeReplay(); const token = ++replayGeneration.current, sessionToken = generation.current; hostPending.current = true; setBusy(true); setError(''); await cancelCoworkers();
+    try {
+      await cancelCoworkers();
+      if (token !== replayGeneration.current || sessionToken !== generation.current) return;
+      const client = new SimulationClient(); replayClient.current = client;
+      await client.initialize(record.scenario, crypto.randomUUID());
+      if (token !== replayGeneration.current || sessionToken !== generation.current) return;
+      const projected = await client.replayTo(engineRecordOf(record), 0);
+      if (token !== replayGeneration.current || sessionToken !== generation.current) return;
+      pauseLive();
+      setSource(record); setLedger(buildOutcomeLedger(engineRecordOf(record))); setComparison(null); setReplayView(projected); setReplayActive(true); setCursor(0); replayAt.current = 0; chooseAsset(''); setMenuOpen(true); menuOpenRef.current = true;
+    } catch { if (token === replayGeneration.current) setError('This recorded run cannot be replayed by the current version. Its stored bytes remain available for export.'); }
+    finally { if (token === replayGeneration.current && sessionToken === generation.current) { hostPending.current = false; setBusy(false); } }
+  }
+  async function reviewSaved(id: string, resume: boolean) {
+    const token = generation.current, request = ++sourceGeneration.current;
+    hostPending.current = true; setBusy(true); setError('');
+    try {
+      const record = await (await getStore()).loadRun(id); if (!record) throw new Error('not_found');
+      if (token !== generation.current || request !== sourceGeneration.current) return;
+      if (resume) {
+        if (record.events.some(event => ['mission.success', 'mission.failure'].includes(event.type))) { setNotice('This run has ended. Replay it, or retry a fresh mission.'); return; }
+        await begin('mission', record, false);
+      } else await activateReplay(record);
+    } catch { if (token === generation.current && request === sourceGeneration.current) setError('This save is incompatible, corrupted, or unavailable. It remains preserved and can be exported.'); }
+    finally { if (token === generation.current && request === sourceGeneration.current) { hostPending.current = false; setBusy(false); } }
+  }
+  async function exportSaved(id: string) {
+    try {
+      const text = await (await getStore()).exportRun(id); if (text === null) throw new Error('not_found');
+      const url = URL.createObjectURL(new Blob([text], { type: 'application/json' })), link = document.createElement('a'); link.href = url; link.download = `blackout-${id.replace(/[^a-zA-Z0-9_-]/g, '_')}.json`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch { setError('Could not export this local save. No stored data was changed.'); }
+  }
+  async function seek(at: number) {
+    if (!source || !replayClient.current || replayPending.current || !replayActive) return;
+    const token = replayGeneration.current; replayPending.current = true;
+    try { const projected = await replayClient.current.replayTo(engineRecordOf(source), at); if (token === replayGeneration.current) { setReplayView(projected); setCursor(at); replayAt.current = at; } }
+    catch { if (token === replayGeneration.current) { setReplayPlaying(false); setError('Replay could not advance. The saved source is unchanged.'); } }
+    finally { if (token === replayGeneration.current) replayPending.current = false; }
+  }
+  useEffect(() => {
+    if (!replayPlaying || !replayActive || !source) return;
+    const timer = setInterval(() => { if (replayAt.current >= source.finalCheckpoint.simTime) setReplayPlaying(false); else void seek(Math.min(source.finalCheckpoint.simTime, replayAt.current + 1)); }, 1000 / speed);
+    return () => clearInterval(timer);
+  }, [replayPlaying, replayActive, source, speed]);
+  async function compare(sequence: number, earlierAt: number) {
+    if (!source || busy || hostPending.current) return; const token = generation.current, request = sourceGeneration.current; hostPending.current = true; setBusy(true); setError('');
+    try {
+      let client = replayClient.current;
+      if (!client) { client = new SimulationClient(); replayClient.current = client; await client.initialize(source.scenario); }
+      const result = await client.compare(engineRecordOf(source), { commandSequence: sequence, earlierAt, branchRunId: crypto.randomUUID() });
+      if (token === generation.current && request === sourceGeneration.current) setComparison(result);
+    } catch { if (token === generation.current && request === sourceGeneration.current) setError('The alternative could not be computed. Choose a recorded batch cap and an earlier whole second.'); }
+    finally { if (token === generation.current && request === sourceGeneration.current) { hostPending.current = false; setBusy(false); } }
+  }
+  const shown = replayActive ? replayView : view;
+  if (!shown) return <main className="host-loading"><h1>BLACKOUT</h1><p role={error ? 'alert' : 'status'}>{error || 'Opening your shift…'}</p>{error && <button onClick={() => { transitioning.current = false; void begin('welcome'); }}>Retry</button>}</main>;
+  const options = conversationOrders(shown);
+  const displayedThreads = withConversationAssignments(replayActive && source ? savedConversations(source) : threads, shown).map(thread => ({ ...thread, suggestedOrders: options.filter(order => order.actorId === thread.actorId).map(({ intent: _intent, ...order }) => order) }));
+  const coolingStopped = shown.observations.some(observation => observation.field === 'running' && observation.value === false && shown.simTime - observation.observedAt <= 10);
+  const replayContent = <DesktopReplayView saved={saved} ledger={ledger} comparison={comparison} cursor={cursor} playing={replayPlaying} busy={busy} active={replayActive} canSave={session === 'mission'} notice={notice} error={error}
+    caps={source?.commands.filter(command => ['accepted', 'applied'].includes(command.receipt.status) && ['pause_batch', 'set_batch_ceiling'].includes(command.intent.action)).map(command => ({ sequence: command.sequence, at: command.at, label: words(command.intent.action) })) ?? []}
+    dialogue={source?.dialogue ?? []} transcript={source ? JSON.stringify(source.interactions, null, 2) : ''}
+    onSave={() => void capture(true)} onRefresh={() => void refreshSaves()} onReview={id => void reviewSaved(id, false)} onResume={id => void reviewSaved(id, true)} onExport={id => void exportSaved(id)}
+    onReplay={() => { if (source) void activateReplay(source); }} onReturn={() => { closeReplay(); setMenuOpen(false); menuOpenRef.current = false; }} onSeek={at => void seek(at)} onToggle={() => setReplayPlaying(value => !value)} onCompare={(sequence, at) => void compare(sequence, at)} />;
+  const menuContent = <div className="conv-host-menu"><select aria-label="Menu section" value={menuTab} onChange={event => setMenuTab(event.target.value)}><option value="replay">Saves and after action</option><option value="help">How to play</option><option value="settings">Game options</option></select>{menuTab === 'replay' ? replayContent : menuTab === 'help' ? <PagedText label="Instructions" text="Choose Alex for cooling, Jules for power, or Sam for background jobs.\n\nSuggested orders start real work. A message asks the live assistant; any work it proposes needs your click.\n\nWatch the assignment: walking, checking or working, then a report. Busy crew finish their task unless you choose Stop.\n\nOlder and Newer show whole messages. Open a report for its readings and sources. Expand a long draft to read every part.\n\nThe map selects equipment only. The crew travel automatically. Pause stops the game.\n\nMenu keeps saves, replay, evidence and options. The facility is fictional." /> : <><label><input type="checkbox" checked={guidanceEnabled} onChange={event => { guideEnabled.current = event.target.checked; setGuidanceEnabled(event.target.checked); syncClock(); }} /> Guidance</label><label>Game speed<select aria-label="Game speed" value={speed} onChange={event => { const next = Number(event.target.value) as 1 | 2 | 4; setSpeed(next); simulation.current?.setSpeed(next); }}><option value="1">1x</option><option value="2">2x</option><option value="4">4x</option></select></label><button onClick={() => void begin('mission', undefined, false)}>Restart game</button><button onClick={() => void begin('practice')}>Start practice</button><PagedText text={error || notice || 'Options do not change the difficulty or equipment rules.'} /></>}</div>;
+  return <ConversationGame view={shown} session={session} selectedActorId={actorId} selectedAssetId={assetId} conversations={displayedThreads} paused={replayActive ? !replayPlaying : paused} speed={speed} busy={busy || replayActive}
+    objective={replayActive ? 'Recorded run — use Menu to return to the game.' : ended(shown) ? `Mission ${shown.mission.status}` : session === 'practice' ? 'Practice: choose Alex and request a cooling check.' : coolingStopped ? 'Keep cooling and critical service running.' : 'Direct your team and watch for updates.'}
+    alerts={[...(coolingStopped ? [{ id: 'cooling-stopped', level: 'warning' as const, text: 'Cooling has stopped. Ask Alex to check the controls.' }] : []), ...(error ? [{ id: 'host-error', level: 'info' as const, text: error }] : [])]}
+    guidance={session !== 'welcome' && guidanceEnabled && !replayActive ? { enabled: guidanceEnabled, paused: false, text: 'Choose a character. Orders start work; messages ask the assistant.', canContinue: false } : null}
+    reader={reader} menuOpen={menuOpen} menuContent={menuContent} onSelectActor={chooseActor} onSelectAsset={chooseAsset}
+    onDraftChange={(id, draft) => { if (!replayActive) updateThreads(previous => setConversationDraft(previous, id, draft)); }} onSend={id => void askCoworker(id)}
+    onReadEntries={(id, ids) => { if (!replayActive) updateThreads(previous => markConversationRead(previous, id, ids)); }} onOpenEntry={(id, entryId) => { if (!displayedThreads.find(thread => thread.actorId === id)?.entries.some(entry => entry.id === entryId)) return; chooseActor(id); setReader({ actorId: id, entryId }); if (!replayActive) updateThreads(previous => markConversationRead(previous, id, [entryId])); }} onCloseEntry={() => setReader(null)}
+    onExecuteProposal={id => void executeProposal(id)} onSuggestedOrder={id => { const current = known.current; if (!current) return; const order = conversationOrders(current).find(order => order.id === id && order.enabled); if (order) void applyOrder(order.actorId, order.intent); }}
+    onStopTask={(id, taskId) => { const current = known.current; if (!current || current.crew.find(crew => crew.id === id)?.taskId !== taskId) return; const task = current.tasks.find(task => task.id === taskId); if (task) void applyOrder(id, { action: 'cancel_task', targetId: task.targetId, atSimTime: current.simTime, args: { taskId } }); }}
+    onWait={() => syncClock()} onPause={() => { if (transitioning.current || hostPending.current || commandPending.current) return; if (replayActive) setReplayPlaying(value => !value); else { manualPaused.current = !paused; syncClock(); } }} onSpeed={next => { setSpeed(next); simulation.current?.setSpeed(next); }}
+    onContinueGuide={() => syncClock()} onSetGuidance={enabled => { guideEnabled.current = enabled; setGuidanceEnabled(enabled); syncClock(); }} onMenuToggle={toggleMenu}
+    onStartGuided={() => { guideEnabled.current = true; setGuidanceEnabled(true); void begin('mission'); }} onStartPractice={() => void begin('practice')} />;
 }

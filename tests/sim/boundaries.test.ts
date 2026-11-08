@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { hotRestart } from '../../src/content/scenarios/hot-restart';
 import { initialize, restore } from '../../src/sim/engine';
-import { pathMeters, route } from '../../src/sim/navigation';
 import type { EngineState, PhysicalState } from '../../src/sim/state';
 import { latest, request } from './mission-policy';
 
@@ -72,8 +71,7 @@ describe('mission boundary and recovery invariants', () => {
     const engine = initialize(hotRestart, 'validation');
     const inRack = engine.snapshot();
     const rack = hotRestart.topology.assets.find(a => a.kind === 'rack')!;
-    (inRack.state as unknown as EngineState).crew[0].x = rack.x;
-    (inRack.state as unknown as EngineState).crew[0].y = rack.y;
+    Object.assign((inRack.state as unknown as EngineState).crew[0], { x: rack.x, y: rack.y });
     expect(() => restore(inRack, 'invalid')).toThrow();
   });
 
@@ -112,14 +110,14 @@ describe('mission boundary and recovery invariants', () => {
 
   it('completes external events before a same-boundary inspection and paused dispatch', () => {
     const spec = structuredClone(hotRestart);
-    const worker = spec.crew.find(c => c.id === 'alex')!;
-    const destination = spec.topology.assets.find(a => a.id === 'controller')!.serviceTile;
-    const completion = Math.ceil(pathMeters(spec, route(spec, worker, destination)!) / worker.speed) + spec.mission.inspectSeconds;
-    spec.externalEvents = [{ id: 'same-boundary', kind: 'cooling_control_fault', at: completion, value: null }];
+    spec.externalEvents = [];
+    const advertised = initialize(spec, 'route-preview').observe('player').affordances.find(a => a.action === 'inspect' && a.targetId === 'controller')!;
+    const completesAt = advertised.travelSeconds! + advertised.workSeconds;
+    spec.externalEvents = [{ id: 'same-boundary', kind: 'cooling_control_fault', at: completesAt, value: null }];
     const engine = initialize(spec, 'order');
     const task = engine.applyCommand(request(engine, 'inspect', 'controller', { technicianId: 'alex' }));
-    expect(task.eta).toBe(completion);
-    engine.step(completion);
+    expect(task.eta).toBe(completesAt);
+    engine.step(completesAt);
     expect(engine.applyCommand(request(engine, 'repair_cooling', 'controller', { technicianId: 'alex' })).reason).toBe('INSPECTION_REQUIRED');
     engine.step(2);
     expect(latest(engine.observe('player'), 'controller', 'prerequisite_ready')?.value).toBe(false);
@@ -132,7 +130,7 @@ describe('mission boundary and recovery invariants', () => {
     const engine = initialize(spec, 'hold');
     const inspect = engine.applyCommand(request(engine, 'inspect', 'controller', { technicianId: 'alex' }));
     engine.step(inspect.eta! + 2);
-    engine.step(17); // t=50: verification completes at 60, before the hold's final boundary if delayed.
+    engine.step(17); // Reset the hold below so the first report predates its final boundary.
     const checkpoint = engine.snapshot();
     const state = checkpoint.state as unknown as EngineState;
     state.mission.stabilitySeconds = 49;

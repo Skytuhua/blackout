@@ -6,3 +6,8 @@
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 .mission-radio-scope{color:var(--muted);font-size:14px;max-width:80ch}.mission-radio-pending{display:flex;align-items:center;gap:16px;flex-wrap:wrap}.coworker-response{max-width:1552px;margin:0 auto 24px;padding:24px;background:var(--panel);border:1px solid #34505f;overflow-wrap:anywhere}.coworker-response h2{font-size:28px;margin:0 0 12px}.coworker-response h3{font-size:22px;margin:24px 0 8px}.coworker-response p{max-width:85ch}.coworker-response li{line-height:1.7}.coworker-response button{margin:8px 12px 8px 0}.coworker-sources{color:var(--muted);font-size:14px}.coworker-response details{margin-top:20px;line-height:1.6}.coworker-response summary{cursor:pointer;min-height:44px;padding:10px 0}.coworker-response :target{outline:2px solid var(--cyan);outline-offset:4px}
 @media(max-width:600px){.coworker-response{margin:0 16px 20px;padding:16px}}
+/* The Menu hosts existing replay/readers without changing the normal conversation layout. */
+.conv-host-menu{display:flex;flex-direction:column;flex:1;gap:8px;min-width:0;min-height:0}
+.conv-host-menu>select{min-height:32px;flex:none;padding:4px 6px}
+.conv-host-menu>.desktop-replay{font-size:16px}
+.conv-host-menu>label{display:flex;align-items:center;gap:8px}

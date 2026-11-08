@@ -1,0 +1,7 @@
+node : ASSET VALIDATION FAILED: missing facility-v2.png: new raster atlas has not been delivered
+At line:2 char:70
++ ... | Out-Null; node public/assets/source/validate.mjs --masters 2>&1 | T ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (ASSET VALIDATIO... been delivered:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 

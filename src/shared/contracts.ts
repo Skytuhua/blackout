@@ -87,3 +87,85 @@ export interface DesktopGameProps {
   onStartMission: () => void;
   onTutorialEvent: (event: TutorialEvent) => void;
 }
+
+/** Host-only authorization snapshot; never infer authorization from the open tab. */
+export interface ProposalAuthorization {
+  id: string;
+  runId: string;
+  actorId: string;
+  requestId: string;
+  intent: ActionIntent;
+  expectedEntityVersions: Record<string, number>;
+}
+export interface ConversationProposal {
+  id: string;
+  label: string;
+  assignedName: string;
+  status: 'ready' | 'sending' | 'accepted' | 'rejected';
+  reason?: string;
+}
+export interface ConversationEntry {
+  id: string;
+  actorId: string;
+  at: number;
+  kind: 'player' | 'order' | 'system' | 'live' | 'fallback' | 'report';
+  text: string;
+  summary?: string;
+  unread: boolean;
+  reportId?: string;
+  exchangeId?: string;
+  sections?: { id: string; label: string; text: string }[];
+  proposals?: ConversationProposal[];
+}
+export interface SuggestedOrder {
+  id: string;
+  actorId: string;
+  label: string;
+  enabled: boolean;
+  reason?: string;
+}
+export interface ConversationThread {
+  actorId: string;
+  name: string;
+  role: 'Cooling' | 'Power' | 'IT';
+  assignment: { taskId: string | null; label: string; status: 'ready' | 'walking' | 'checking' | 'working' | 'report_pending' | 'delivered' };
+  entries: ConversationEntry[];
+  draft: string;
+  busy: boolean;
+  unread: number;
+  suggestedOrders: SuggestedOrder[];
+}
+export interface ConversationGameProps {
+  view: KnowledgeView;
+  session: 'welcome' | 'practice' | 'mission';
+  selectedActorId: string;
+  selectedAssetId: string | null;
+  conversations: ConversationThread[];
+  paused: boolean;
+  speed: 1 | 2 | 4;
+  busy: boolean;
+  objective: string;
+  alerts: { id: string; level: 'warning' | 'info'; text: string }[];
+  guidance: { enabled: boolean; paused: boolean; text: string; canContinue: boolean; targetActorId?: string; targetOrderId?: string } | null;
+  reader: { actorId: string; entryId: string } | null;
+  menuOpen: boolean;
+  menuContent?: ReactNode;
+  onSelectActor: (actorId: string) => void;
+  onSelectAsset: (assetId: string) => void;
+  onDraftChange: (actorId: string, draft: string) => void;
+  onSend: (actorId: string) => void;
+  onReadEntries: (actorId: string, entryIds: string[]) => void;
+  onOpenEntry: (actorId: string, entryId: string) => void;
+  onCloseEntry: () => void;
+  onExecuteProposal: (proposalId: string) => void;
+  onSuggestedOrder: (orderId: string) => void;
+  onStopTask: (actorId: string, taskId: string) => void;
+  onWait: (actorId: string) => void;
+  onPause: () => void;
+  onSpeed: (speed: 1 | 2 | 4) => void;
+  onContinueGuide: () => void;
+  onSetGuidance: (enabled: boolean) => void;
+  onMenuToggle: () => void;
+  onStartGuided: () => void;
+  onStartPractice: () => void;
+}

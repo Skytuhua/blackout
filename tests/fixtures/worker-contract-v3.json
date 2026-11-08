@@ -1,0 +1,16 @@
+{
+  "integrationContractVersion": 3,
+  "engineWireSchemaVersion": 1,
+  "savedHostFormatVersion": 2,
+  "additionalWorkerRequests": [
+    "replay_to",
+    "compare"
+  ],
+  "additionalWorkerReply": "comparison",
+  "replayCursor": {
+    "minimum": 0,
+    "maximum": 600,
+    "integer": true
+  },
+  "normalUIReceivesCheckpoints": false
+}

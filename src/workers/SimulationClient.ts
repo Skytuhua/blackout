@@ -1,4 +1,4 @@
-import type { ActionRequest, Checkpoint, KnowledgeView, RunRecord, ScenarioSpec, CommandReceipt } from '../shared/contracts';
+import type { ActionRequest, Checkpoint, ComparisonResult, KnowledgeView, RunRecord, ScenarioSpec, CommandReceipt } from '../shared/contracts';
 import { WorkerReplySchema, type WorkerReply, type WorkerRequest } from './protocol';
 type RequestPayload<T> = T extends WorkerRequest ? Omit<T, 'correlationId' | 'runId'> : never;
 
@@ -55,14 +55,16 @@ export class SimulationClient {
   resume() {
     if (!this.paused || this.terminal) return;
     this.paused = false;
-    this.timer = setInterval(() => { if (this.advancing) return; this.advancing = true; void this.advance(this.speed).catch(() => this.pause()).finally(() => { this.advancing = false; }); }, 1000);
+    this.timer = setInterval(() => { if (this.advancing) return; this.advancing = true; void this.advance(1).catch(() => this.pause()).finally(() => { this.advancing = false; }); }, 1000 / this.speed);
   }
-  setSpeed(speed: 1 | 2 | 4) { this.speed = speed; }
+  setSpeed(speed: 1 | 2 | 4) { const running = !this.paused; this.speed = speed; if (running) { this.pause(); this.resume(); } }
   async snapshot(): Promise<Checkpoint> { const reply = await this.send({ kind: 'snapshot' }); if (reply.kind !== 'checkpoint') throw new Error('Unexpected worker reply'); return reply.checkpoint; }
   async restore(checkpoint: Checkpoint, newRunId: string = crypto.randomUUID()): Promise<KnowledgeView> {
     this.pause(); this.rejectPending('stale_run');
     const reply = await this.send({ kind: 'restore', checkpoint, newRunId }, newRunId); if (reply.kind !== 'restored') throw new Error('Unexpected worker reply'); return reply.view;
   }
   async record(): Promise<RunRecord> { const reply = await this.send({ kind: 'record' }); if (reply.kind !== 'record') throw new Error('Unexpected worker reply'); return reply.record; }
+  async replayTo(record: RunRecord, at: number): Promise<KnowledgeView> { const reply = await this.send({ kind: 'replay_to', record, at }); if (reply.kind !== 'view') throw new Error('Unexpected replay reply'); return reply.view; }
+  async compare(record: RunRecord, change: { commandSequence: number; earlierAt: number; branchRunId: string }): Promise<ComparisonResult> { const reply = await this.send({ kind: 'compare', record, change }); if (reply.kind !== 'comparison') throw new Error('Unexpected comparison reply'); return reply.comparison; }
   dispose() { this.pause(); this.rejectPending('Simulation closed.'); this.worker.terminate(); this.listeners.clear(); }
 }

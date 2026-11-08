@@ -1,0 +1,3 @@
+# Hash custody must survive Windows checkouts and coordinator cherry-picks.
+* text=auto eol=lf
+*.png binary

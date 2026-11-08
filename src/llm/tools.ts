@@ -18,6 +18,8 @@ export async function executeToolIntent(intent: ToolIntent, context: ScopedConte
   if (cached) return cached.fingerprint === fingerprint ? cached.result : reject('duplicate_call_conflict');
   const result = (async (): Promise<PublicToolResult> => {
     if (closed()) return reject('canceled_or_expired');
+    // Defense in depth for injected or legacy-shaped replies in the advisory route.
+    if (context.start.interactionMode === 'advisory' && intent.tool === 'inspect_asset') return reject('advisory_execution_forbidden');
     const view = context.simulation ? KnowledgeViewSchema.parse(await context.simulation.observe(intent.actorId)) : context.start.view;
     if (closed()) return reject('canceled_or_expired');
     if (view.runId !== intent.runId || view.actorId !== intent.actorId) return reject('stale_run');
@@ -38,7 +40,8 @@ export async function executeToolIntent(intent: ToolIntent, context: ScopedConte
     const idempotencyKey = 'llm:' + Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
     if (closed()) return reject('canceled_or_expired');
     const receipt = CommandReceiptSchema.parse(await context.simulation.command({ schemaVersion: 1, ...{ runId: intent.runId, requestId: intent.requestId, actorId: intent.actorId }, intent: { ...intent.action, atSimTime: view.simTime }, expectedEntityVersions: context.start.view.observedEntityVersions, idempotencyKey }));
-    if (receipt.runId !== intent.runId || receipt.actorId !== intent.actorId || receipt.requestId !== intent.requestId || closed()) return reject('stale_run');
+    // Cancellation can stop continuation, but cannot undo an acknowledged engine command.
+    if (receipt.runId !== intent.runId || receipt.actorId !== intent.actorId || receipt.requestId !== intent.requestId) return reject('stale_run');
     return { ...reject('inspection_receipt'), status: receipt.status === 'rejected' ? 'rejected' : 'accepted', receipt };
   })().catch(() => reject('worker_unavailable'));
   calls.set(key, { fingerprint, result }); return result;

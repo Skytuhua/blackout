@@ -1,7 +1,15 @@
 import { it, expect, vi, afterEach } from 'vitest';
-import { startInteraction, continueInteraction, cancelInteraction } from '../../src/llm/client';
+import { startInteraction, continueInteraction, cancelInteraction, providerCallFor } from '../../src/llm/client';
 import { start, final } from './fixtures';
 afterEach(() => vi.unstubAllGlobals());
+it('retains a received provider receipt while rejecting expired response content', async () => {
+  const input = { ...start, requestId: 'expired-with-receipt' };
+  const call = { receiptId: 'local-expired-call', provider: 'openai', responseId: 'response-expired', runId: input.runId, requestId: input.requestId, actorId: input.actorId, model: 'observed-model', inputTokens: 10, outputTokens: 5, durationMs: 4, status: 'completed' };
+  vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ kind: 'final', runId: input.runId, requestId: input.requestId, actorId: input.actorId, response: { ...final, requestId: input.requestId } }), { headers: { 'X-Blackout-Deadline-Ms': '0', 'X-Blackout-Call': JSON.stringify(call) } }));
+  const reply = await startInteraction(input);
+  expect(reply.kind === 'fallback' && reply.reason).toBe('canceled_or_expired');
+  expect(providerCallFor(reply)).toEqual(call);
+});
 it('validates gateway identity and facts and labels network failure', async () => {
   for (const valid of [true, false]) {
     const input = { ...start, requestId: `identity-${valid}` };

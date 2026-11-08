@@ -1,5 +1,7 @@
 import type { SimulationEngine } from '../shared/contracts';
 import { initialize, restore } from '../sim/engine';
+import { replayViewAt } from '../sim/replay/recorder';
+import { compareEarlierCap } from '../sim/replay/comparison';
 import { WorkerRequestSchema, type WorkerReply } from './protocol';
 
 let engine: SimulationEngine | null = null;
@@ -19,6 +21,10 @@ self.onmessage = (event: MessageEvent<unknown>) => {
       reply = { kind: 'error', ...identity, code: 'not_initialized', message: 'Start a mission first.' };
     } else if (request.runId !== runId || request.kind === 'command' && request.request.runId !== runId) {
       reply = { kind: 'error', ...identity, code: 'stale_run', message: 'This run is no longer active.' };
+    } else if (request.kind === 'replay_to') {
+      reply = { kind: 'view', ...identity, view: replayViewAt(request.record, request.runId, request.at) };
+    } else if (request.kind === 'compare') {
+      reply = { kind: 'comparison', ...identity, comparison: compareEarlierCap(request.record, request.change) };
     } else if (request.kind === 'observe') {
       reply = { kind: 'view', ...identity, view: engine.observe(request.actorId) };
     } else if (request.kind === 'advance') {

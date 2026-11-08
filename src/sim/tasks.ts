@@ -1,7 +1,7 @@
 import type { Action, ActionIntent, Crew, KnowledgeView, Observation } from '../shared/contracts';
 import type { EngineState, EngineTask } from './state';
 import { REPORT_DELAY_SECONDS, evidence, evidenceConditions, observation, prerequisiteEvidence } from './knowledge';
-import { pathMeters, positionAlong, route } from './navigation';
+import { isWalkablePosition, pathMeters, positionAlong, route } from './navigation';
 import { hasUpstream, resolvePower } from './systems/power';
 
 export type Emit = (type: string, ids: string[], payload?: Record<string, string | number | boolean | null | string[]>, visibility?: 'public' | 'actor' | 'forensic', actorIds?: string[]) => void;
@@ -9,10 +9,7 @@ export const active = (task: EngineTask) => !['completed', 'canceled'].includes(
 const remoteActions: Exclude<Action, 'move_crew'>[] = ['pause_batch', 'resume_batch', 'set_batch_ceiling', 'verify_recovery'];
 
 export function requiredRole(state: EngineState, intent: ActionIntent): Crew['role'] | null {
-  if (intent.action === 'move_crew') {
-    const worker = state.crew.find(c => c.id === intent.targetId);
-    return worker && worker.role !== 'remote' ? worker.role : null;
-  }
+  if (intent.action === 'move_crew') return state.crew.find(c => c.id === intent.targetId)?.role ?? null;
   const asset = state.scenario.topology.assets.find(a => a.id === intent.targetId);
   if (remoteActions.includes(intent.action)) return intent.targetId === 'site' || (asset?.kind === 'rack' && intent.action !== 'verify_recovery') ? 'remote' : null;
   if (!asset) return null;
@@ -24,14 +21,17 @@ export function requiredRole(state: EngineState, intent: ActionIntent): Crew['ro
 }
 
 export function workSeconds(state: EngineState, action: Action) {
-  if (action === 'move_crew') return 0;
   const m = state.scenario.mission;
   return Math.ceil(action === 'repair_cooling' ? m.repairSeconds : ['inspect', 'independent_reading'].includes(action) ? m.inspectSeconds
-    : action === 'verify_recovery' ? m.verifySeconds : action === 'reset_ups' ? 20 : action === 'restart_cooling' ? 0 : m.remoteSeconds);
+    : action === 'verify_recovery' ? m.verifySeconds : action === 'reset_ups' ? 20 : ['restart_cooling', 'move_crew'].includes(action) ? 0 : m.remoteSeconds);
 }
 
 export function taskArgumentError(state: EngineState, intent: ActionIntent): string | null {
-  if (intent.action === 'move_crew') return intent.args.technicianId && intent.args.technicianId !== intent.targetId ? 'TECHNICIAN_MISMATCH' : null;
+  if (intent.action === 'move_crew') {
+    if (intent.args.technicianId && intent.args.technicianId !== intent.targetId) return 'NOT_QUALIFIED';
+    const destination = intent.args.destination;
+    return !Number.isInteger(destination.x) || !Number.isInteger(destination.y) || !isWalkablePosition(state.scenario, destination) ? 'INVALID_DESTINATION' : null;
+  }
   const role = requiredRole(state, intent);
   if (role && role !== 'remote' && !intent.args.technicianId) return 'TECHNICIAN_REQUIRED';
   if (intent.action === 'set_batch_ceiling' && intent.args.ceiling === undefined) return 'CEILING_REQUIRED';
@@ -54,9 +54,11 @@ export function actionPlan(state: EngineState, actorId: string, intent: ActionIn
   }
   const role = requiredRole(state, intent);
   if (!role) return fail('INVALID_TARGET_ACTION');
+  if (intent.action === 'move_crew' && role === 'remote') return fail('NOT_QUALIFIED');
   const argumentError = taskArgumentError(state, intent);
   if (argumentError) return fail(argumentError);
-  const worker = role === 'remote' ? state.crew.find(c => c.role === 'remote') : state.crew.find(c => c.id === (intent.action === 'move_crew' ? intent.targetId : intent.args.technicianId));
+  const worker = intent.action === 'move_crew' ? state.crew.find(c => c.id === intent.targetId)
+    : role === 'remote' ? state.crew.find(c => c.role === 'remote') : state.crew.find(c => c.id === intent.args.technicianId);
   if (!worker) return fail('TECHNICIAN_REQUIRED');
   if (worker.role !== role) return fail('NOT_QUALIFIED');
   if (actorId !== 'player' && actorId !== worker.id) return fail('NOT_AUTHORIZED');
@@ -70,8 +72,8 @@ export function actionPlan(state: EngineState, actorId: string, intent: ActionIn
   if (intent.action === 'reset_ups' && !evidence(state, actorId).some(o => o.assetId === intent.targetId && o.field === 'inspection_complete' && o.value === true)) return fail('INSPECTION_REQUIRED');
   const resources = taskResources(intent);
   if (resources.some(id => state.reservations[id])) return fail('RESOURCE_BUSY');
-  const destination = intent.action === 'move_crew' ? intent.args.destination : state.scenario.topology.assets.find(a => a.id === intent.targetId)?.serviceTile;
-  const path = role === 'remote' ? [] : destination ? route(state.scenario, worker, destination) : null;
+  const path = role === 'remote' ? [] : route(state.scenario, worker, intent.action === 'move_crew'
+    ? intent.args.destination : state.scenario.topology.assets.find(a => a.id === intent.targetId)!.serviceTile);
   if (path === null) return fail('PATH_BLOCKED');
   const travelSeconds = role === 'remote' ? 0 : Math.ceil(pathMeters(state.scenario, path) / worker.speed);
   return { reason: null, worker, path, travelSeconds, workSeconds: workSeconds(state, intent.action), resources };
@@ -158,7 +160,9 @@ function completeTask(state: EngineState, task: EngineTask, at: number, emit: Em
   }
   task.public.status = 'completed'; task.public.progress = 1; task.public.reason = applied ? null : 'PRECONDITION_CHANGED';
   release(state, task);
-  emit(action === 'move_crew' ? 'crew.moved' : 'task.applied', [...new Set([target, task.technicianId])], { taskId: task.public.id, action, applied });
+  // Moving completes a travel task; it is not an equipment operation or a field report.
+  if (action === 'move_crew') emit('task.completed', [target], { taskId: task.public.id, action });
+  else emit('task.applied', [target, task.technicianId], { taskId: task.public.id, action, applied });
 }
 
 export function advanceTasks(state: EngineState, at: number, emit: Emit) {
@@ -190,7 +194,7 @@ export function affordances(state: EngineState, actorId: string, at: number): Kn
   const actions = (kind: string): Exclude<Action, 'move_crew'>[] => kind === 'rack' ? ['inspect', 'independent_reading', 'pause_batch', 'resume_batch', 'set_batch_ceiling']
     : kind === 'cooling' || kind === 'controller' ? ['inspect', 'repair_cooling', 'restart_cooling'] : kind === 'ups' ? ['inspect', 'reset_ups'] : ['inspect'];
   const pairs = [...state.scenario.topology.assets.flatMap(asset => actions(asset.kind).map(action => ({ action, targetId: asset.id }))), ...remoteActions.map(action => ({ action, targetId: 'site' }))];
-  const result = pairs.map(({ action, targetId }) => {
+  const result: KnowledgeView['affordances'] = pairs.map(({ action, targetId }) => {
     const intent: ActionIntent = { action, targetId, atSimTime: at, args: { ...(action === 'set_batch_ceiling' ? { ceiling: state.scenario.workload.batch } : {}) } };
     const role = requiredRole(state, intent);
     const eligible = state.crew.filter(c => c.role === role && (actorId === 'player' || actorId === c.id));
@@ -199,6 +203,11 @@ export function affordances(state: EngineState, actorId: string, at: number): Kn
     const plan = actionPlan(state, actorId, intent);
     return { action, targetId, enabled: !plan.reason, reason: plan.reason, technicianIds: role === 'remote' ? [] : eligible.map(c => c.id), travelSeconds: plan.path === null ? null : plan.travelSeconds, workSeconds: plan.workSeconds };
   });
+  if (actorId === 'player') for (const worker of state.crew.filter(c => c.role !== 'remote')) {
+    const reason = !['active', 'practice'].includes(state.mission.status) ? 'MISSION_ENDED' : worker.taskId !== null ? 'WORKER_BUSY' : null;
+    // A destination has not been selected yet, so no travel ETA can be advertised.
+    result.push({ action: 'move_crew', targetId: worker.id, enabled: reason === null, reason, technicianIds: [worker.id], travelSeconds: null, workSeconds: 0 });
+  }
   for (const task of state.tasks.filter(active)) {
     const intent: ActionIntent = { action: 'cancel_task', targetId: task.public.targetId, atSimTime: at, args: { taskId: task.public.id } };
     const plan = actionPlan(state, actorId, intent);

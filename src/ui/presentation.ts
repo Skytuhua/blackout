@@ -13,7 +13,7 @@ export function parseCeiling(value: string): number | undefined {
 
 // Ten seconds is the mission's verification window, not a claim about sensor accuracy.
 export function readingStatus(observation: Observation | null, simTime: number): 'unknown' | 'stale' | 'fresh' {
-  if (!observation || observation.value === null || observation.quality === 'unknown' || observation.observedAt > simTime) return 'unknown';
+  if (!observation || observation.value === null || observation.quality === 'unknown' || observation.observedAt > simTime || observation.receivedAt > simTime) return 'unknown';
   return simTime - observation.observedAt > 10 ? 'stale' : 'fresh';
 }
 
@@ -31,4 +31,9 @@ export function indicatorState(observations: Observation[], simTime: number): 'u
   if (state.value === true || ['running', 'online', 'ready', 'available'].includes(String(state.value))) return 'active';
   if (state.value === false || ['not_ready', 'offline', 'stopped', 'off', 'booting', 'throttled', 'thermal_tripped', 'tripped', 'unavailable'].includes(String(state.value))) return 'attention';
   return 'unknown';
+}
+
+export function freshRunning(observations: Observation[], simTime: number): boolean {
+  const state = observations.filter(o => o.field === 'running' || o.field === 'state').sort((a, b) => b.observedAt - a.observedAt)[0];
+  return !!state && readingStatus(state, simTime) === 'fresh' && (state.field === 'running' && state.value === true || state.field === 'state' && state.value === 'running');
 }
