@@ -23,8 +23,9 @@ it('preserves exact output items and call IDs in the next input and stops tools 
     calls++;
     if (calls > 1) {
       const items = params.input;
-      expect(items.slice(-3, -1)).toEqual([output[0], { ...output[1], call_id: `provider-call-${calls - 1}` }]);
-      expect(items.at(-1).call_id).toBe(`provider-call-${calls - 1}`);
+      expect(items.slice(-4, -2)).toEqual([output[0], { ...output[1], call_id: `provider-call-${calls - 1}` }]);
+      expect(items.at(-2).call_id).toBe(`provider-call-${calls - 1}`);
+      expect(JSON.parse(items.at(-1).content).view.viewHash).toBe(start.view.viewHash);
     }
     if (calls === 3) { expect(params.tool_choice).toBe('none'); return text(final); }
     return response([output[0], { ...output[1], call_id: `provider-call-${calls}` }]);

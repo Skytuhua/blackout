@@ -19,8 +19,9 @@ export function factValue(fact: FactSelector, start: GatewayStart): string | num
   const context = start.debriefContext;
   if (!context || start.role !== 'debrief') return undefined;
   const comparison = context.comparison;
-  const ledgers = [context.ledger, ...(comparison ? comparison.status === 'complete' ? [comparison.baseline, comparison.alternative] : [comparison.validPrefix.baseline, comparison.validPrefix.alternative] : [])];
-  return ledgers.find(l => l.runId === fact.ledgerRunId)?.[fact.field];
+  const ledgers = comparison ? comparison.status === 'complete' ? [comparison.baseline, comparison.alternative] : [comparison.validPrefix.baseline, comparison.validPrefix.alternative] : [context.ledger];
+  const matches = ledgers.filter(l => l.runId === fact.ledgerRunId);
+  return matches.length === 1 ? matches[0][fact.field] : undefined;
 }
 export function validateResponse(response: AgentResponse, start: GatewayStart): boolean {
   return AgentResponseSchema.safeParse(response).success && response.runId === start.runId && response.requestId === start.requestId && response.actorId === start.actorId && response.speaker === start.actorId && response.mode === 'live' && response.facts.every(f => factValue(f, start) !== undefined) && response.proposals.every(a => validAction(a, start));

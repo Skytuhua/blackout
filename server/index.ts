@@ -39,6 +39,8 @@ export function createDemoServer(gateway = new Gateway()) {
         const parsed = GatewayInputSchema.safeParse(body);
         if (!parsed.success) { json(400, { error: 'Invalid gateway envelope.' }); return; }
         const reply = await gateway.turn(parsed.data, controller.signal);
+        const remaining = gateway.remainingMs(parsed.data);
+        if (remaining !== undefined) res.setHeader('X-Blackout-Deadline-Ms', String(remaining));
         if (!res.writableEnded && !res.destroyed) json(200, reply);
       } catch { if (!res.writableEnded && !res.destroyed) json(400, { error: 'Request unavailable.' }); }
       finally { clearTimeout(timer); res.removeListener('close', disconnected); }

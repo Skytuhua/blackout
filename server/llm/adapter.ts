@@ -25,6 +25,11 @@ export function initialHistory(start: GatewayStart): History {
   const { view, ...context } = start;
   return [{ role: 'user', content: JSON.stringify({ ...context, view: { runId: view.runId, actorId: view.actorId, simTime: view.simTime, viewHash: view.viewHash, assets: view.knownTopology.assets.map(a => ({ id: a.id, kind: a.kind })), crew: view.crew.map(c => ({ id: c.id, role: c.role, taskId: c.taskId })), observations: view.observations, tasks: view.tasks, allowedProcedureIds: view.allowedProcedureIds, observedEntityVersions: view.observedEntityVersions, affordances: view.affordances, messages: view.messages.slice(-4) } }) }];
 }
+export function appendFreshView(history: History, start: GatewayStart): History {
+  const initial = initialHistory(start)[0] as { content: string };
+  // Only the latest continuation snapshot is needed; provider items stay exact.
+  return [...history.filter((item, index) => index === 0 || !('role' in item && item.role === 'user')), { role: 'user', content: JSON.stringify({ view: JSON.parse(initial.content).view }) }];
+}
 export function parameters(start: GatewayStart, input: History, calls: number): ResponseCreateParamsNonStreaming {
   return { model: process.env.OPENAI_MODEL ?? 'gpt-5.6-luna', reasoning: { effort: 'none' }, store: false, parallel_tool_calls: false,
     max_output_tokens: start.role === 'debrief' ? 800 : 400,

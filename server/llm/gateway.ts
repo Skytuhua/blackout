@@ -3,7 +3,7 @@ import type { GatewayInput, GatewayResponse, GatewayStart, ToolIntent, PublicToo
 import { GatewayInputSchema } from '../../src/shared/schemas';
 import { validStart, validAction, validateResponse } from '../../src/llm/validation';
 import { Budget } from './budget';
-import { initialHistory, parameters, decode, appendOutput, appendToolResult, officialTransport, type History, type Transport } from './adapter';
+import { initialHistory, parameters, decode, appendOutput, appendToolResult, appendFreshView, officialTransport, type History, type Transport } from './adapter';
 type Options = { mode?: string; keyConfigured?: boolean; transport?: Transport; budget?: Budget; callTimeoutMs?: number; interactionTimeoutMs?: number; debriefTimeoutMs?: number };
 type Diagnostic = { runId: string; requestId: string; model: string; inputTokens: number | null; outputTokens: number | null; durationMs: number; status: string };
 type Interaction = { start: GatewayStart; history: History; calls: number; controller: AbortController; deadline: number; pending?: ToolIntent; fingerprint: string; reply?: GatewayResponse; busy: boolean; expires: ReturnType<typeof setTimeout> };
@@ -13,6 +13,18 @@ export class Gateway {
   private providerBusy = false;
   private recent: Diagnostic[] = [];
   get diagnostics(): readonly Diagnostic[] { return this.recent.map(item => ({ ...item })); }
+  remainingMs(identity: { runId: string; requestId: string; actorId: string }): number | undefined {
+    const state = [...this.interactions.values()].find(s => sameIdentity(s.start, identity));
+    return state ? Math.max(0, Math.min(20000, Math.floor(state.deadline - Date.now()))) : undefined;
+  }
+  private makeRoom() {
+    for (const [id, state] of this.interactions) {
+      if (this.interactions.size < 128) break;
+      if (!state.busy && (state.controller.signal.aborted || Date.now() >= state.deadline || state.reply && state.reply.kind !== 'tool_request')) {
+        clearTimeout(state.expires); this.interactions.delete(id);
+      }
+    }
+  }
   private options: Options;
   private transport: Transport;
   private budget: Budget;
@@ -53,6 +65,7 @@ export class Gateway {
       if (existing) return existing.controller.signal.aborted ? this.fallback(input, 'canceled') : existing.fingerprint === fingerprint && existing.reply ? existing.reply : this.fallback(input, 'duplicate_or_busy');
       if (this.providerBusy) return this.fallback(input, 'provider_busy');
       if ([...this.interactions.values()].some(s => s.start.actorId === input.actorId && !s.reply && !s.controller.signal.aborted || s.start.actorId === input.actorId && s.reply?.kind === 'tool_request' && !s.controller.signal.aborted)) return this.fallback(input, 'interaction_busy');
+      this.makeRoom();
       if (this.interactions.size >= 128) return this.fallback(input, 'interaction_limit');
       const id = randomUUID(), controller = new AbortController();
       const duration = input.role === 'debrief' ? this.options.debriefTimeoutMs ?? 20000 : this.options.interactionTimeoutMs ?? 18000;
@@ -69,6 +82,7 @@ export class Gateway {
       if (this.providerBusy) return this.fallback(input, 'provider_busy');
       state.history = appendToolResult(state.history, input.expectedCallId, input.result);
       state.start = { ...state.start, view: input.view }; state.pending = undefined; state.fingerprint = fingerprint;
+      state.history = appendFreshView(state.history, state.start);
     }
     const interactionId = [...this.interactions.entries()].find(([, s]) => s === state)![0];
     const abort = () => state.controller.abort('canceled'); signal?.addEventListener('abort', abort, { once: true });
