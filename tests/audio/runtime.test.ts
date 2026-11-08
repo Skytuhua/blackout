@@ -159,11 +159,11 @@ describe('native playback lifecycle', () => {
     const audio = await ready(view({ simTime: 10 }));
     let finish!: (buffer: { url: string; duration: number; numberOfChannels: number }) => void;
     contexts[0].decodeAudioData.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
-    audio.update(view({ simTime: 11, mission: { ...view().mission, status: 'success' } }), { paused: false }); await settle();
+    audio.play('crew-step'); await settle();
     if (barrier === 'mute') audio.setMuted(true);
     else if (barrier === 'hidden') { page.hidden = true; page.dispatchEvent(new Event('visibilitychange')); }
     else audio.update(view({ simTime: barrier === 'rewind' ? 2 : 11 }), { paused: barrier === 'pause', replay: barrier === 'replay' });
-    finish({ url: '/audio/retro-v1/mission-success.wav', duration: 0.1, numberOfChannels: 1 }); await settle(); expect(cues()).toEqual([]);
+    finish({ url: '/audio/retro-v1/crew-step.wav', duration: 0.1, numberOfChannels: 1 }); await settle(); expect(cues()).toEqual([]);
   });
   it('keeps at most four uncancelable loads across repeated resets and aborts on disposal', async () => {
     const audio = await ready(); const signals: AbortSignal[] = [];
@@ -252,6 +252,17 @@ describe('public state sampling', () => {
     const audio = await ready(); const end = view({ simTime: 4, mission: { ...view().mission, status } });
     audio.update(end, { paused: false }); audio.update(end, { paused: false }); await settle(); expect(cues()).toEqual([`mission-${status}`]);
   });
+  it('preserves a real terminal notification when the host pauses before cold decoding finishes', async () => {
+    const audio = await ready(); let finish!: () => void;
+    contexts[0].decodeAudioData.mockImplementation(data => new Promise(resolve => { finish = () => resolve({ url: new TextDecoder().decode(data), duration: 0.1, numberOfChannels: 1 }); }));
+    const terminal = view({ simTime: 4, mission: { ...view().mission, status: 'success' } });
+    audio.update(terminal, { paused: false }); await settle(); audio.update(terminal, { paused: true }); finish(); await settle();
+    expect(cues()).toEqual(['mission-success']); expect(activeLoops()).toEqual([]);
+  });
+  it('sounds the actual public terminal transition when the final view and auto-pause are published together', async () => {
+    const audio = await ready(); const terminal = view({ simTime: 4, mission: { ...view().mission, status: 'failure' } });
+    audio.update(terminal, { paused: true }); audio.update(terminal, { paused: true }); await settle(); expect(cues()).toEqual(['mission-failure']);
+  });
   it('stops physical loops on pause/hidden/replay/cancel but permits visible paused UI sound', async () => {
     const audio = await ready();
     const working = view({ simTime: 3, crew: crew(2), tasks: [task({ status: 'working' })], observations: [running(true, 3)] });
@@ -306,11 +317,12 @@ describe('public state sampling', () => {
     expect(cues()).toEqual(['task-start']); expect(activeLoops()).toEqual([]);
     audio.update(view({ simTime: 50, crew: crew(2), tasks: [task({ status: 'working' })] }), { paused: false }); await settle(); expect(activeLoops()).toEqual([]);
   });
-  it('does not replay transitions seen during mute/unlock/pause or let old-run decoding contaminate a new run', async () => {
+  it('does not replay suppressed work or duplicate a terminal notification across pause/resume', async () => {
     const audio = await ready(); audio.setMuted(true);
     const done = view({ simTime: 6, tasks: [task({ status: 'completed' })], messages: [report()] });
     audio.update(done, { paused: false }); audio.setMuted(false); audio.update(done, { paused: false }); audio.update({ ...done, simTime: 7 }, { paused: false }); await settle(); expect(cues()).toEqual([]);
     audio.update({ ...done, simTime: 8, mission: { ...done.mission, status: 'success' } }, { paused: true });
-    audio.update({ ...done, simTime: 9, mission: { ...done.mission, status: 'success' } }, { paused: false }); await settle(); expect(cues()).toEqual([]);
+    await settle(); expect(cues()).toEqual(['mission-success']);
+    audio.update({ ...done, simTime: 9, mission: { ...done.mission, status: 'success' } }, { paused: false }); await settle(); expect(cues()).toEqual(['mission-success']);
   });
 });

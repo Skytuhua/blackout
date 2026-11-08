@@ -53,7 +53,7 @@ export class CueSampler {
 
   clear() { this.previous = undefined; this.started.clear(); }
 
-  sample(view: AudioView, silent: boolean): Sample {
+  sample(view: AudioView, silent: boolean, paused: boolean): Sample {
     const current = summarize(view);
     const work = [...current.working].sort().join('\0');
     const previous = this.previous;
@@ -63,6 +63,11 @@ export class CueSampler {
       return { cues: [], loops: new Set(), work };
     }
     const cues = new Set<SoundCue>();
+    if (['active', 'practice'].includes(previous.mission) && ['success', 'failure'].includes(current.mission)) cues.add(current.mission === 'success' ? 'mission-success' : 'mission-failure');
+    if (paused) {
+      this.started = new Set(current.working);
+      return { cues: [...cues], loops: new Set(), work };
+    }
     for (const task of view.tasks.slice(-HISTORY_LIMIT)) {
       const before = previous.tasks.get(task.id);
       if (current.working.has(task.id) && !previous.working.has(task.id) && !this.started.has(task.id)) {
@@ -86,7 +91,6 @@ export class CueSampler {
     if (view.messages.some(message => message.at >= previous.time && message.at <= current.time && !previous.reports.has(message.id)
       && (message.conversationKind === 'report' || reportIds.has(message.id)))) cues.add('report-arrived');
     for (const [id, running] of current.cooling) if (running === true && previous.cooling.get(id) === false) cues.add('cooling-recovered');
-    if (['active', 'practice'].includes(previous.mission) && ['success', 'failure'].includes(current.mission)) cues.add(current.mission === 'success' ? 'mission-success' : 'mission-failure');
     // The retained state is bounded even if a host streams unbounded histories.
     this.started = new Set([...this.started].slice(-HISTORY_LIMIT));
     const loops = new Set<LoopCue>();

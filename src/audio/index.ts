@@ -84,8 +84,17 @@ export function createGameAudio(options: { assetBaseUrl?: string; storage?: Pick
     voice.source.disconnect(); voice.gain.disconnect();
   }
   function invalidate(all: boolean) {
-    generation++; silentNext = true; wantedLoops.clear(); waiting.clear(); failures.clear();
-    for (const job of loading.values()) { clearTimeout(job.timer); job.abort.abort(); }
+    const previousGeneration = generation++;
+    silentNext = true; wantedLoops.clear(); failures.clear();
+    const preserve = (request: Request) => !all && request.generation === previousGeneration && !isPhysical(request.cue);
+    for (const [cue, request] of waiting) {
+      if (preserve(request)) request.generation = generation;
+      else waiting.delete(cue);
+    }
+    for (const job of loading.values()) {
+      if (!job.abort.signal.aborted && preserve(job.request)) job.request.generation = generation;
+      else { clearTimeout(job.timer); job.abort.abort(); }
+    }
     for (const voice of [...voices]) if (all || isPhysical(voice.cue)) stop(voice);
   }
   function start(request: Request, buffer: AudioBuffer) {
@@ -219,9 +228,16 @@ export function createGameAudio(options: { assetBaseUrl?: string; storage?: Pick
       }
       if (lastSimTime !== undefined && view.simTime < lastSimTime) invalidate(true);
       lastSimTime = view.simTime;
-      if (paused !== options.paused || replay !== !!options.replay) invalidate(false);
+      if (replay !== !!options.replay) invalidate(true);
+      if (paused !== options.paused) {
+        const wasSilent = silentNext;
+        invalidate(false);
+        // A final worker view may be committed together with the automatic
+        // mission-end pause. Its public terminal notification is still current.
+        silentNext = options.paused ? wasSilent : true;
+      }
       paused = options.paused; replay = !!options.replay;
-      const sample = sampler.sample(view, silentNext || !audible() || paused || replay);
+      const sample = sampler.sample(view, silentNext || !audible() || replay, paused);
       // Cancellation/completion/reassignment must also cancel a cold task-start
       // sample that is still decoding, even while the run itself is unchanged.
       if (work && work !== sample.work) invalidate(false);
