@@ -1,5 +1,7 @@
 import type { ActionIntent, AgentResponse, GatewayStart, Observation } from '../shared/contracts';
 import { factValue, validStart, validateResponse } from './validation';
+import { usesNaturalConversation } from './conversation-mode';
+import { naturalNarrativeAllowed } from './natural-conversation';
 
 const active = (status: string) => !['completed', 'canceled'].includes(status);
 const delivered = (o: Observation, start: GatewayStart) => o.observedAt <= o.receivedAt && o.receivedAt <= start.view.simTime;
@@ -58,6 +60,7 @@ function procedureText(start: GatewayStart): string {
     const o = currentField(start, asset.id, field);
     return reported(start, o) && o.value === value;
   });
+  if (usesNaturalConversation(start)) return `You handle ${start.role === 'facilities' ? 'cooling and equipment checks' : start.role === 'electrical' ? 'qualified power work' : 'background jobs and recovery checks'}. Discuss questions naturally. Supported work is limited to the supplied eligible actions, regardless of the current objective. A clear player order can start that work; tools only read or describe actions. Never replace busy work without an explicit stop request. Describe only delivered evidence; an unmet start condition does not identify the faulty component.`;
   if (start.view.crew.find(c => c.id === start.actorId)?.taskId || start.view.tasks.some(t => t.actorId === start.actorId && active(t.status))) return 'Keep the current assignment unless the player explicitly confirms stopping it.';
   if (start.role === 'facilities') return hasReport('prerequisite_ready', false)
     ? 'Cooling: a delivered inspection supports proposing a repair of the inspected equipment. Work requires player confirmation.'
@@ -70,10 +73,11 @@ function procedureText(start: GatewayStart): string {
 
 export function projectCoworkerContext(start: GatewayStart): GatewayStart {
   const projected = structuredClone(start);
-  if (start.interactionMode !== 'advisory') return projected;
+  if (!start.interactionMode) return projected;
   // Preserve the exact evidence/view identity: this narrows disclosure, never authority.
   const available = validStart(start) ? ownAffordances(start) : [];
-  projected.view.affordances = explicitWorkRequest(start.message) ? available : [];
+  // The model classifies natural requests; no objective or leading-verb relevance gate.
+  projected.view.affordances = usesNaturalConversation(start) || explicitWorkRequest(start.message) ? available : [];
   projected.procedures = validStart(start) && ['facilities', 'electrical', 'remote'].includes(start.role)
     ? projected.procedures.filter(p => p.id === 'hot-restart-v1').map(p => ({ id: p.id, text: procedureText(projected) })) : [];
   return projected;
@@ -117,7 +121,7 @@ function legalProposal(start: GatewayStart, action: ActionIntent): boolean {
 
 export function conciseCoworkerResponse(start: GatewayStart, response: AgentResponse): AgentResponse | null {
   if (!validateResponse(response, start)) return null;
-  if (start.interactionMode !== 'advisory') return response;
+  if (!start.interactionMode) return response;
   if (!validStart(start) || !['facilities', 'electrical', 'remote'].includes(start.role)) return null;
   const projected = projectCoworkerContext(start);
   if (!validateResponse(response, projected) || response.proposals.length > 1 || !response.proposals.every(a => legalProposal(projected, a))) return null;
@@ -127,8 +131,9 @@ export function conciseCoworkerResponse(start: GatewayStart, response: AgentResp
     const o = start.view.observations.find(o => o.id === fact.observationId)!;
     if (!usable(o, start)) return null;
     const superseded = start.view.observations.some(newer => delivered(newer, start) && newer.assetId === o.assetId && newer.field === o.field && newer.source === o.source && (newer.observedAt > o.observedAt || newer.observedAt === o.observedAt && newer.receivedAt > o.receivedAt));
-    if (superseded && response.uncertainty !== historical) return null;
+    if (superseded && !usesNaturalConversation(start) && response.uncertainty !== historical) return null;
   }
+  if (usesNaturalConversation(start)) return naturalNarrativeAllowed(start, response) ? response : null;
   // shortcut: authored English only; add reviewed evidence-bound phrases when dialogue needs grow.
   const vocabulary = coworkerReplyVocabulary(start);
   let allowed = vocabulary.inference.filter(text => !Object.values(workText).includes(text) && text !== 'Please confirm the proposed work.');

@@ -7,10 +7,10 @@ import { executeToolIntent, type ScopedContext } from './tools';
 import type { ProviderCall } from './diagnostics';
 import { validAction } from './validation';
 import { conciseCoworkerResponse, projectCoworkerContext } from './conversation-policy';
-import { CONVERSATION_PROMPT_VERSION, usesConversationPolicy } from './conversation-mode';
+import { CONVERSATION_PROMPT_VERSION, usesConversationPolicy, usesNaturalConversation } from './conversation-mode';
 
 export type CoworkerResult = { start: GatewayStart; targetId: string | null; view: KnowledgeView; reply: Exclude<GatewayResponse, { kind: 'tool_request' }>; tools: PublicToolResult[]; intents: ToolIntent[]; calls: ProviderCall[]; durationMs: number; recording: RecordedInteraction | null; authorizations: ProposalAuthorization[] };
-export type CoworkerRequest = { simulation: Pick<SimulationClient, 'observe' | 'command'>; runId: string; requestId?: string; actorId: string; targetId: string | null; message: string; signal: AbortSignal; interactionMode?: 'advisory'; promptVersion?: string; getSimTime?: () => number; onTool?: (intent: ToolIntent, result: PublicToolResult) => Promise<void> };
+export type CoworkerRequest = { simulation: Pick<SimulationClient, 'observe' | 'command'>; runId: string; requestId?: string; actorId: string; targetId: string | null; message: string; signal: AbortSignal; interactionMode?: GatewayStart['interactionMode']; promptVersion?: string; getSimTime?: () => number; onTool?: (intent: ToolIntent, result: PublicToolResult) => Promise<void> };
 
 export async function runCoworker(input: CoworkerRequest): Promise<CoworkerResult> {
   const began = performance.now();
@@ -18,12 +18,12 @@ export async function runCoworker(input: CoworkerRequest): Promise<CoworkerResul
   const role = view.crew.find(c => c.id === input.actorId)?.role;
   if (!role || view.runId !== input.runId || view.actorId !== input.actorId) throw new Error('stale_or_invalid_actor');
   const focusTargets = input.targetId ? [input.targetId] : [];
-  if (input.promptVersion === CONVERSATION_PROMPT_VERSION && role === 'remote') {
+  if ([CONVERSATION_PROMPT_VERSION, 'coworker-v2'].includes(input.promptVersion ?? '') && role === 'remote') {
     focusTargets.push(...view.knownTopology.assets.filter(asset => asset.kind === 'cooling').map(asset => asset.id));
     const hottest = view.observations.filter(observation => observation.field.includes('temperature') && typeof observation.value === 'number').sort((a, b) => Number(b.value) - Number(a.value))[0];
     if (hottest) focusTargets.push(hottest.assetId);
   }
-  const original: GatewayStart = { kind: 'start', runId: input.runId, requestId: input.requestId ?? crypto.randomUUID(), actorId: input.actorId, role, message: input.message, view: scopeKnowledge(view, focusTargets), procedures: procedures.filter(p => view.allowedProcedureIds.includes(p.id)), promptVersion: input.promptVersion ?? 'coworker-v1', ...(input.interactionMode ? { interactionMode: input.interactionMode } : {}) };
+  const original: GatewayStart = { kind: 'start', runId: input.runId, requestId: input.requestId ?? crypto.randomUUID(), actorId: input.actorId, role, message: input.message, view: scopeKnowledge(view, focusTargets, [], input.interactionMode === 'conversation'), procedures: procedures.filter(p => view.allowedProcedureIds.includes(p.id)), promptVersion: input.promptVersion ?? 'coworker-v1', ...(input.interactionMode ? { interactionMode: input.interactionMode } : {}) };
   const start = usesConversationPolicy(original) ? projectCoworkerContext(original) : original;
   const context: ScopedContext = { start, simulation: input.simulation, signal: input.signal };
   const tools: PublicToolResult[] = [], intents: ToolIntent[] = [];
@@ -33,7 +33,7 @@ export async function runCoworker(input: CoworkerRequest): Promise<CoworkerResul
   const proposals = new Set<string>();
   let originatingWire: GatewayInput | undefined;
   const retainProposal = (intent: ActionIntent, wire: GatewayInput | undefined) => {
-    if (start.interactionMode !== 'advisory' || !wire || !validAction(intent, { ...start, view: wire.view }) || wire.view.observedEntityVersions[intent.targetId] === undefined) return;
+    if (!start.interactionMode || !wire || !validAction(intent, { ...start, view: wire.view }) || wire.view.observedEntityVersions[intent.targetId] === undefined) return;
     // Repeating an operation in a later turn must not refresh its authority or
     // create another executable token. Distinct task/worker/ceiling args remain distinct.
     const key = JSON.stringify([intent.action, intent.targetId, Object.entries(intent.args).sort(([a], [b]) => a.localeCompare(b))]);
@@ -48,7 +48,7 @@ export async function runCoworker(input: CoworkerRequest): Promise<CoworkerResul
     const durationMs = Math.round(performance.now() - began);
     const atSimTime = Math.max(view.simTime, input.getSimTime?.() ?? 0, ...turns.map(t => t.atSimTime), ...tools.map(t => t.receipt?.observedAt ?? 0));
     const recording: RecordedInteraction | null = turns.length ? structuredClone({ turns, end: { atSimTime, reason: input.signal.aborted ? 'canceled' : reply.kind === 'final' ? 'final' : 'fallback', reply, durationMs } }) : null;
-    return { start: context.start, targetId: input.targetId, view, reply, tools, intents, calls, durationMs, recording, authorizations: input.signal.aborted || reply.kind === 'fallback' && reply.reason === 'stale_run' ? [] : structuredClone(authorizations) };
+    return { start: context.start, targetId: input.targetId, view, reply, tools, intents, calls, durationMs, recording, authorizations: input.signal.aborted || reply.kind === 'fallback' && reply.reason === 'stale_run' || usesNaturalConversation(start) && (reply.kind !== 'final' || reply.response.requestKind !== 'order') ? [] : structuredClone(authorizations) };
   };
   const receive = async (send: (onWire: GatewayWireObserver) => Promise<GatewayResponse>) => {
     const capture: { turn?: RecordedInteraction['turns'][number] } = {};
@@ -89,7 +89,7 @@ export async function runCoworker(input: CoworkerRequest): Promise<CoworkerResul
       view = await input.simulation.observe(input.actorId);
       if (input.signal.aborted) return finish(fallback('canceled'));
       if (view.runId !== input.runId || view.actorId !== input.actorId) return finish(fallback('stale_run'));
-      const fresh = { ...start, view: scopeKnowledge(view, [...targets], [...evidenceIds]) };
+      const fresh = { ...start, view: scopeKnowledge(view, [...targets], [...evidenceIds], usesNaturalConversation(start)) };
       context.start = usesConversationPolicy(start) ? { ...projectCoworkerContext(fresh), procedures: start.procedures } : fresh;
       const continuation: GatewayInput = { kind: 'continue', runId: start.runId, requestId: start.requestId, actorId: start.actorId, interactionId: intent.interactionId, expectedCallId: intent.callId, result, view: context.start.view };
       reply = await receive(onWire => continueInteraction(continuation, input.signal, onWire));

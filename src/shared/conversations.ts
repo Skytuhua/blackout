@@ -55,10 +55,10 @@ export function withConversationAssignments(threads: ConversationThread[], view:
 export function authorizationMatchesOrigin(authorization: ProposalAuthorization, interaction: RecordedInteraction | null) {
   if (!interaction || ['canceled', 'reset', 'interrupted'].includes(interaction.end.reason) || interaction.end.reply?.kind === 'fallback' && interaction.end.reply.reason === 'stale_run') return false;
   const first = interaction.turns[0].input;
-  if (first.kind !== 'start' || first.interactionMode !== 'advisory') return false;
+  if (first.kind !== 'start' || !first.interactionMode) return false;
   const seen = new Set<string>(); let index = 0;
   for (const turn of interaction.turns) {
-    const proposals: ActionIntent[] = turn.reply?.kind === 'final' ? turn.reply.response.proposals : turn.reply?.kind === 'tool_request' && turn.reply.intent.tool === 'propose_action' && turn.reply.intent.action && turn.toolResult?.status === 'completed' && turn.toolResult.reason === 'player_confirmation_required' ? [turn.reply.intent.action] : [];
+    const proposals: ActionIntent[] = turn.reply?.kind === 'final' ? turn.reply.response.proposals : first.interactionMode === 'advisory' && turn.reply?.kind === 'tool_request' && turn.reply.intent.tool === 'propose_action' && turn.reply.intent.action && turn.toolResult?.status === 'completed' && turn.toolResult.reason === 'player_confirmation_required' ? [turn.reply.intent.action] : [];
     for (const intent of proposals) {
       if (!validAction(intent, { ...first, view: turn.input.view }) || turn.input.view.observedEntityVersions[intent.targetId] === undefined) continue;
       const key = canonicalJson([intent.action, intent.targetId, intent.args]); if (seen.has(key)) continue; seen.add(key); index++;

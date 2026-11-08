@@ -1,0 +1,12 @@
+diff --git a/tests/audio-assets/parent-hook.example.ts b/tests/audio-assets/parent-hook.example.ts
+new file mode 100644
+--- /dev/null
++++ b/tests/audio-assets/parent-hook.example.ts
+@@ -0,0 +1,7 @@
++// External root example, applied only after the separate runtime is integrated.
++import { createGameAudio } from '../../src/audio/index';
++
++// Root owns lifecycle, trusted gesture unlock, settings, captions and events.
++export function createRetroAudioForRoot() {
++  return createGameAudio({ assetBaseUrl: '/audio/retro-v1/' });
++}

@@ -1,0 +1,13 @@
+# UNIFIED-REVIEW-01
+
+Root integration branch feat/unified-review starts from natural-chat2c1c186 plus report findings31. It adopts reviewed speed source abc009a/486246c, assets57a70a8/d8a3de5 and runtime2d7a604/6756650/85cb309. No predecessor PR or red hosted check was merged. The larger map and unfinished facility engine are excluded from this current-facility review build.
+
+Actual host integration creates one optional audio controller, unlocks only on trusted gestures, publishes UI/receipt/chat/alert/save/manual-clock cues after existing identity/generation guards, and supplies only player-scoped public views to the physical sampler. Runtime update remains sole owner of crew/task/report/cooling/mission cues. Fresh starts, restore, replay-mode changes and seeks reset audio scope. Old async tickets cannot publish into a replacement run, including same-run restores. Destruction removes audio-owned listeners/resources. Settings persist under the audio-only key, not run storage. The local server serves WAV with audio/wav MIME.
+
+Menu has Sound controls for enable/mute, volume and an explicit test. Compact Menu navigation cycles all action pages without losing existing save/history/replay/guidance functions. Current help describes natural chat orders. Original source cue assets and provenance stay intact; the pack uses explicitly identified CC0 Freesound public previews and derived WAVs.
+
+Observed before independent integration review: audio host tests3/3, focused audio/report/menu51tests, typecheck and isolated production build pass. Built-app17case check passes real PCM decode/start, persisted sound controls, actual task/report/save/pause cue requests, all13 speed cases, live report findings and native replay. Further sound geometry/current-route checks and exact-head independent review are reported with the final revision. Browser-native playback does not prove physical speaker output or human listening.
+
+Actual4173 remains the previously verified natural2c until the combined review gate. No automation refreshes/resets the user's tab/run. After publishing a combined build, report exact head, served-byte hashes, checks and limitations to the requested side chat. The separate5197 speed preview is retired only by its owner after combined4173 verification.
+
+Pending Menu/queued-save correction is separately owned on the CI-route branch. Its old source candidates are explicitly held; do not adopt one as verified before the owner's corrected-head review. Legacy test migration and hosted merge gates remain distinct from a review-build deployment. Full facility engine/content/save/replay and novice/laptop acceptance remain outstanding.

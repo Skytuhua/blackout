@@ -4,6 +4,7 @@ import type { SimulationClient } from '../workers/SimulationClient';
 import { validAction, validStart } from './validation';
 import { lifecycleFor, expired } from './lifecycle';
 import { latestObservations } from './context';
+import { usesNaturalConversation } from './conversation-mode';
 export type ScopedContext = { start: GatewayStart; simulation?: Pick<SimulationClient, 'observe' | 'command'>; signal?: AbortSignal };
 const completed = new WeakMap<ScopedContext, Map<string, { fingerprint: string; result: Promise<PublicToolResult> }>>();
 export async function executeToolIntent(intent: ToolIntent, context: ScopedContext): Promise<PublicToolResult> {
@@ -19,7 +20,8 @@ export async function executeToolIntent(intent: ToolIntent, context: ScopedConte
   const result = (async (): Promise<PublicToolResult> => {
     if (closed()) return reject('canceled_or_expired');
     // Defense in depth for injected or legacy-shaped replies in the advisory route.
-    if (context.start.interactionMode === 'advisory' && intent.tool === 'inspect_asset') return reject('advisory_execution_forbidden');
+    if (!!context.start.interactionMode && intent.tool === 'inspect_asset') return reject('advisory_execution_forbidden');
+    if (usesNaturalConversation(context.start) && intent.tool === 'propose_action') return reject('action_requires_final_reply');
     const view = context.simulation ? KnowledgeViewSchema.parse(await context.simulation.observe(intent.actorId)) : context.start.view;
     if (closed()) return reject('canceled_or_expired');
     if (view.runId !== intent.runId || view.actorId !== intent.actorId) return reject('stale_run');

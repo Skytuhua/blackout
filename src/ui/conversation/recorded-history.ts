@@ -1,6 +1,6 @@
 import type { SavedRunRecord, KnowledgeView } from '../../shared/contracts';
 import { appendConversationEntry, conversationPeople, createConversations } from '../../shared/conversations';
-import { observationText } from '../desktop-copy';
+import { reportSections } from './report-findings';
 const person = (actorId: string) => conversationPeople.find(actor => actor.actorId === actorId);
 export function savedConversations(source?: SavedRunRecord, view?: KnowledgeView) {
   let threads = createConversations();
@@ -12,8 +12,7 @@ export function savedConversations(source?: SavedRunRecord, view?: KnowledgeView
     // Reissuing accepted commands can renumber task/report IDs after rejected attempts.
     // Retain the source ID, but require the same delivered public evidence at this cursor.
     if (report && view && !view.messages.some(delivered => delivered.speaker === message.speaker && delivered.at === message.at && delivered.evidenceIds.length === message.evidenceIds.length && message.evidenceIds.every(id => delivered.evidenceIds.includes(id)))) continue;
-    const readings = view?.observations.filter(observation => message.evidenceIds.includes(observation.id)) ?? [];
-    threads = appendConversationEntry(threads, { id: message.id, actorId, at: message.at, kind: message.conversationKind ?? (report ? 'report' : message.mode === 'live' ? 'live' : 'system'), text: message.text, summary: message.text.length > 260 ? `${person(actorId)?.name} sent a saved message.` : message.text, unread: false, ...(report ? { reportId: message.id, ...(view ? { sections: [{ id: 'evidence', label: 'Evidence', text: readings.map(observation => observationText(observation, view.simTime)).join('\n\n') || 'No new reading supplied.' }] } : {}) } : {}) });
+    threads = appendConversationEntry(threads, { id: message.id, actorId, at: message.at, kind: message.conversationKind ?? (report ? 'report' : message.mode === 'live' ? 'live' : 'system'), text: message.text, summary: message.text.length > 260 ? `${person(actorId)?.name} sent a saved message.` : message.text, unread: false, ...(report ? { reportId: message.id, ...(view ? { sections: reportSections(message, view) } : {}) } : {}) });
   }
   for (const interaction of source?.interactions ?? []) {
     if (view && interaction.turns[0].atSimTime > view.simTime) continue;

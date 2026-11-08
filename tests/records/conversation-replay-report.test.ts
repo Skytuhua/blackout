@@ -19,14 +19,18 @@ function fixture(rejectedAttempt = false) {
 
 it.each([false, true])('rebuilds exact delivered report details from the scoped replay view, rejected history=%s', rejected => {
   const { source, report } = fixture(rejected);
+  const original = JSON.stringify(source);
   const view = replayViewAt(engineRecordOf(source), 'report-replay', source.finalCheckpoint.simTime);
   const restored = savedConversations(source, view).find(thread => thread.actorId === 'alex')!.entries.find(entry => entry.id === report.id)!;
   expect(restored.reportId).toBe(report.id); expect(restored.unread).toBe(false);
-  expect(restored.sections).toHaveLength(1);
-  expect(restored.sections![0].text).toContain('prerequisite ready: false');
-  for (const id of report.evidenceIds) expect(restored.sections![0].text).toContain(id);
-  expect(restored.sections![0].text).toContain('Observed T+');
-  expect(restored.sections![0].text).toContain('Received T+');
+  expect(restored.sections).toHaveLength(2);
+  expect(restored.sections![0]).toMatchObject({ id: 'findings', label: 'Findings' });
+  expect(restored.sections![0].text).toContain('Cooling start condition: not met');
+  const evidence = restored.sections!.find(section => section.id === 'evidence')!.text;
+  expect(evidence).toContain('prerequisite ready: false');
+  for (const id of report.evidenceIds) expect(evidence).toContain(id);
+  expect(evidence).toContain('Observed T+'); expect(evidence).toContain('Received T+');
+  expect(JSON.stringify(source)).toBe(original);
 });
 
 it('does not reveal a later report or its readings before its real delivery cursor', () => {

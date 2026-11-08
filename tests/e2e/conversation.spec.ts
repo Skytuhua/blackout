@@ -8,7 +8,7 @@ async function startPaused(page: Page) {
   await page.locator('.conv-header').getByRole('button', { name: 'Pause', exact: true }).click();
 }
 function reply(input: GatewayInput, inference: string, proposals: unknown[] = []) {
-  return { kind: 'final', runId: input.runId, requestId: input.requestId, actorId: input.actorId, response: { runId: input.runId, requestId: input.requestId, actorId: input.actorId, speaker: input.actorId, mode: 'live', facts: [], inference, uncertainty: '', proposals } };
+  return { kind: 'final', runId: input.runId, requestId: input.requestId, actorId: input.actorId, response: { runId: input.runId, requestId: input.requestId, actorId: input.actorId, speaker: input.actorId, mode: 'live', requestKind: proposals.length ? 'order' : 'question', facts: [], inference, uncertainty: '', proposals } };
 }
 
 test('late replies stay with their originating character and do not switch chats or drafts', async ({ page }) => {
@@ -17,14 +17,14 @@ test('late replies stay with their originating character and do not switch chats
   const gate = new Promise<void>(resolve => { release = resolve; });
   await page.route('**/api/llm/turn', async route => {
     const input = route.request().postDataJSON() as GatewayInput; captured = input; await gate;
-    await route.fulfill({ json: { kind: 'final', runId: input.runId, requestId: input.requestId, actorId: input.actorId, response: { runId: input.runId, requestId: input.requestId, actorId: input.actorId, speaker: input.actorId, mode: 'live', facts: [], inference: 'Please check the latest readings.', uncertainty: 'The cause is still unverified.', proposals: [] } } });
+    await route.fulfill({ json: { kind: 'final', runId: input.runId, requestId: input.requestId, actorId: input.actorId, response: { runId: input.runId, requestId: input.requestId, actorId: input.actorId, speaker: input.actorId, mode: 'live', requestKind: 'question', facts: [], inference: 'Please check the latest readings.', uncertainty: 'The cause is still unverified.', proposals: [] } } });
   });
   await page.goto('/'); await page.getByRole('button', { name: 'Start guided game', exact: true }).click();
   await expect(page.getByRole('tab', { name: /Alex · Cooling/ })).toBeVisible();
   await page.getByRole('textbox', { name: 'Message Alex', exact: true }).fill('What do you know?');
   await page.getByRole('button', { name: 'Send to Alex', exact: true }).click();
   await expect.poll(() => captured?.actorId).toBe('alex');
-  expect(captured?.kind === 'start' && captured.interactionMode).toBe('advisory');
+  expect(captured?.kind === 'start' && captured.interactionMode).toBe('conversation');
   await page.getByRole('tab', { name: /Sam · IT/ }).click();
   await page.getByRole('textbox', { name: 'Message Sam', exact: true }).fill('Keep this IT draft'); release();
   await expect(page.getByRole('tab', { name: /Sam · IT/ })).toHaveAttribute('aria-selected', 'true');
@@ -36,25 +36,23 @@ test('late replies stay with their originating character and do not switch chats
   await expect(page.getByRole('textbox', { name: 'Message Sam', exact: true })).toHaveValue('Keep this IT draft');
 });
 
-test('proposal confirmation retains original versions through direct work, cancellation and tab changes', async ({ page }) => {
+test('clear chat orders start real work once and a busy crew is never silently replaced', async ({ page }) => {
+  let calls = 0;
   await page.route('**/api/llm/turn', async route => {
-    const input = route.request().postDataJSON() as GatewayInput;
-    await route.fulfill({ json: reply(input, 'I can inspect that equipment if you confirm.', [{ action: 'inspect', targetId: 'controller', atSimTime: input.view.simTime, args: { technicianId: 'alex' } }]) });
+    const input = route.request().postDataJSON() as GatewayInput; calls++;
+    await route.fulfill({ json: reply(input, 'I can check the controls and report back.', [{ action: 'inspect', targetId: 'controller', atSimTime: input.view.simTime, args: { technicianId: 'alex' } }]) });
   });
   await startPaused(page);
-  await page.getByRole('textbox', { name: 'Message Alex', exact: true }).fill('Please inspect the cooling controls.');
-  await page.getByRole('button', { name: 'Send to Alex', exact: true }).click();
-  const proposal = page.getByRole('button', { name: 'Check cooling controls · Alex', exact: true }); await expect(proposal).toBeEnabled();
+  const draft = page.getByRole('textbox', { name: 'Message Alex', exact: true });
+  await draft.fill('Please inspect the cooling controls.'); await draft.press('Enter');
+  await expect(page.locator('.conv-assignment')).toContainText('Walking');
+  const proposal = page.getByRole('button', { name: 'Check cooling controls \u00b7 Alex', exact: true });
+  await expect(proposal).toBeDisabled();
+  await draft.fill('Now check something else.'); await draft.press('Enter');
+  await expect(page.locator('.conv-history-window > article.conv-entry-fallback')).toHaveCount(1);
+  await expect(page.locator('.conv-assignment')).toContainText('Walking'); expect(calls).toBe(2);
+  await page.getByRole('button', { name: 'Stop current task', exact: true }).click();
   await expect(page.locator('.conv-assignment')).toContainText('Ready');
-  await page.locator('.conv-suggested').click(); await expect(page.locator('.conv-assignment')).toContainText('Walking');
-  await page.getByRole('button', { name: 'Stop current task', exact: true }).click(); await expect(page.locator('.conv-assignment')).toContainText('Ready');
-  await page.getByRole('tab', { name: /Sam · IT/ }).click(); await page.getByRole('tab', { name: /Alex · Cooling/ }).click();
-  await page.getByRole('button', { name: 'Menu', exact: true }).click(); await page.getByRole('button', { name: 'History', exact: true }).click();
-  const menu = page.getByRole('dialog'); const historicalProposal = menu.getByRole('button', { name: 'Check cooling controls · Alex', exact: true });
-  for (let i = 0; i < 20 && !(await historicalProposal.count()); i++) await menu.getByRole('button', { name: 'Previous entry', exact: true }).click();
-  await historicalProposal.click(); await expect(historicalProposal).toBeDisabled(); await expect(menu).toContainText('rejected');
-  await menu.getByRole('button', { name: 'Read action result', exact: true }).click(); await menu.getByRole('combobox', { name: 'Reader section', exact: true }).selectOption({ label: 'Alex action result' });
-  await expect(menu.getByLabel('Message text', { exact: true })).toContainText('stale entity version');
 });
 
 test('more than twenty complete entries remain in Menu History and a native save/export', async ({ page }) => {

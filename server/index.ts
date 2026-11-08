@@ -6,7 +6,7 @@ import { Gateway } from './llm/gateway';
 import { modelConfiguration } from './llm/config';
 import { GatewayInputSchema, GatewayStartSchema } from '../src/shared/schemas';
 const identitySchema = GatewayStartSchema.pick({ runId: true, requestId: true, actorId: true });
-const mime: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.woff2': 'font/woff2', '.svg': 'image/svg+xml' };
+const mime: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.woff2': 'font/woff2', '.svg': 'image/svg+xml', '.wav': 'audio/wav' };
 export function createDemoServer(gateway = new Gateway()) {
   const root = resolve('dist');
   let windowStart = Date.now(), requests = 0;
