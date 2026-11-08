@@ -1,5 +1,13 @@
 # Conversation game integration contract5
 
+## Subsequent user overrides
+
+Ordinary sidebar Older/Newer/counter controls are removed. Keep complete per-character history and older reports/proposals in compact Menu → History. Reclaim space for a persistent multiline composer (at least3visible lines at required desktop sizes); Enter inserts newline,Ctrl/Cmd+Enter explicitly sends,IME never sends. Keep expanded lossless long-draft pages.
+
+Remove the default instructional guidance/footer strip and its toggle without reserving an empty row. Guidance on/off belongs in Menu; required pause explanations/Continue remain above the map with the current objective/alerts. Retain the separate Team assignments strip,adding existing-atlas portraits for Alex/Jules/Sam and subtle idle motion that freezes on pause/reducedmotion/reset. No new art/physics.
+
+Menu becomes a compact,clearly labeled,content-sized panel around30%of the old fullscreen footprint. Use direct short empty states and focusedhistory/save/replay readers,no stacked menu dropdowns or visible measurement probes. MENU-01 exclusively owns new src/ui/conversation-menu/** and tests/ui/conversation-menu/**; root retains host/wrapper/composer/team changes. ANIM-01 owns only new ambient modules/tests; no existing scene hook until coordinatorintegration. These user overrides supersede the earlier sidebar paging/defaultfooter language below and in the approved original plan.
+
 Approved experience: docs/conversation-game-plan.md, copied verbatim from the user's approved replacement in the main thread. This replaces all normal WASD/E/click-travel/proximity UX. No further design approval is required.
 
 ## Reconciliation and retained data
