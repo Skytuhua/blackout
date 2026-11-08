@@ -1,6 +1,7 @@
 ﻿import type { KnowledgeView, Point } from '../../shared/contracts';
 import { TopologySchema } from '../../shared/schemas';
 import { FacilityTopologySchema, type FacilityMapView, type FacilityTopology } from '../../shared/facility-map';
+import { onPublicFloor } from '../desktop-world';
 
 const OFFSET = Object.freeze({ x: 14, y: 8 });
 const ROOM_ID = 'demo-current-facility';
@@ -74,7 +75,7 @@ export function createFacilityDemoProjector(): (view: KnowledgeView) => DemoProj
       ],
       view: {
         runId: source.runId, simTime: source.simTime, knownTopology: previousGeometry,
-        crew: source.crew.map(c => c.role === 'remote' ? { ...c } : { ...c, ...shifted(c) }),
+        crew: source.crew.map(c => c.role === 'remote' && !onPublicFloor(c, source.knownTopology) ? { ...c } : { ...c, ...shifted(c) }),
         tasks: source.tasks.map(t => ({ ...t, path: t.path.map(shifted) })),
         observations: structuredClone(source.observations), mission: { ...source.mission },
       },

@@ -48,7 +48,7 @@ function LegacyConversationMap(props: ConversationGameProps & { projectionNotice
 
 function DemoConversationMap(props: ConversationGameProps) {
   const [project] = useState(createFacilityDemoProjector);
-  const [roomId, setRoomId] = useState<string | null>(() => { const initial = project(props.view); return initial.status === 'available' ? initial.roomId : null; });
+  const [roomId, setRoomId] = useState<string | null>(null);
   const latest = useRef(props); latest.current = props;
   const projection = project(props.view);
   if (projection.status !== 'available') return <LegacyConversationMap {...props} projectionNotice={projection.reason} />;

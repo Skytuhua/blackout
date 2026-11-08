@@ -1,8 +1,38 @@
 import type { AgentResponse, GatewayStart, KnowledgeView, Observation, ProposalAuthorization } from '../shared/contracts';
+import { usesMovementConversation } from './conversation-mode';
 
 const clock = (at: number) => `${Math.floor(at / 60)}:${String(Math.floor(at % 60)).padStart(2, '0')}`;
 const words = (value: string) => value.replace(/([a-z])([A-Z])/g, '$1 $2').replaceAll('_', ' ');
 const delivered = (o: Observation, view: KnowledgeView) => o.quality !== 'unknown' && o.observedAt <= o.receivedAt && o.receivedAt <= view.simTime;
+
+function contradictsExplicitInstruction(start: GatewayStart, response: AgentResponse): boolean {
+  const action = response.proposals[0]; if (!action) return false;
+  if (/^\s*(?:hi|hello|hey|hiya|good\s+(?:morning|afternoon|evening))[!.\s]*$/i.test(start.message)) return true;
+  const clauses = start.message.toLowerCase().replaceAll('’', "'").split(/[,;.!?]|\bbut\b|\band\s+(?=(?:please\s+)?(?:walk|go|move|travel|head|approach|check|inspect|examine|repair|fix|pause|resume|stop|cancel|verify|set|adjust)\b)/);
+  const negative = /\b(?:don't|dont|do\s+not|never|avoid)\b/;
+  const stopWork = /\b(?:stop|cancel|abort|halt)\b(?:\s+(?:your|the|current|this|that|my|ongoing|existing|please)){0,3}\s+(?:task|job|work|inspection|repair|check|working)\b|\b(?:stop|cancel|abort|halt)\s+what\s+(?:you(?:'re| are)|you)\s+doing\b|^\s*(?:please\s+)?(?:stop|cancel|abort|halt)(?:\s+(?:it|that))?\s*$/;
+  if (action.action === 'cancel_task' && !clauses.some(clause => !negative.test(clause) && stopWork.test(clause))) return true;
+  const verbs: Partial<Record<typeof action.action, RegExp>> = {
+    inspect: /\b(?:check|inspect|examine|test|look at)\b/, independent_reading: /\b(?:check|inspect|read|measure|test|look at)\b/,
+    repair_cooling: /\b(?:repair|fix)\b/, restart_cooling: /\b(?:restart|start)\b/, reset_ups: /\breset\b/,
+    pause_batch: /\b(?:pause|stop|set|adjust|change)\b/, resume_batch: /\b(?:resume|restore|start|set|adjust|change)\b/, verify_recovery: /\b(?:verify|check)\b/,
+    set_batch_ceiling: action.action === 'set_batch_ceiling' && action.args.ceiling === 0 ? /\b(?:set|adjust|change|increase|decrease|raise|lower|pause|stop)\b/ : /\b(?:set|adjust|change|increase|decrease|raise|lower|resume|restore)\b/,
+    move_crew: /\b(?:walk|go|move|travel|head|approach)\b/,
+    cancel_task: /\b(?:stop|cancel|abort|halt)\b/,
+  };
+  const verb = verbs[action.action];
+  return clauses.some(clause => {
+    const noAction = /\b(?:do|perform|take|start)\s+(?:anything|any\s+(?:action|work|task))\b/.test(clause);
+    if (!negative.test(clause) || !noAction && !verb?.test(clause)) return false;
+    const named = start.view.knownTopology.assets.filter(asset => {
+      const label = asset.label.toLowerCase(), short = label.replace(/^rack\s+/, '');
+      return clause.includes(label) || clause.includes(asset.id.toLowerCase()) || short !== label && new RegExp(`\\b${short.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(clause) || asset.kind === 'controller' && /\bcontrols?\b/.test(clause);
+    });
+    const target = action.action === 'move_crew' ? start.view.knownTopology.assets.find(asset => asset.serviceTile.x === action.args.destination.x && asset.serviceTile.y === action.args.destination.y)?.id : action.targetId;
+    const affectsAllRacks = target === 'site' && ['pause_batch', 'resume_batch', 'set_batch_ceiling'].includes(action.action);
+    return !named.length || named.some(asset => asset.id === target || affectsAllRacks && asset.kind === 'rack');
+  });
+}
 
 /** Model prose stays verbatim. Readings and age labels are separate, scoped evidence. */
 export function naturalReplyText(response: AgentResponse, view: KnowledgeView): string {
@@ -30,6 +60,7 @@ export function naturalReplyText(response: AgentResponse, view: KnowledgeView): 
 export function naturalNarrativeAllowed(start: GatewayStart, response: AgentResponse): boolean {
   if (!response.requestKind || !response.inference.trim() || response.inference.length > 180 || response.uncertainty.length > 100) return false;
   if (response.requestKind !== 'order' && response.proposals.length) return false;
+  if (usesMovementConversation(start) && contradictsExplicitInstruction(start, response)) return false;
   if (naturalReplyText(response, start.view).length > 260) return false;
   const text = `${response.inference} ${response.uncertainty}`;
   if (/\b(?:simulation time|engine tick|entity version|checkpoint|scheduled (?:completion|at))\b|\b\d+(?:\.\d+)?\s*(?:°C|kW|kWh|seconds?|minutes?)\b/i.test(text)) return false;

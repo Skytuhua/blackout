@@ -14,7 +14,7 @@ test('an actual delivered inspection gets the complete natural reply, with raw e
   let calls = 0;
   await page.route('**/api/llm/turn', async route => {
     calls++; const wire = route.request().postDataJSON() as GatewayStart;
-    expect(wire.interactionMode).toBe('conversation'); expect(wire.promptVersion).toBe('coworker-v3');
+    expect(wire.interactionMode).toBe('conversation'); expect(wire.promptVersion).toBe('coworker-v4');
     const evidence = wire.view.observations.filter(o => o.assetId === 'controller' && ['inspection_complete', 'prerequisite_ready'].includes(o.field));
     expect(evidence).toHaveLength(2);
     await route.fulfill({ json: { kind: 'final', runId: wire.runId, requestId: wire.requestId, actorId: wire.actorId, response: { runId: wire.runId, requestId: wire.requestId, actorId: wire.actorId, speaker: wire.actorId, mode: 'live', requestKind: 'question', facts: evidence.flatMap(o => [{ observationId: o.id, field: 'value' }, { observationId: o.id, field: 'assetId' }]), inference: prose, uncertainty: doubt, proposals: [] } } });

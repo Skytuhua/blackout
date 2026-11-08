@@ -85,7 +85,7 @@ export class Gateway {
       if (state.fingerprint === fingerprint && state.reply) return state.reply;
       if (state.busy || !this.validResult(input.result, state, input) || input.view.runId !== input.runId || input.view.actorId !== input.actorId) return this.fallback(input, 'invalid_tool_result');
       if (this.providerBusy) return this.fallback(input, 'provider_busy');
-      state.history = appendToolResult(state.history, input.expectedCallId, input.result);
+      state.history = appendToolResult(state.history, input.expectedCallId, input.result, state.start.interactionMode === 'conversation' && state.start.promptVersion === 'coworker-v4');
       const fresh = { ...state.start, view: input.view };
       state.start = usesConversationPolicy(fresh) ? { ...projectCoworkerContext(fresh), procedures: state.start.procedures } : fresh; state.pending = undefined; state.fingerprint = fingerprint;
       for (const observation of input.view.observations) state.evidence.set(observation.id, observation);

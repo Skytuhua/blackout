@@ -1,6 +1,6 @@
 import atlas from '../../../public/assets/facility-v2.json';
 import type { FacilityMapProps, FacilityTopology } from '../../shared/facility-map';
-import { routePosition } from '../desktop-world';
+import { onPublicFloor, routePosition } from '../desktop-world';
 import { assetEvidence, PresentationClock, roomViewport } from './model';
 
 export type ConnectionKind = FacilityTopology['connections'][number]['kind'];
@@ -50,7 +50,7 @@ export class FacilityRenderer {
   private schedule() {
     if (this.disposed || !this.atlas || !this.running() || this.clock.time >= this.state.view.simTime + 1) { this.canvas.dataset.animationRequests = '0'; return; }
     const { view } = this.state;
-    const motion = view.crew.some(c => c.role !== 'remote' && view.tasks.some(t => t.id === c.taskId && t.actorId === c.id && ['traveling', 'working', 'inspecting'].includes(t.status))) || view.knownTopology.assets.some(a => ['cooling', 'generator'].includes(a.kind) && assetEvidence(view.observations.filter(o => o.assetId === a.id), view.simTime).running);
+    const motion = view.crew.some(c => onPublicFloor(c, view.knownTopology) && view.tasks.some(t => t.id === c.taskId && t.actorId === c.id && ['traveling', 'working', 'inspecting'].includes(t.status))) || view.knownTopology.assets.some(a => ['cooling', 'generator'].includes(a.kind) && assetEvidence(view.observations.filter(o => o.assetId === a.id), view.simTime).running);
     if (!motion) return;
     this.canvas.dataset.animationRequests = '1';
     this.frame = requestAnimationFrame(now => {
@@ -72,6 +72,17 @@ export class FacilityRenderer {
     this.terrain.width = topology.width * 16; this.terrain.height = topology.height * 16;
     const ctx = this.terrain.getContext('2d'); if (!ctx) return;
     ctx.imageSmoothingEnabled = false;
+    if (this.state.illustrative) {
+      // Decorative rooms never enter the public topology or act as command targets.
+      const rooms = [ { x: 0, y: 0, w: 14, h: 14 }, { x: 0, y: 14, w: 14, h: 14 }, { x: 34, y: 0, w: 14, h: 14 }, { x: 34, y: 14, w: 14, h: 14 }, { x: 14, y: 0, w: 20, h: 8 }, { x: 14, y: 20, w: 20, h: 8 } ];
+      ctx.globalAlpha = .55;
+      for (const room of rooms) for (let y = room.y; y < room.y + room.h; y++) for (let x = room.x; x < room.x + room.w; x++) {
+        const wall = x === room.x || y === room.y || x === room.x + room.w - 1 || y === room.y + room.h - 1;
+        this.sprite(ctx, wall ? (y === room.y || y === room.y + room.h - 1 ? 'wall_0' : 'wall_1') : (x + y) % 13 === 0 ? 'floor_1' : 'floor_0', x * 16, y * 16);
+        if (wall && y === room.y && (x - room.x) % 4 === 2) this.sprite(ctx, 'infra_1', x * 16, y * 16);
+      }
+      ctx.globalAlpha = 1;
+    }
     const walkable = new Set(topology.walkable.map(p => `${p.x},${p.y}`));
     const doors = new Set(topology.rooms.flatMap(r => r.doors).map(p => `${p.x},${p.y}`));
     for (let y = 0; y < topology.height; y++) for (let x = 0; x < topology.width; x++) {
@@ -121,8 +132,8 @@ export class FacilityRenderer {
       if (asset.id === selectedAssetId) { ctx.strokeStyle = '#45d5e8'; ctx.lineWidth = 1; ctx.strokeRect(asset.x * 16 - .5, asset.y * 16 - .5, asset.width * 16 + 1, asset.height * 16 + 1); }
     }
     const poses: Record<string, { x: number; y: number; frame: string }> = {};
-    for (const id of this.poses.keys()) if (!view.crew.some(c => c.id === id && c.role !== 'remote')) this.poses.delete(id);
-    for (const crew of view.crew.filter(c => c.role !== 'remote')) {
+    for (const id of this.poses.keys()) if (!view.crew.some(c => c.id === id && onPublicFloor(c, topology))) this.poses.delete(id);
+    for (const crew of view.crew.filter(c => onPublicFloor(c, topology))) {
       const task = view.tasks.find(t => t.id === crew.taskId && t.actorId === crew.id);
       const pose = reducedMotion ? { x: crew.x, y: crew.y } : routePosition(crew, task, this.clock.time, topology);
       const previous = this.poses.get(crew.id), dx = pose.x - (previous?.x ?? pose.x), dy = pose.y - (previous?.y ?? pose.y);
@@ -130,8 +141,8 @@ export class FacilityRenderer {
       const moving = task?.status === 'traveling' && (pose.x !== crew.x || pose.y !== crew.y) && this.clock.time < task.arrivalAt;
       const working = task && ['working', 'inspecting'].includes(task.status) && view.simTime >= task.arrivalAt && task.progress > 0 && task.progress < 1;
       const activity = reducedMotion ? 'idle' : moving ? `walk${Math.floor(cycle * 6) % 2}` : working ? `work${Math.floor(cycle * 4) % 2}` : 'idle';
-      const frame = `${crew.role}_${facing}_${activity}`;
-      this.sprite(ctx, frame, pose.x * 16 + 2, pose.y * 16);
+      const frame = crew.role === 'remote' ? 'portrait_it' : `${crew.role}_${facing}_${activity}`;
+      this.sprite(ctx, frame, pose.x * 16 + 2, pose.y * 16, crew.role === 'remote' ? 12 : undefined, crew.role === 'remote' ? 16 : undefined);
       if (crew.id === selectedActorId) {
         ctx.strokeStyle = '#f4b860'; ctx.strokeRect(Math.round(pose.x * 16) + .5, Math.round(pose.y * 16) + .5, 15, 15);
         if (task?.status === 'traveling') {

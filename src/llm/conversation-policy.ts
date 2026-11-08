@@ -1,6 +1,6 @@
 import type { ActionIntent, AgentResponse, GatewayStart, Observation } from '../shared/contracts';
 import { factValue, validStart, validateResponse } from './validation';
-import { usesNaturalConversation } from './conversation-mode';
+import { usesMovementConversation, usesNaturalConversation } from './conversation-mode';
 import { naturalNarrativeAllowed } from './natural-conversation';
 
 const active = (status: string) => !['completed', 'canceled'].includes(status);
@@ -35,9 +35,10 @@ function ownAffordances(start: GatewayStart): GatewayStart['view']['affordances'
     return reported(start, o) && o.value === false;
   };
   const available = view.affordances.filter(a => a.enabled && Object.hasOwn(view.observedEntityVersions, a.targetId) && (!a.technicianIds.length || a.technicianIds.includes(actorId)));
-  return available.filter(a => {
+  const result = available.filter(a => {
     if (a.action === 'cancel_task') return view.tasks.some(t => t.actorId === actorId && t.targetId === a.targetId && active(t.status));
     if (busy) return false;
+    if (usesMovementConversation(start)) return role === 'remote' ? a.technicianIds.length === 0 : a.technicianIds.includes(actorId);
     const kind = view.knownTopology.assets.find(asset => asset.id === a.targetId)?.kind;
     if (role === 'remote') {
       if (a.targetId !== 'site' && kind !== 'rack') return false;
@@ -52,6 +53,8 @@ function ownAffordances(start: GatewayStart): GatewayStart['view']['affordances'
     if (role !== 'facilities' || !kind || !['cooling', 'controller', 'rack'].includes(kind)) return false;
     return a.action === 'repair_cooling' && diagnosis(a.targetId) || a.action === 'inspect' || a.action === 'independent_reading' && kind === 'rack';
   }).map(a => ({ ...a, technicianIds: a.technicianIds.length ? [actorId] : [] }));
+  if (usesMovementConversation(start) && !busy && Object.hasOwn(view.observedEntityVersions, actorId) && view.knownTopology.walkable.length) result.push({ action: 'move_crew', targetId: actorId, enabled: true, reason: null, technicianIds: [actorId], travelSeconds: null, workSeconds: 0 });
+  return result;
 }
 
 function procedureText(start: GatewayStart): string {
@@ -113,6 +116,7 @@ export function coworkerReplyVocabulary(start: GatewayStart): { inference: strin
 
 function legalProposal(start: GatewayStart, action: ActionIntent): boolean {
   const { args } = action;
+  if (action.action === 'move_crew') return usesMovementConversation(start) && action.targetId === start.actorId && (args.technicianId === undefined || args.technicianId === start.actorId) && args.ceiling === undefined && args.taskId === undefined;
   if (args.destination !== undefined || args.technicianId !== undefined && args.technicianId !== start.actorId) return false;
   if ((args.ceiling !== undefined) !== (action.action === 'set_batch_ceiling') || (args.taskId !== undefined) !== (action.action === 'cancel_task')) return false;
   if (action.action === 'cancel_task') return args.technicianId === undefined && start.view.tasks.some(t => t.id === args.taskId && t.targetId === action.targetId && t.actorId === start.actorId && active(t.status));

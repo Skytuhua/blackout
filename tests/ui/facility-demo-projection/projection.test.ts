@@ -16,6 +16,17 @@ const project = (view = engineView()) => {
 };
 
 describe('honest legacy facility projection', () => {
+  it('keeps offsite Sam hidden but translates his actual walking position', () => {
+    const engine = initialize(hotRestart, 'sam-map');
+    const initial = engine.observe('player');
+    expect(project(initial).view.crew.find(c => c.id === 'sam')).toMatchObject({ x: 0, y: 0 });
+    const destination = initial.knownTopology.assets.find(a => a.id === 'rack-2')!.serviceTile;
+    const receipt = engine.applyCommand(request(engine, 'move_crew', 'sam', { destination }));
+    expect(receipt.status).toBe('accepted');
+    const current = engine.observe('player'), projected = project(current);
+    const sam = current.crew.find(c => c.id === 'sam')!;
+    expect(projected.view.crew.find(c => c.id === 'sam')).toMatchObject({ x: sam.x + projected.offset.x, y: sam.y + projected.offset.y });
+  });
   it('maps only published equipment and floor, with no fabricated readings or connections', () => {
     const original = engineView(); const snapshot = structuredClone(original);
     const result = project(original); const { view, offset, unavailableAreas } = result;
