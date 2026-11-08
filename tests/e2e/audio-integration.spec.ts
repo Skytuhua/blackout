@@ -65,3 +65,16 @@ test('actual crew work, report delivery, pause and successful native save reques
   await expect(page.getByRole('dialog')).toContainText('Mission saved locally'); await expect.poll(() => requested.has('save-complete')).toBe(true);
   expect(await page.evaluate(() => (window as any).__soundProof.peak)).toBeLessThanOrEqual(10);
 });
+
+test('a guidance-held Resume request does not sound like the clock resumed', async ({ page }) => {
+  const cues: string[] = []; page.on('request', request => { if (request.url().includes('/audio/retro-v1/')) cues.push(request.url()); });
+  let release!: () => void; const held = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/api/llm/turn', async route => { const wire = route.request().postDataJSON(); await held; await route.fulfill({ json: { kind: 'fallback', runId: wire.runId, requestId: wire.requestId, actorId: wire.actorId, mode: 'scripted', reason: 'provider_unavailable', message: 'Unavailable.', facts: [] } }).catch(() => {}); });
+  try {
+    await page.goto('/'); await page.getByRole('button', { name: 'Start guided game', exact: true }).click();
+    await page.getByRole('textbox', { name: 'Message Alex', exact: true }).fill('What do you know?'); await page.getByRole('button', { name: 'Send to Alex', exact: true }).click();
+    const resume = page.locator('.conv-header').getByRole('button', { name: 'Resume', exact: true }); await expect(resume).toBeVisible(); await resume.click();
+    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+    await expect(resume).toBeVisible(); expect(cues.some(url => url.endsWith('/simulation-resume.wav'))).toBe(false);
+  } finally { release(); }
+});

@@ -66,7 +66,7 @@ export default function App() {
   function syncClock() {
     if (!simulation.current || transitioning.current || replayClient.current && replayActive) return;
     const stop = manualPaused.current || menuOpenRef.current || sessionRef.current === 'welcome' || !!known.current && ended(known.current) || guideEnabled.current && jobs.current.size > 0;
-    if (stop) simulation.current.pause(); else simulation.current.resume(); setPaused(stop);
+    if (stop) simulation.current.pause(); else simulation.current.resume(); setPaused(stop); return stop;
   }
   async function cancelCoworkers(cancel = true) { const active = [...jobs.current.values()]; if (cancel) active.forEach(job => job.controller.abort()); await Promise.allSettled(active.map(job => job.promise)); }
   function getStore() { return store.current ??= openRunStore().catch(problem => { store.current = null; throw problem; }); }
@@ -294,7 +294,7 @@ export default function App() {
     onReadEntries={readEntries} onOpenEntry={openEntry} onCloseEntry={() => { uiSound('ui-close'); setReader(null); }}
     onExecuteProposal={id => void executeProposal(id)} onSuggestedOrder={id => { const current = known.current; if (!current) return; const order = conversationOrders(current).find(order => order.id === id && order.enabled); if (order) void applyOrder(order.actorId, order.intent); }}
     onStopTask={(id, taskId) => { const current = known.current; if (!current || current.crew.find(crew => crew.id === id)?.taskId !== taskId) return; const task = current.tasks.find(task => task.id === taskId); if (task) void applyOrder(id, { action: 'cancel_task', targetId: task.targetId, atSimTime: current.simTime, args: { taskId } }); }}
-    onWait={() => syncClock()} onPause={() => { if (transitioning.current || hostPending.current || commandPending.current) return; if (replayActive) setReplayPlaying(value => !value); else { uiSound(paused ? 'simulation-resume' : 'simulation-pause'); manualPaused.current = !paused; syncClock(); } }} onSpeed={setGameSpeed}
+    onWait={() => syncClock()} onPause={() => { if (transitioning.current || hostPending.current || commandPending.current) return; if (replayActive) setReplayPlaying(value => !value); else { manualPaused.current = !paused; const stopped = syncClock(); if (stopped !== undefined && stopped !== paused) uiSound(stopped ? 'simulation-pause' : 'simulation-resume'); } }} onSpeed={setGameSpeed}
     onContinueGuide={() => syncClock()} onSetGuidance={enabled => { guideEnabled.current = enabled; setGuidanceEnabled(enabled); syncClock(); }} onMenuToggle={toggleMenu}
     onStartGuided={() => { guideEnabled.current = true; setGuidanceEnabled(true); void begin('mission'); }} onStartPractice={() => void begin('practice')} />;
 }

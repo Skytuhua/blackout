@@ -2,7 +2,7 @@ import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 const origin = process.env.CONVERSATION_FIXTURE_ORIGIN ?? 'http://127.0.0.1:5184';
-const out = '.local/conversation-ui'; mkdirSync(out, { recursive: true });
+const out = process.env.CONVERSATION_FIXTURE_OUTPUT ?? '.local/conversation-ui'; mkdirSync(out, { recursive: true });
 const browser = await chromium.launch({ headless: true }), results = [], failures = [];
 const check = async (name, run) => { if(process.env.CONV_CHECK_FILTER && !name.includes(process.env.CONV_CHECK_FILTER)) return; try { results.push({ name, status: 'passed', detail: await run() }); console.log(`PASS ${name}`); } catch (error) { failures.push({ name, error: error.stack }); console.error(`FAIL ${name}: ${error.message}`); } };
 const settle = page => page.evaluate(async () => { for (let i = 0; i < 3; i++) await new Promise(requestAnimationFrame); });
@@ -35,6 +35,15 @@ async function readPages(page, label) {
   throw new Error('Unexpectedly many text pages');
 }
 try {
+  await check('report hydration preserves an explicit Delivery notice section', async () => {
+    const page = await open();
+    await page.evaluate(() => window.convFixture.setThreads(current => current.map(thread => thread.actorId === 'alex' ? { ...thread, entries: [{ id: 'hydrating-report', actorId: 'alex', at: 50, kind: 'report', text: window.convFixture.longText, summary: 'Read the report.', unread: false }] } : thread)));
+    await page.getByRole('button', { name: 'Read report', exact: true }).click();
+    await page.getByLabel('Section', { exact: true }).selectOption({ label: 'Delivery notice' });
+    await page.evaluate(() => window.convFixture.setThreads(current => current.map(thread => thread.actorId === 'alex' ? { ...thread, entries: thread.entries.map(entry => ({ ...entry, sections: [{ id: 'findings', label: 'Findings', text: 'Cooling start condition: not met.' }, { id: 'evidence', label: 'Evidence', text: 'New structured evidence.' }] })) } : thread)));
+    await settle(page); assert.equal(await page.getByLabel('Section', { exact: true }).inputValue(), 'full-text');
+    assert.equal(await readPages(page, 'Message text'), await page.evaluate(() => window.convFixture.longText)); await page.close();
+  });
   await check('fixed controls, identities and no overflow at required desktop and enlarged geometry', async () => {
     const sizes = [[1280,720],[1366,768],[1920,1080],[640,360]];
     for (const [width,height] of sizes) {
@@ -57,8 +66,8 @@ try {
     for (let i = 0; i < 30; i++) { await settle(page); for (const id of await page.locator('.conv-history-window > .conv-entry').evaluateAll(entries => entries.map(e => e.dataset.entryId))) collected.add(id); if (!(await page.getByRole('button', { name: 'Older messages', exact: true }).isEnabled())) break; await page.getByRole('button', { name: 'Older messages', exact: true }).click(); }
     assert.equal(collected.size, 15); assert.ok(collected.has('alex-0'));
     while (await page.getByRole('button', { name: 'Newer messages', exact: true }).isEnabled()) await page.getByRole('button', { name: 'Newer messages', exact: true }).click();
-    await page.getByRole('button', { name: 'Read report', exact: true }).click(); assert.equal(await readPages(page, 'Message text'), await page.evaluate(() => window.convFixture.longText));
-    await page.getByLabel('Section', { exact: true }).selectOption('1'); assert.equal(await readPages(page, 'Message text'), 'Synthetic evidence.\n'.repeat(30)); await page.close(); return { wholeEntries: collected.size, fullText: 'exact', sections: 'exact' };
+    await page.getByRole('button', { name: 'Read report', exact: true }).click(); assert.equal(await readPages(page, 'Message text'), 'No findings are available for this report.'); await page.getByLabel('Section', { exact: true }).selectOption('full-text'); assert.equal(await readPages(page, 'Message text'), await page.evaluate(() => window.convFixture.longText));
+    await page.getByLabel('Section', { exact: true }).selectOption({ label: 'Evidence' }); assert.equal(await readPages(page, 'Message text'), 'Synthetic evidence.\n'.repeat(30)); await page.close(); return { wholeEntries: collected.size, fullText: 'exact', sections: 'exact' };
   });
   await check('per-character drafts, history anchor, late unread and selected-character busy', async () => {
     const page = await open(); await page.getByLabel('Message Alex', { exact: true }).fill('Alex retained draft');

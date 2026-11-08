@@ -73,18 +73,19 @@ function History({ thread, props }: { thread: ConversationThread; props: Convers
 }
 
 function Reader({ props, thread, entry }: { props: ConversationGameProps; thread: ConversationThread; entry: ConversationEntry }) {
-  const [section, setSection] = useState(0);
+  const [sectionId, setSectionId] = useState<string | null>(null);
   const read = useRef(false);
   useEffect(() => { if (entry.unread && !read.current) { read.current = true; props.onReadEntries(thread.actorId, [entry.id]); } }, [entry.unread, entry.id, thread.actorId, props.onReadEntries]);
   // Full text always remains present even when the host adds structured evidence.
   const structured = reportFirstSections(entry);
   const notice = { id: 'full-text', label: entry.kind === 'report' ? 'Delivery notice' : 'Full message', text: entry.text };
   const sections = [...(entry.kind === 'report' ? [...structured, notice] : [notice, ...structured]), ...(entry.proposals ?? []).filter(proposal => proposal.reason).map(proposal => ({ id: proposal.id, label: `${proposal.assignedName} action result`, text: `${proposal.label} · ${proposal.assignedName}\n${proposal.status}\n${proposal.reason}` }))];
-  const index = Math.min(section, sections.length - 1);
+  const selectedId = sectionId ?? sections[0].id;
+  const current = sections.find(item => item.id === selectedId);
   return <section className="conv-reader" aria-label={`${thread.name} message reader`}>
     <div className="conv-reader-heading"><button onClick={props.onCloseEntry}>Back</button><strong>{thread.name} · {kindLabels[entry.kind]}</strong></div>
-    {sections.length > 1 && <label className="conv-section-label">Section<select aria-label="Section" value={index} onChange={event => setSection(Number(event.target.value))}>{sections.map((item, i) => <option key={item.id} value={i}>{item.label}</option>)}</select></label>}
-    <PagedText key={`${index}:${sections[index].id}`} text={sections[index].text} label="Message text" />
+    {(sections.length > 1 || !current) && <label className="conv-section-label">Section<select aria-label="Section" value={selectedId} onChange={event => setSectionId(event.target.value)}>{!current && <option value={selectedId}>Section no longer available</option>}{sections.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>}
+    <PagedText key={selectedId} text={current?.text ?? 'This section is no longer available. Choose another section.'} label="Message text" />
     <div className="conv-reader-proposals"><Proposals entry={entry} props={props} compact /></div>
   </section>;
 }
