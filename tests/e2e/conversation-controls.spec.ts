@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 
 test('sidebar resizes by keyboard and pointer without losing a character draft', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 }); await page.goto('/');
@@ -27,20 +28,17 @@ test('Enter sends once, Shift+Enter adds a line, and IME and pending Enter never
   await expect(page.getByRole('button', { name: 'Read full message', exact: true })).toHaveCount(0);
 });
 
-test('an unexpectedly tall reply keeps its complete History text and stays unread until opened', async ({ page }) => {
+test('an unsafe reply is rejected whole while its exact original remains in the saved wire', async ({ page }) => {
   const original = 'Line.\n'.repeat(40); await page.setViewportSize({ width: 1280, height: 720 });
   await page.route('**/api/llm/turn', async route => { const input = route.request().postDataJSON(); await route.fulfill({ json: { kind: 'final', runId: input.runId, requestId: input.requestId, actorId: input.actorId, response: { runId: input.runId, requestId: input.requestId, actorId: input.actorId, speaker: input.actorId, mode: 'live', facts: [], inference: original, uncertainty: '', proposals: [] } } }); });
   await page.goto('/'); await page.getByRole('button', { name: 'Start guided game', exact: true }).click();
   await page.getByRole('textbox', { name: 'Message Alex', exact: true }).fill('A question'); await page.getByRole('button', { name: 'Send to Alex', exact: true }).click();
-  await expect(page.locator('.conv-history-window > article.conv-entry-live > p')).toContainText('A detailed reply is saved');
-  await expect(page.getByRole('tab', { name: /Alex.*1 unread/ })).toBeVisible();
+  await expect(page.locator('.conv-history-window > article.conv-entry-fallback > p')).toContainText('couldn’t verify');
   await expect(page.getByRole('button', { name: 'Read full message', exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Menu', exact: true }).click(); await page.getByRole('button', { name: 'History', exact: true }).click();
-  await page.getByRole('button', { name: 'Read full message', exact: true }).click();
-  const parts: string[] = [];
-  const menu = page.getByRole('dialog');
-  for (;;) { parts.push(await menu.getByLabel('Message text', { exact: true }).textContent() ?? ''); const next = menu.getByRole('button', { name: 'Next message text page', exact: true }); if (!await next.count() || !await next.isEnabled()) break; await next.click(); }
-  expect(parts.join('')).toBe(original);
-  await page.getByRole('button', { name: 'Close menu', exact: true }).click();
-  await expect(page.getByRole('tab', { name: /Alex.*unread/ })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Menu', exact: true }).click(); await page.getByRole('button', { name: 'Save game', exact: true }).click();
+  await expect(page.getByRole('dialog')).toContainText('Mission saved locally'); await page.getByRole('button', { name: 'Saved games', exact: true }).click(); await page.getByRole('combobox', { name: 'Saved game', exact: true }).selectOption({ index: 1 });
+  const download = page.waitForEvent('download'); await page.getByRole('button', { name: 'Export original', exact: true }).click();
+  const saved = JSON.parse(await readFile((await (await download).path())!, 'utf8'));
+  expect(saved.interactions[0].turns[0].reply.response.inference).toBe(original);
+  expect(saved.interactions[0].end.reply.reason).toBe('unsafe_narrative');
 });
