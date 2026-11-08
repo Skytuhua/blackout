@@ -8,16 +8,17 @@ export function FacilityMap(props: FacilityMapProps) {
   const { view, selectedRoomId, selectedAssetId, selectedActorId, onSelectRoom, onSelectAsset } = props;
   const topology = view.knownTopology, room = topology.rooms.find(r => r.id === selectedRoomId);
   const bounds = roomViewport(topology, selectedRoomId), id = useId();
-  const stage = useRef<HTMLDivElement>(null), world = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null);
+  const stage = useRef<HTMLDivElement>(null), world = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null), navMeasure = useRef<HTMLDivElement>(null);
   const renderer = useRef<FacilityRenderer | null>(null), latest = useRef(props); latest.current = props;
   const [box, setBox] = useState({ width: 0, height: 0, fontSize: 16 });
+  const [navWidth, setNavWidth] = useState(0);
   const [equipmentPage, setEquipmentPage] = useState(0);
   const [kind, setKind] = useState<ConnectionKind>('power'), [art, setArt] = useState<'loading' | 'ready' | 'error'>('loading');
   const [systemReduced, setSystemReduced] = useState(false);
   const state = { ...props, reducedMotion: props.reducedMotion || systemReduced };
   const fitted = fitMap(box.width, box.height, { width: bounds.width * 16, height: bounds.height * 16 });
   const assets = room ? topology.assets.filter(a => a.roomId === room.id) : [];
-  const compact = box.width > 0 && box.width / box.fontSize < 50;
+  const compact = box.width > 0 && (box.width / box.fontSize < 50 || navWidth > box.width);
   const pageSize = box.fontSize >= 28 ? 1 : Math.max(1, Math.min(4, Math.floor((box.width - 160) / (box.fontSize * 11))));
   const pages = Math.max(1, Math.ceil(assets.length / pageSize)), page = Math.min(equipmentPage, pages - 1);
 
@@ -40,6 +41,11 @@ export function FacilityMap(props: FacilityMapProps) {
     observer.observe(element); return () => observer.disconnect();
   }, []);
   useEffect(() => {
+    const measure = navMeasure.current!;
+    const observer = new ResizeObserver(entries => setNavWidth(entries[0].contentRect.width));
+    observer.observe(measure); return () => observer.disconnect();
+  }, []);
+  useEffect(() => {
     const instance = new FacilityRenderer(canvas.current!, world.current!, latest.current); renderer.current = instance;
     const image = new Image();
     image.onload = () => { instance.setAtlas(image); setArt('ready'); };
@@ -54,17 +60,26 @@ export function FacilityMap(props: FacilityMapProps) {
     const element = world.current;
     if (!element) return;
     const labels = [...element.querySelectorAll<HTMLElement>('.fm-room-label, .fm-upstream-mark, .fm-asset-label')];
-    for (const label of labels) label.hidden = false;
     const bounds = element.getBoundingClientRect(), placed: DOMRect[] = [];
-    for (const label of labels) {
-      const rect = label.getBoundingClientRect();
+    const rectangles = labels.map(label => label.getBoundingClientRect());
+    const visible = rectangles.map(rect => {
       const outside = !bounds.width || !bounds.height || rect.left < bounds.left || rect.right > bounds.right || rect.top < bounds.top || rect.bottom > bounds.bottom;
       const collision = placed.some(other => rect.left < other.right + 2 && rect.right + 2 > other.left && rect.top < other.bottom + 2 && rect.bottom + 2 > other.top);
-      label.hidden = outside || collision;
-      if (!label.hidden) placed.push(rect);
-    }
+      if (!outside && !collision) placed.push(rect);
+      return !outside && !collision;
+    });
+    labels.forEach((label, index) => {
+      const visibility = visible[index] ? 'visible' : 'hidden';
+      if (label.style.visibility !== visibility) label.style.visibility = visibility;
+    });
   }
   useLayoutEffect(arrangeLabels);
+  useLayoutEffect(() => {
+    const labels = world.current?.querySelectorAll<HTMLElement>('.fm-room-label, .fm-upstream-mark, .fm-asset-label');
+    const observer = new ResizeObserver(arrangeLabels);
+    labels?.forEach(label => observer.observe(label));
+    return () => observer.disconnect();
+  }, [topology, room?.id, compact]);
   useEffect(() => {
     const fonts = document.fonts;
     fonts?.addEventListener('loadingdone', arrangeLabels);
@@ -87,6 +102,7 @@ export function FacilityMap(props: FacilityMapProps) {
   const upstream = topology.connections.find(c => c.fromId === topology.sharedUpstream.id)?.points[0];
   return <section className="facility-map" aria-label="Public facility map" data-room={room?.id ?? 'overview'} data-art={art} data-compact={compact}>
     <nav className="fm-rooms" aria-label="Facility rooms">
+      <div className="fm-rooms-measure" ref={navMeasure} aria-hidden="true"><span>Overview</span>{topology.rooms.map(r => <span key={r.id}>{r.label}</span>)}</div>
       <button type="button" aria-pressed={!room} onClick={() => onSelectRoom(null)}>Overview</button>
       {topology.rooms.map(r => <button key={r.id} type="button" hidden={compact} aria-pressed={r.id === room?.id} onClick={() => onSelectRoom(r.id)}>{r.label}</button>)}
       {compact && <label className="fm-room-select">Room <select aria-label="Room view" value={room?.id ?? ''} onChange={e => onSelectRoom(e.target.value || null)}>

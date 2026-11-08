@@ -20,8 +20,10 @@
 .facility-map button:hover, .facility-map select:hover { border-color: var(--fm-cyan); }
 .facility-map button[aria-pressed="true"] { color: var(--fm-cyan); border-color: var(--fm-cyan); background: #143444; }
 .facility-map :focus-visible { outline: 3px solid var(--fm-amber); outline-offset: -3px; }
-.fm-rooms { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px; border-bottom: 1px solid var(--fm-border); }
+.fm-rooms { position: relative; display: flex; flex-wrap: wrap; gap: 4px; padding: 8px; border-bottom: 1px solid var(--fm-border); }
 .fm-rooms button { flex: 1 0 auto; text-align: center; }
+.fm-rooms-measure { position: absolute; left: 0; top: 0; display: flex; gap: 4px; width: max-content; visibility: hidden; pointer-events: none; }
+.fm-rooms-measure span { padding: 6px 10px; border: 1px solid transparent; white-space: nowrap; }
 .fm-room-select { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
 .fm-room-select select { min-width: 0; width: 100%; min-height: 44px; padding: 4px; }
 .facility-map[data-compact="true"] .fm-rooms > button { flex: 0 0 auto; }
