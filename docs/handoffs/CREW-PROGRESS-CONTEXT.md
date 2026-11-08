@@ -1,0 +1,7 @@
+# Public task progress and automatic equipment context
+
+Base578cd4e. Progress derives from accepted public task status/times/work progress, with walking/checking/working/reportpending/delivered distinguished. Cancellation clears the bar; pause advances no public input. Automatic top-right equipment details use actual public field-crew positions and known footprints only, with deterministic selection and a small exit margin. It requires no button or manual movement. Unknown/earlier readings remain labeled; all public readings are reachable through pages. Display numbers use two decimals while original evidence remains in History/replay.
+
+Observed missing-progress browserRED thenGREEN. Fourrealengineunits/typecheck pass, including actualindependentreading/arrival/routeaway/cancellation/reportdelay. Initial independent review reproducedHIGH rackpopup clipping at640x360 andMED independent-readinglabel. Corrected available-world-height page sizing/compact header navigation and inspection-status labeling. Freshdifferent reviewer independentlypassed4units/typecheck/8browsercases plus10actualsavedrack/controller resize/navigation probes; no blockers. All6rackreadings reachable at640x360, no pageerrors/overflow. Source consumes only KnowledgeView, no physical state/checkpoints.
+
+Receipts.local/task-progress-red.log,.local/task-progress-browser.log,.local/nearby-browser.log,.local/progress-proximity-recheck/**. No paidcalls. Fullguide/modelhook and actualfinalproductionacceptance remain separate.
