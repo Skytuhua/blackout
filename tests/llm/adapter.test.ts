@@ -11,7 +11,7 @@ it('uses the installed SDK without retries and sends explicit Responses settings
     expect(String(url)).toBe('https://api.openai.com/v1/responses');
     const body = JSON.parse(String(init.body));
     expect(body.store).toBe(false); expect(body.parallel_tool_calls).toBe(false);
-    expect(body.reasoning.effort).toBe('none'); expect(body.max_output_tokens).toBe(400);
+    expect(body.model).toBe('gpt-6.1-terra'); expect(body.reasoning.effort).toBe('low'); expect(body.max_output_tokens).toBe(400);
     expect(body.text.format.strict).toBe(true);
     for (const tool of body.tools) { expect(tool.strict).toBe(true); expect(tool.parameters.additionalProperties).toBe(false); }
     return new Response(JSON.stringify({ error: { message: 'Synthetic quota exhausted', type: 'insufficient_quota', code: 'insufficient_quota' } }), { status: 429, headers: { 'Content-Type': 'application/json' } });
