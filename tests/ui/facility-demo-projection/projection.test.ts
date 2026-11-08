@@ -102,6 +102,24 @@ describe('honest legacy facility projection', () => {
     expect(engine.exportRecord()).toEqual(before);
     expect(verifyReplay(before, 'full-demo-replay').matches).toBe(true);
   });
+  it('never resolves a missing source dependency to the display placeholder', () => {
+    const source = engineView('dependency');
+    const malformed = structuredClone(source);
+    malformed.knownTopology.assets[0].dependencies = ['demo-unavailable-power-diagram'];
+    expect(createFacilityDemoProjector()(malformed).status).toBe('unsupported');
+    expect(selectDemoAsset(malformed, malformed.runId, malformed.knownTopology.assets[0].id)).toBeNull();
+    expect(selectDemoRoom(malformed, malformed.runId, null)).toEqual({ accepted: false });
+    malformed.knownTopology.assets[0].dependencies = ['another-missing-asset'];
+    expect(createFacilityDemoProjector()(malformed).status).toBe('unsupported');
+
+    const legitimate = structuredClone(source), marker = 'demo-unavailable-power-diagram';
+    const generator = legitimate.knownTopology.assets.find(a => a.id === 'generator')!;
+    generator.id = marker;
+    for (const asset of legitimate.knownTopology.assets) asset.dependencies = asset.dependencies.map(id => id === 'generator' ? marker : id);
+    const projected = project(legitimate);
+    expect(projected.view.knownTopology.assets.some(a => a.id === marker)).toBe(true);
+    expect(projected.view.knownTopology.sharedUpstream.id).not.toBe(marker);
+  });
   it('reuses geometry across snapshots but replaces it if the published topology changes', () => {
     const source = engineView(); const projector = createFacilityDemoProjector();
     const first = projector(source), second = projector({ ...source, simTime: source.simTime + 1 });
