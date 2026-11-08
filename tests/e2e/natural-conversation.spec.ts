@@ -55,3 +55,39 @@ test('a freeform off-objective order starts accepted travel once, while a questi
   await expect(page.getByRole('button', { name: 'Check equipment · Alex', exact: true })).toBeDisabled();
   await expect(page.locator('.conv-history-window > article.conv-entry-order')).toHaveCount(1); expect(count).toBe(2);
 });
+
+test('authorized natural order arriving during a different command still starts after that command', async ({ page }) => {
+  await page.addInitScript(() => {
+    const NativeWorker = window.Worker;
+    (window as any).__heldOrder = null;
+    window.Worker = class extends NativeWorker {
+      postMessage(message: any, options?: any) {
+        if (message.kind === 'command' && message.request.intent.targetId === 'distribution') {
+          (window as any).__heldOrder = () => super.postMessage(message, options);
+          return;
+        }
+        super.postMessage(message, options);
+      }
+    } as typeof Worker;
+  });
+  let ready!: () => void; const responseGate = new Promise<void>(resolve => { ready = resolve; });
+  let captured: GatewayStart | undefined;
+  await page.route('**/api/llm/turn', async route => {
+    const wire = route.request().postDataJSON() as GatewayStart; captured = wire; await responseGate;
+    await route.fulfill({ json: { kind: 'final', runId: wire.runId, requestId: wire.requestId, actorId: wire.actorId, response: { runId: wire.runId, requestId: wire.requestId, actorId: wire.actorId, speaker: wire.actorId, mode: 'live', requestKind: 'order', facts: [], inference: "I'll check Rack C2 and report back.", uncertainty: '', proposals: [{ action: 'inspect', targetId: 'rack-8', atSimTime: wire.view.simTime, args: { technicianId: 'alex' } }] } } });
+  });
+  await page.goto('/'); await page.getByRole('button', { name: 'Start guided game', exact: true }).click();
+  await page.locator('.conv-header').getByRole('button', { name: 'Pause', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Message Alex', exact: true }).fill('Please inspect Rack C2.');
+  await page.getByRole('button', { name: 'Send to Alex', exact: true }).click();
+  await expect.poll(() => captured?.actorId).toBe('alex');
+  await page.getByRole('tab', { name: /Jules/ }).click();
+  await page.getByRole('button', { name: 'Check the power board', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => Boolean((window as any).__heldOrder))).toBe(true);
+  ready();
+  await page.getByRole('tab', { name: /Alex/ }).click();
+  await expect(page.locator('.conv-history-window > article.conv-entry-live').last()).toContainText("I'll check Rack C2");
+  await page.evaluate(() => (window as any).__heldOrder());
+  await expect(page.getByRole('button', { name: /Check equipment.*Alex/ })).toBeDisabled();
+  await expect(page.locator('.conv-assignment')).toContainText('Walking to Rack C2');
+});

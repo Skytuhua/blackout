@@ -131,3 +131,22 @@ it('binds an off-objective natural order to one original turn, then starts real 
   expect(directOrderAuthorizationIds({ ...result.reply.response, requestKind: 'question' }, result.authorizations)).toEqual([]);
   expect(directOrderAuthorizationIds({ ...result.reply.response, actorId: 'jules' }, result.authorizations)).toEqual([]);
 });
+
+it('rejects a running claim based on a retained reading superseded by a current stopped reading', async () => {
+  const engine = initialize(hotRestart, 'reviewer-running-conflict'); engine.step(5);
+  const initial = engine.observe('alex');
+  const running = initial.observations.find(o => o.assetId === 'cooling-1' && o.field === 'running' && o.value === true && o.observedAt === 5)!;
+  expect(running).toBeDefined();
+  let calls = 0;
+  vi.stubGlobal('fetch', async (path: string, init: RequestInit) => {
+    if (path.endsWith('/cancel')) return new Response('{}');
+    const wire = JSON.parse(String(init.body)) as import('../../src/shared/contracts').GatewayInput;
+    if (++calls === 1) return new Response(JSON.stringify({ kind: 'tool_request', runId: wire.runId, requestId: wire.requestId, actorId: wire.actorId, interactionId: 'read-running', intent: { runId: wire.runId, requestId: wire.requestId, actorId: wire.actorId, interactionId: 'read-running', callId: 'read-cooling', tool: 'read_observations', targetId: 'cooling-1', action: null } }));
+    expect(wire.view.observations.some(o => o.assetId === 'cooling-1' && o.field === 'running' && o.value === false && o.observedAt === 10)).toBe(true);
+    expect(wire.view.observations.some(o => o.id === running.id)).toBe(true);
+    return new Response(JSON.stringify({ kind: 'final', runId: wire.runId, requestId: wire.requestId, actorId: wire.actorId, response: { runId: wire.runId, requestId: wire.requestId, actorId: wire.actorId, speaker: wire.actorId, mode: 'live', requestKind: 'question', inference: 'Cooling is running.', uncertainty: '', facts: [{ observationId: running.id, field: 'value' }], proposals: [] } }));
+  });
+  const result = await runCoworker({ simulation: { observe: async actorId => engine.observe(actorId ?? 'player'), command: vi.fn() }, runId: initial.runId, actorId: 'alex', targetId: 'cooling-1', message: 'Is cooling running?', signal: new AbortController().signal, interactionMode: 'conversation', promptVersion: 'coworker-v3', onTool: async () => { engine.step(5); } });
+  if (result.reply.kind === 'final') expect(formatConversationReply(result.reply.response, result.view)).not.toBe('Cooling is running.');
+  expect(result.reply).toMatchObject({ kind: 'fallback', reason: 'unsafe_narrative' });
+});

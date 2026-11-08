@@ -31,6 +31,7 @@ type RadioJob = { controller: AbortController; promise: Promise<CoworkerResult> 
 export default function App() {
   const simulation = useRef<SimulationClient | null>(null), unsubscribe = useRef<(() => void) | null>(null), known = useRef<KnowledgeView | null>(null);
   const generation = useRef(0), transitioning = useRef(false), commandPending = useRef(false), jobs = useRef(new Map<string, RadioJob>());
+  const hostWaiters = useRef(new Set<() => void>());
   const sourceGeneration = useRef(0), hostPending = useRef(false), listGeneration = useRef(0);
   const archive = useRef<HostArchive | null>(null), store = useRef<Promise<RunStore> | null>(null), proposals = useRef<ProposalBook | null>(null);
   const replayClient = useRef<SimulationClient | null>(null), replayGeneration = useRef(0), replayAt = useRef(0), replayPending = useRef(false);
@@ -45,6 +46,7 @@ export default function App() {
   const [replayView, setReplayView] = useState<KnowledgeView | null>(null), [replayActive, setReplayActive] = useState(false), [replayPlaying, setReplayPlaying] = useState(false), [cursor, setCursor] = useState(0);
 
   function updateThreads(update: (previous: ConversationThread[]) => ConversationThread[]) { const next = update(threadState.current); threadState.current = next; setThreads(next); }
+  function settleHostWaiters() { if (!commandPending.current && !hostPending.current) for (const done of [...hostWaiters.current]) done(); }
   function chooseAsset(id: string) { if (id && !known.current?.knownTopology.assets.some(asset => asset.id === id)) return; selected.current = id || null; setAssetId(id || null); }
   function chooseActor(id: string) { if (!person(id)) return; selectedActor.current = id; setActorId(id); setReader(null); }
   function append(entry: ConversationEntry, evidenceIds: string[] = [], record = true) {
@@ -64,7 +66,7 @@ export default function App() {
     catch { if (request === listGeneration.current && token === generation.current) setError('Local saves are unavailable. You can still play.'); }
   }
   function pauseLive() { simulation.current?.pause(); setPaused(true); }
-  function closeReplay() { sourceGeneration.current++; hostPending.current = false; setBusy(false); replayGeneration.current++; replayClient.current?.dispose(); replayClient.current = null; replayAt.current = 0; replayPending.current = false; setReplayActive(false); setReplayPlaying(false); setReplayView(null); setCursor(0); }
+  function closeReplay() { sourceGeneration.current++; hostPending.current = false; setBusy(false); settleHostWaiters(); replayGeneration.current++; replayClient.current?.dispose(); replayClient.current = null; replayAt.current = 0; replayPending.current = false; setReplayActive(false); setReplayPlaying(false); setReplayView(null); setCursor(0); }
   function ingestReports(raw: KnowledgeView) {
     updateThreads(previous => {
       let next = previous;
@@ -92,7 +94,7 @@ export default function App() {
       if (token !== generation.current) return;
       if (previous) setNotice('Saved mission resumed paused.');
     } catch { if (token === generation.current) setError('Could not open this game. Retry a fresh mission; saved data stays preserved.'); }
-    finally { if (token === generation.current) { transitioning.current = false; setBusy(false); syncClock(); } }
+    finally { if (token === generation.current) { transitioning.current = false; setBusy(false); settleHostWaiters(); syncClock(); } }
   }
   useEffect(() => {
     void begin('welcome');
@@ -112,9 +114,19 @@ export default function App() {
       append({ id: crypto.randomUUID(), actorId: originActor, at: receipt.observedAt, kind: 'order', text: receipt.status === 'rejected' ? `That order could not start: ${words(receipt.reason)}.` : receipt.status === 'applied' && intent.action === 'cancel_task' ? 'Current task stopped.' : `${labelAction(intent)} accepted. ${person(originActor)!.name} will report back.`, unread: false, summary: `${labelAction(intent)} ${receipt.status === 'rejected' ? 'could not start' : 'accepted'}.`, sections: [{ id: 'receipt', label: 'Order receipt', text: JSON.stringify(receipt, null, 2) }] }, receipt.evidenceIds);
       return receipt;
     } catch { if (token === generation.current) setError('Could not confirm the order. Check the current assignment before retrying.'); return null; }
-    finally { if (token === generation.current) { commandPending.current = false; setBusy(false); } }
+    finally { if (token === generation.current) { commandPending.current = false; setBusy(false); settleHostWaiters(); } }
   }
-  async function executeProposal(id: string) {
+  async function executeProposal(id: string, automatic = false, signal?: AbortSignal) {
+    const atGeneration = generation.current;
+    while (automatic && (commandPending.current || hostPending.current)) {
+      await new Promise<void>(resolve => {
+        const done = () => { hostWaiters.current.delete(done); signal?.removeEventListener('abort', done); resolve(); };
+        hostWaiters.current.add(done); signal?.addEventListener('abort', done, { once: true });
+        if (signal?.aborted) done();
+      });
+      if (atGeneration !== generation.current || signal?.aborted) return;
+    }
+    if (atGeneration !== generation.current || signal?.aborted) return;
     if (transitioning.current || commandPending.current || hostPending.current || replayActive || !known.current || ended(known.current)) return;
     const token = proposals.current?.take(id); if (!token) return;
     const originActor = token.authorization.actorId, generationAtStart = generation.current;
@@ -142,7 +154,7 @@ export default function App() {
       append({ id: crypto.randomUUID(), actorId: originActor, at: known.current?.simTime ?? current.simTime, kind: answer ? 'live' : 'fallback', text, summary: text.length <= 260 ? text : `${person(originActor)!.name} sent a detailed reply.`, unread: true, exchangeId: result.start.requestId, proposals: allowed.map(authorization => ({ id: authorization.id, label: labelAction(authorization.intent), assignedName: person(authorization.intent.args.technicianId ?? (['pause_batch', 'resume_batch', 'set_batch_ceiling', 'verify_recovery'].includes(authorization.intent.action) ? 'sam' : originActor))?.name ?? person(originActor)!.name, status: 'ready' })), sections: [{ id: 'reply', label: 'Facts and reply', text: radioReport(result) }, { id: 'citations', label: 'Evidence', text: radioCitations(result) }, { id: 'receipts', label: 'Tool receipts', text: radioReceipts(result) }, { id: 'provenance', label: 'Provenance', text: radioProvenance(result) }] }, answer?.facts.flatMap(fact => 'observationId' in fact ? [fact.observationId] : []) ?? []);
       if (answer && result.start.interactionMode === 'conversation') for (const id of directOrderAuthorizationIds(answer, allowed)) {
         if (token !== generation.current || controller.signal.aborted) break;
-        await executeProposal(id);
+        await executeProposal(id, true, controller.signal);
       }
     } catch { if (token === generation.current) append({ id: crypto.randomUUID(), actorId: originActor, at: known.current?.simTime ?? current.simTime, kind: 'fallback', text: 'I couldn’t finish that reply. Suggested orders still work.', unread: true }); }
     finally { if (jobs.current.get(originActor)?.promise === job) jobs.current.delete(originActor); if (token === generation.current) { updateThreads(previous => updateConversation(previous, originActor, thread => ({ ...thread, busy: false }))); syncClock(); } }
@@ -162,7 +174,7 @@ export default function App() {
       setSource(record); setLedger(buildOutcomeLedger(engineRecordOf(record))); setComparison(null);
       if (save) await refreshSaves();
     } catch (problem) { if (token === generation.current && request === sourceGeneration.current) setError(`Could not save or review this run: ${problem instanceof Error ? problem.message : 'storage unavailable'}`); }
-    finally { if (token === generation.current && request === sourceGeneration.current) { hostPending.current = false; setBusy(false); } }
+    finally { if (token === generation.current && request === sourceGeneration.current) { hostPending.current = false; setBusy(false); settleHostWaiters(); } }
   }
   async function activateReplay(record: SavedRunRecord) {
     pauseLive(); closeReplay(); const token = ++replayGeneration.current, sessionToken = generation.current; hostPending.current = true; setBusy(true); setError(''); await cancelCoworkers();
@@ -177,7 +189,7 @@ export default function App() {
       pauseLive();
       setSource(record); setLedger(buildOutcomeLedger(engineRecordOf(record))); setComparison(null); setReplayView(projected); setReplayActive(true); setCursor(0); replayAt.current = 0; chooseAsset(''); setMenuOpen(true); menuOpenRef.current = true;
     } catch { if (token === replayGeneration.current) setError('This recorded run cannot be replayed by the current version. Its stored bytes remain available for export.'); }
-    finally { if (token === replayGeneration.current && sessionToken === generation.current) { hostPending.current = false; setBusy(false); } }
+    finally { if (token === replayGeneration.current && sessionToken === generation.current) { hostPending.current = false; setBusy(false); settleHostWaiters(); } }
   }
   async function reviewSaved(id: string, resume: boolean) {
     const token = generation.current, request = ++sourceGeneration.current;
@@ -190,7 +202,7 @@ export default function App() {
         await begin('mission', record, false);
       } else await activateReplay(record);
     } catch { if (token === generation.current && request === sourceGeneration.current) setError('This save is incompatible, corrupted, or unavailable. It remains preserved and can be exported.'); }
-    finally { if (token === generation.current && request === sourceGeneration.current) { hostPending.current = false; setBusy(false); } }
+    finally { if (token === generation.current && request === sourceGeneration.current) { hostPending.current = false; setBusy(false); settleHostWaiters(); } }
   }
   async function exportSaved(id: string) {
     try {
@@ -218,7 +230,7 @@ export default function App() {
       const result = await client.compare(engineRecordOf(source), { commandSequence: sequence, earlierAt, branchRunId: crypto.randomUUID() });
       if (token === generation.current && request === sourceGeneration.current) setComparison(result);
     } catch { if (token === generation.current && request === sourceGeneration.current) setError('The alternative could not be computed. Choose a recorded batch cap and an earlier whole second.'); }
-    finally { if (token === generation.current && request === sourceGeneration.current) { hostPending.current = false; setBusy(false); } }
+    finally { if (token === generation.current && request === sourceGeneration.current) { hostPending.current = false; setBusy(false); settleHostWaiters(); } }
   }
   const shown = replayActive ? replayView : view;
   if (!shown) return <main className="host-loading"><h1>BLACKOUT</h1><p role={error ? 'alert' : 'status'}>{error || 'Opening your shift…'}</p>{error && <button onClick={() => { transitioning.current = false; void begin('welcome'); }}>Retry</button>}</main>;

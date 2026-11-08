@@ -17,7 +17,7 @@ export function naturalReplyText(response: AgentResponse, view: KnowledgeView): 
     const key = `${o.id}:${fact.field}`; if (seen.has(key)) continue; seen.add(key);
     if (fact.field === 'value') {
       if (typeof o.value !== 'boolean') lines.push(`${label}: ${words(o.field)} ${String(o.value ?? 'unknown')}${o.units ? ` ${o.units}` : ''}`);
-      if (view.simTime - o.observedAt > 10) ages.add(`${label}: Earlier report, ${clock(o.observedAt)}.`);
+      if (view.simTime - o.observedAt > 10 || view.observations.some(newer => newer.assetId === o.assetId && newer.field === o.field && newer.receivedAt <= view.simTime && newer.observedAt > o.observedAt)) ages.add(`${label}: Earlier report, ${clock(o.observedAt)}.`);
     } else if (fact.field === 'assetId') { if (!values.has(o.id)) lines.push(`Equipment: ${label}.`); }
     else if (fact.field === 'observedAt') lines.push(`${label}: Checked at ${clock(o.observedAt)}.`);
     else if (fact.field === 'receivedAt') lines.push(`${label}: Report arrived at ${clock(o.receivedAt)}.`);
@@ -41,6 +41,12 @@ export function naturalNarrativeAllowed(start: GatewayStart, response: AgentResp
     if (o.field !== field || o.value !== value || !reported(o)) return false;
     return !start.view.observations.some(other => other.assetId === o.assetId && other.field === field && delivered(other, start.view) && other.observedAt >= o.observedAt && other.value !== value);
   });
+  const running = (assetId: string) => {
+    const rows = start.view.observations.filter(o => o.assetId === assetId && ['running', 'state'].includes(o.field) && o.observedAt <= o.receivedAt && o.receivedAt <= start.view.simTime);
+    const latest = Math.max(-1, ...rows.map(o => o.observedAt));
+    const current = rows.filter(o => o.observedAt === latest);
+    return current.length > 0 && start.view.simTime - latest <= 10 && current.every(o => o.quality !== 'unknown' && (o.field === 'running' ? o.value === true : o.value === 'running')) && selected.some(o => current.some(row => row.id === o.id));
+  };
   for (const sentence of text.split(/[;.!?]/)) {
     const qualified = /\b(?:does not|doesn't|cannot|can't|not)\s+(?:\w+\s+){0,3}(?:mean|prove|confirm|establish|known|verified)\b/i.test(sentence);
     const conditional = /\b(?:if|when|once)\b/i.test(sentence);
@@ -51,7 +57,12 @@ export function naturalNarrativeAllowed(start: GatewayStart, response: AgentResp
       if (!selected.some(o => reported(o) && typeof o.value === 'string' && terms.every(term => String(o.value).toLowerCase().includes(term.toLowerCase())))) return false;
     }
     if (!qualified && !conditional && /\b(?:repair|fix)\b.{0,25}\b(?:complete|completed|finished|done)\b/i.test(sentence) && !start.view.tasks.some(t => t.actorId === start.actorId && t.action === 'repair_cooling' && t.status === 'completed')) return false;
-    if (!qualified && !conditional && /\bcooling\s+(?:(?:is|has)\s+)?(?:running|recovered|restarted|working)\b/i.test(sentence) && !selected.some(o => delivered(o, start.view) && start.view.simTime - o.observedAt <= 10 && (o.field === 'running' && o.value === true || o.field === 'state' && o.value === 'running') && start.view.knownTopology.assets.some(a => a.id === o.assetId && a.kind === 'cooling'))) return false;
+    if (!qualified && !conditional && /\bcooling(?:\s+(?:unit|train))?(?:\s*\d+)?\s+(?:(?:is|has)\s+)?(?:running|recovered|restarted|working)\b/i.test(sentence)) {
+      const units = start.view.knownTopology.assets.filter(a => a.kind === 'cooling');
+      const named = units.filter(a => sentence.toLowerCase().includes(a.label.toLowerCase()));
+      const claimed = named.length ? named : units;
+      if (!claimed.length || !claimed.every(a => running(a.id))) return false;
+    }
   }
   return true;
 }
