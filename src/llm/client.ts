@@ -7,14 +7,15 @@ const key = (input: GatewayInput) => JSON.stringify([input.runId, input.requestI
 const fallback = (input: GatewayInput, reason: string): GatewayResponse => ({ kind: 'fallback', runId: input.runId, requestId: input.requestId, actorId: input.actorId, mode: 'scripted', reason, message: 'Scripted fallback: use permitted observations and procedures.', facts: [] });
 async function turn(input: GatewayInput, context: GatewayStart, lifecycle: Lifecycle, signal?: AbortSignal): Promise<GatewayResponse> {
   if (signal && signal !== lifecycle.signal) lifecycle.signal = lifecycle.signal ? AbortSignal.any([lifecycle.signal, signal]) : signal;
+  const effectiveSignal = lifecycle.signal;
   const cancel = () => { void fetch('/api/llm/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ runId: input.runId, requestId: input.requestId, actorId: input.actorId }), keepalive: true }).catch(() => {}); };
-  if (signal?.aborted) { lifecycle.closed = true; return fallback(input, 'canceled'); }
+  if (effectiveSignal?.aborted) { lifecycle.closed = true; return fallback(input, 'canceled'); }
   if (lifecycle.signal?.aborted || performance.now() >= lifecycle.deadline) return fallback(input, 'canceled_or_expired');
-  signal?.addEventListener('abort', cancel, { once: true });
+  effectiveSignal?.addEventListener('abort', cancel, { once: true });
   let toolPending = false;
   try {
     const sentAt = performance.now();
-    const response = await fetch('/api/llm/turn', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input), signal });
+    const response = await fetch('/api/llm/turn', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input), signal: effectiveSignal });
     const remaining = response.headers.get('X-Blackout-Deadline-Ms');
     if (remaining !== null) {
       if (!/^\d{1,5}$/.test(remaining) || Number(remaining) > 20000) return fallback(input, 'invalid_deadline');
@@ -24,7 +25,7 @@ async function turn(input: GatewayInput, context: GatewayStart, lifecycle: Lifec
     if (!response.ok) return fallback(input, 'gateway_unavailable');
     const reply = GatewayResponseSchema.parse(await response.json());
     if (lifecycle.signal?.aborted || performance.now() >= lifecycle.deadline) return fallback(input, 'canceled_or_expired');
-    if (signal?.aborted) return fallback(input, 'canceled');
+    if (effectiveSignal?.aborted) return fallback(input, 'canceled');
     if (reply.runId !== input.runId || reply.requestId !== input.requestId || reply.actorId !== input.actorId) return fallback(input, 'stale_response');
     if (reply.kind === 'final' && !validateResponse(reply.response, context)) return fallback(input, 'invalid_evidence');
     if (reply.kind === 'tool_request' && (reply.intent.runId !== input.runId || reply.intent.actorId !== input.actorId || reply.intent.requestId !== input.requestId || reply.intent.interactionId !== reply.interactionId)) return fallback(input, 'invalid_tool_identity');
@@ -34,8 +35,8 @@ async function turn(input: GatewayInput, context: GatewayStart, lifecycle: Lifec
     }
     if (reply.kind === 'fallback') return { ...reply, facts: [] };
     return reply;
-  } catch { return fallback(input, signal?.aborted ? 'canceled' : 'gateway_unavailable'); }
-  finally { if (!toolPending) lifecycle.closed = true; signal?.removeEventListener('abort', cancel); }
+  } catch { return fallback(input, effectiveSignal?.aborted ? 'canceled' : 'gateway_unavailable'); }
+  finally { if (!toolPending) lifecycle.closed = true; effectiveSignal?.removeEventListener('abort', cancel); }
 }
 export async function startInteraction(input: GatewayStart, signal?: AbortSignal): Promise<GatewayResponse> {
   if (!GatewayStartSchema.safeParse(input).success || !validStart(input)) return fallback(input, 'invalid_scope');

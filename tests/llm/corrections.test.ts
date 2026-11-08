@@ -17,9 +17,41 @@ const call = (name = 'read_procedure', action: unknown = null) => [{ type: 'reas
 const setup = (transport: (params: any, signal: AbortSignal) => Promise<any>, extra = {}) => new Gateway({ mode: 'live', keyConfigured: true, transport, budget: new Budget(join(mkdtempSync(join(tmpdir(), 'blackout-correction-')), 'usage.json')), ...extra });
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
+it.each([false, true])('retained start cancellation aborts pending continuation HTTP (new signal: %s)', async withNewSignal => {
+  const input = { ...start, requestId: `retained-abort-${withNewSignal}` };
+  const original = new AbortController(); const current = new AbortController();
+  const intent = { runId: input.runId, requestId: input.requestId, actorId: input.actorId, interactionId: 'retained-abort', callId: 'one', tool: 'read_observations', targetId: 'cooling-1', action: null };
+  const response = { kind: 'tool_request', runId: input.runId, requestId: input.requestId, actorId: input.actorId, interactionId: intent.interactionId, intent };
+  vi.stubGlobal('fetch', async () => new Response(JSON.stringify(response)));
+  const first = await startInteraction(input, original.signal);
+  if (first.kind !== 'tool_request') throw new Error('Expected initial tool request.');
+  const result = await executeToolIntent(first.intent, { start: input });
+  let observedSignal: AbortSignal | undefined; let release!: () => void; let cancellations = 0;
+  vi.stubGlobal('fetch', (path: string, init?: RequestInit) => {
+    if (path.endsWith('/cancel')) { cancellations++; return Promise.resolve(new Response('{}')); }
+    observedSignal = init?.signal ?? undefined;
+    return new Promise<Response>((resolve, reject) => {
+      release = () => resolve(new Response(JSON.stringify({ ...response, intent: { ...intent, callId: 'late' } })));
+      observedSignal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
+    });
+  });
+  let settled = false;
+  const pending = continueInteraction({ kind: 'continue', runId: input.runId, requestId: input.requestId, actorId: input.actorId, interactionId: intent.interactionId, expectedCallId: intent.callId, view: input.view, result }, withNewSignal ? current.signal : undefined).then(reply => { settled = true; return reply; });
+  original.abort();
+  await new Promise(resolve => setImmediate(resolve));
+  const promptlySettled = settled;
+  release();
+  const reply = await pending;
+  expect(observedSignal?.aborted).toBe(true);
+  expect(cancellations).toBe(1);
+  expect(promptlySettled).toBe(true);
+  expect(reply.kind === 'fallback' && reply.reason).toBe('canceled');
+  expect(current.signal.aborted).toBe(false);
+});
+
 it.each(['observation', 'hashing'])('HTTP/client/tools share expiry across asynchronous %s without a caller signal', async stage => {
   const input = { ...start, requestId: `http-expiry-${stage}` };
-  const gateway = setup(async () => output(call('inspect_asset', { action: 'inspect', targetId: 'cooling-1', atSimTime: 75, args: { technicianId: 'alex', ceiling: null, taskId: null } })), { interactionTimeoutMs: 80 });
+  const gateway = setup(async () => output(call('inspect_asset', { action: 'inspect', targetId: 'cooling-1', atSimTime: 75, args: { technicianId: 'alex', ceiling: null, taskId: null } })), { interactionTimeoutMs: 500 });
   const server = createDemoServer(gateway);
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   const port = (server.address() as { port: number }).port;
@@ -36,12 +68,12 @@ it.each(['observation', 'hashing'])('HTTP/client/tools share expiry across async
     if (stage === 'hashing') {
       const digest = crypto.subtle.digest.bind(crypto.subtle);
       vi.spyOn(crypto.subtle, 'digest').mockImplementation(async (...args) => {
-        await new Promise(resolve => setTimeout(resolve, 120)); return digest(...args);
+        await new Promise(resolve => setTimeout(resolve, 750)); return digest(...args);
       });
     }
     let commands = 0;
     const result = await executeToolIntent(reply.intent, { start: input, simulation: {
-      observe: async () => { if (stage === 'observation') await new Promise(resolve => setTimeout(resolve, 120)); return input.view; },
+      observe: async () => { if (stage === 'observation') await new Promise(resolve => setTimeout(resolve, 750)); return input.view; },
       command: async () => { commands++; return { schemaVersion: 1, runId: input.runId, requestId: input.requestId, actorId: input.actorId, status: 'accepted', reason: 'queued', taskId: 'task', eta: 109, evidenceIds: [], observedAt: 75 }; },
     } });
     expect(commands).toBe(0);
