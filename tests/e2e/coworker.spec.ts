@@ -254,3 +254,63 @@ test('provider outage produces labeled fallback without blocking direct orders',
   const receipt = await suggested(page, 'alex', 'Check cooling controls'); expect(receipt.taskId).toMatch(/^task-/);
   await expect(page.locator('.conv-assignment')).toContainText('Walking');
 });
+test('reopening menu while comparison is pending preserves its result', async ({ page }) => {
+  await page.addInitScript(() => {
+    const desc = Object.getOwnPropertyDescriptor(Worker.prototype, 'onmessage')!;
+    Object.defineProperty(Worker.prototype, 'onmessage', { configurable: true, get: desc.get, set(handler) {
+      desc.set!.call(this, (event: MessageEvent) => {
+        if (event.data.kind === 'comparison') (window as any).__releaseComparison = () => handler.call(this, event);
+        else handler.call(this, event);
+      });
+    }});
+  });
+  await begin(page); await advanceTo(page, 2); await suggested(page, 'sam', 'Pause background jobs'); await advanceTo(page, 5);
+  let dialog = await menu(page, 'Replay and results');
+  await dialog.getByRole('combobox', { name: 'After action section' }).selectOption('compare');
+  await dialog.getByRole('button', { name: 'Run comparison' }).click();
+  await expect.poll(() => page.evaluate(() => typeof (window as any).__releaseComparison)).toBe('function');
+  await closeMenu(page); dialog = await menu(page, 'Replay and results');
+  await dialog.getByRole('combobox', { name: 'After action section' }).selectOption('compare');
+  await page.evaluate(() => (window as any).__releaseComparison());
+  await dialog.getByRole('combobox', { name: 'Comparison section' }).selectOption('result');
+  await expect(dialog.getByLabel('Comparison metrics', { exact: true })).toContainText('COMPUTED ALTERNATIVE', { timeout: 3000 });
+});
+
+test('saving while reply pending keeps restart available', async ({ page }) => {
+  let got = false; let release!: () => void; const gate = new Promise<void>(r => release = r);
+  await page.route('**/api/llm/turn', async route => { got = true; await gate; await route.abort().catch(() => {}); });
+  try {
+    await begin(page); await radio(page, 'What is known?'); await expect.poll(() => got).toBe(true);
+    const dialog = await menu(page);
+    await dialog.getByRole('button', { name: 'Save game', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Game options', exact: true }).click();
+    const restart = dialog.getByRole('button', { name: 'Restart mission', exact: true });
+    await expect(restart).toBeEnabled(); await restart.click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    release();
+    await expect(page.locator('.conv-header time')).toHaveText('0:00');
+    const saves = await menu(page, 'Saved games');
+    await expect(saves).toContainText('No saved games');
+  } finally { release(); }
+});
+
+
+
+
+test('saving waits for a pending reply and retains its original transcript', async ({ page }) => {
+  const wire = fixtures(); let captured: GatewayInput | undefined; let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/api/llm/turn', async route => {
+    captured = route.request().postDataJSON() as GatewayInput;
+    await gate; await route.fulfill({ json: wire.final(captured) });
+  });
+  try {
+    await begin(page); await radio(page, 'What is known?'); await expect.poll(() => !!captured).toBe(true);
+    const dialog = await menu(page); await dialog.getByRole('button', { name: 'Save game', exact: true }).click();
+    await expect(dialog).toContainText('Waiting for the reply before saving.');
+    release(); await expect(dialog).toContainText('Mission saved locally');
+    await dialog.getByRole('button', { name: 'Replay and results', exact: true }).click();
+    await dialog.getByRole('combobox', { name: 'After action section' }).selectOption('provenance');
+    expect(await readPages(page, 'Original wire transcript')).toContain(captured!.requestId);
+  } finally { release(); }
+});
