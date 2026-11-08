@@ -18,6 +18,12 @@ function planWork(spec: ScenarioSpec, physical: PhysicalState, rack: RackState) 
   return { ...work, powerKw: rack.mode === 'booting' ? spec.profile.bootKw : work.powerKw };
 }
 
+function prospectiveWork(spec: ScenarioSpec, physical: PhysicalState, rack: RackState) {
+  const candidate = { ...rack };
+  prepareRack(candidate, true, spec.profile, rack.temperatureC);
+  return planWork(spec, physical, candidate);
+}
+
 function coolingPrerequisites(spec: ScenarioSpec, physical: PhysicalState, id: string, visited = new Set<string>()): boolean {
   const asset = spec.topology.assets.find(a => a.id === id);
   if (!asset || visited.has(id)) return false;
@@ -44,7 +50,7 @@ export function createPhysical(spec: ScenarioSpec): PhysicalState {
     sources: { utilityAvailable: true, generatorReady: false, transferComplete: false }, controllerFault: false, pulse: 0,
     racks: spec.topology.assets.filter(a => a.kind === 'rack').map(a => ({
       id: a.id, temperatureC: p.supplyReferenceC + (p.conductanceKwK > 0 ? initialWork.powerKw / p.conductanceKwK : 0),
-      backlog: 0, batchCeiling: spec.workload.catchupCeiling, mode: 'ready', thermalLatched: false, resetRequested: false,
+      backlog: 0, batchCeiling: spec.workload.catchupCeiling, mode: 'ready', thermalLatched: false, throttleLatched: false, resetRequested: false,
       bootRemainingSeconds: 0, hotSeconds: 0, tripSeconds: 0, coolSeconds: 0,
       powered: true, powerKw: initialWork.powerKw, critical: initialWork.critical, interactive: initialWork.interactive, batch: initialWork.batch,
     })),
@@ -83,12 +89,7 @@ export function advancePhysical(physical: PhysicalState, spec: ScenarioSpec, emi
         cooling.restartRemainingSeconds = spec.mission.recoveryRestartSeconds;
       } else if (!cooling.ready && cooling.restartRemainingSeconds === 0) cooling.ready = true;
     }
-    for (const rack of physical.racks) {
-      const dependencies = spec.topology.assets.find(a => a.id === rack.id)!.dependencies;
-      const candidate = physical.ups.some(u => dependencies.includes(u.id) && !u.tripped && !u.faulted && (u.energyKwh > 0 || hasUpstream(spec, physical.sources, u.id)));
-      for (const type of prepareRack(rack, candidate, profile, rack.temperatureC)) emit(type, [rack.id], elapsed);
-    }
-    const planned = physical.racks.map(r => planWork(spec, physical, r));
+    const planned = physical.racks.map(r => prospectiveWork(spec, physical, r));
     const power = resolvePower(spec, physical.sources, physical.ups, physical.racks.map((r, i) => ({ id: r.id, powerKw: planned[i].powerKw })));
     for (const id of power.trippedIds) emit('ups_overload_trip', [id], elapsed);
     last.sourceCapacityKw = power.sourceCapacityKw;
@@ -167,7 +168,7 @@ export function advancePhysical(physical: PhysicalState, spec: ScenarioSpec, emi
   last.criticalServedFraction = offered.critical * count > 0 ? deliveredCritical / (offered.critical * count) : 1;
   last.interactiveServedFraction = offered.interactive * count > 0 ? deliveredInteractive / (offered.interactive * count) : 1;
   // Endpoint availability reflects trips/depletion; interval accounting above retains work already done.
-  const endpoint = resolvePower(spec, physical.sources, physical.ups, physical.racks.map(r => ({ id: r.id, powerKw: planWork(spec, physical, r).powerKw })));
+  const endpoint = resolvePower(spec, physical.sources, physical.ups, physical.racks.map(r => ({ id: r.id, powerKw: prospectiveWork(spec, physical, r).powerKw })));
   for (const id of endpoint.trippedIds) emit('ups_overload_trip', [id], 1);
   for (const rack of physical.racks) {
     rack.powered = endpoint.poweredRackIds.includes(rack.id);

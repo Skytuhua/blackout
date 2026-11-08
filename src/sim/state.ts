@@ -8,10 +8,10 @@ export const PhysicalStateSchema = z.strictObject({
   controllerFault: z.boolean(), pulse: nonnegative,
   racks: z.array(z.strictObject({
     id: z.string(), temperatureC: finite, backlog: nonnegative, batchCeiling: nonnegative,
-    mode: z.enum(['ready', 'throttled', 'off', 'booting']), thermalLatched: z.boolean(), resetRequested: z.boolean(),
+    mode: z.enum(['ready', 'throttled', 'off', 'booting']), thermalLatched: z.boolean(), throttleLatched: z.boolean(), resetRequested: z.boolean(),
     bootRemainingSeconds: nonnegative, hotSeconds: nonnegative, tripSeconds: nonnegative, coolSeconds: nonnegative,
     powered: z.boolean(), powerKw: nonnegative, critical: nonnegative, interactive: nonnegative, batch: nonnegative,
-  })),
+  }).refine(r => r.mode !== 'booting' || r.bootRemainingSeconds > 0, 'Booting requires a positive remaining timer.')),
   ups: z.array(z.strictObject({ id: z.string(), energyKwh: nonnegative, tripped: z.boolean(), faulted: z.boolean() })),
   cooling: z.array(z.strictObject({ id: z.string(), ready: z.boolean(), restartRemainingSeconds: nonnegative })),
   totals: z.strictObject({

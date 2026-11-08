@@ -2,10 +2,22 @@ import { describe, expect, it } from 'vitest';
 import { hotRestart } from '../../src/content/scenarios/hot-restart';
 import { advanceProtection, prepareRack, type RackProtection } from '../../src/sim/systems/protection';
 
-const rack = (): RackProtection => ({ mode: 'ready', thermalLatched: false, resetRequested: false, bootRemainingSeconds: 0, hotSeconds: 0, tripSeconds: 0, coolSeconds: 0 });
+const rack = (): RackProtection => ({ mode: 'ready', thermalLatched: false, throttleLatched: false, resetRequested: false, bootRemainingSeconds: 0, hotSeconds: 0, tripSeconds: 0, coolSeconds: 0 });
 const profile = hotRestart.profile;
 
 describe('fictional equipment protection profile', () => {
+  it('retains throttle protection through power loss and boot until the release dwell', () => {
+    const r = rack(); r.mode = 'throttled';
+    prepareRack(r, false, profile, 31);
+    prepareRack(r, true, profile, 31);
+    advanceProtection(r, 31, 31.4, 20, profile);
+    expect(r.mode).toBe('throttled');
+    expect(r.coolSeconds).toBe(0);
+    advanceProtection(r, 30, 30, 29, profile);
+    expect(r.mode).toBe('throttled');
+    advanceProtection(r, 30, 30, 1, profile);
+    expect(r.mode).toBe('ready');
+  });
   it('requires continuous high exposure, then continuous hysteresis release', () => {
     const r = rack();
     advanceProtection(r, 32, 32, 29, profile);

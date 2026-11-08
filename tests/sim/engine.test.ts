@@ -16,6 +16,38 @@ function configured(spec: ScenarioSpec, edit: (p: PhysicalState) => void) {
 const command = (runId = 'run-a'): ActionRequest => ({ schemaVersion: 1, runId, requestId: 'request-1', actorId: 'player', idempotencyKey: 'once', expectedEntityVersions: {}, intent: { action: 'repair_cooling', targetId: 'cooling-1', atSimTime: 0, args: {} } });
 
 describe('frozen simulation engine physical slice', () => {
+  it('does not start boot or emit boot churn without enough power for prospective boot demand', () => {
+    const spec = healthy(); spec.profile.generatorKw = 10; spec.profile.upsRechargeKw = 0;
+    const engine = configured(spec, p => {
+      p.sources = { utilityAvailable: false, generatorReady: true, transferComplete: true };
+      p.ups.forEach(u => { u.energyKwh = 0; });
+      p.racks.forEach(r => { r.mode = 'off'; r.powered = false; r.powerKw = 0; });
+    });
+    const events = engine.step(3).events;
+    expect(physical(engine).racks.every(r => r.mode === 'off' && !r.powered && r.powerKw === 0)).toBe(true);
+    expect(events.filter(e => e.type === 'boot_started')).toHaveLength(0);
+  });
+
+  it('rejects a zero-time boot checkpoint before replacing an engine', () => {
+    const checkpoint = initialize(healthy(), 'run-a').snapshot();
+    const p = checkpoint.state.physical as unknown as PhysicalState;
+    p.racks[0].mode = 'booting'; p.racks[0].bootRemainingSeconds = 0;
+    expect(() => restore(checkpoint, 'branch')).toThrow();
+  });
+
+  it('preserves throttle hysteresis across a powered restart and checkpoint restore', () => {
+    const spec = healthy();
+    spec.externalEvents = [{ id: 'off', at: 0, kind: 'utility_loss', value: null }, { id: 'on', at: 1, kind: 'utility_restore', value: null }];
+    const engine = configured(spec, p => {
+      p.controllerFault = true; p.ups.forEach(u => { u.energyKwh = 0; });
+      p.racks.forEach(r => { r.mode = 'throttled'; r.temperatureC = 31; r.coolSeconds = 0; });
+    });
+    engine.step(10);
+    const resumed = restore(engine.snapshot(), 'branch');
+    engine.step(12); resumed.step(12);
+    expect(physical(engine).racks.every(r => r.mode === 'throttled' && r.coolSeconds === 0)).toBe(true);
+    expect(physical(resumed)).toEqual(physical(engine));
+  });
   it('starts balanced from real content and advances the same one-second steps in every batch', () => {
     const full = initialize(healthy(), 'run-a');
     expect(physical(full).racks).toHaveLength(8);
