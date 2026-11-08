@@ -2,6 +2,7 @@ import * as Phaser from 'phaser';
 import type { DesktopGameProps, Point } from '../shared/contracts';
 import { indicatorState, readingStatus } from '../ui/presentation';
 import { Commander, nearbyAsset, pointKey, routePosition, terminal, type Direction } from './desktop-world';
+import { atlasFrame } from './atlas-frame';
 
 export type DesktopSceneState = Pick<DesktopGameProps, 'view' | 'selectedAssetId' | 'selectedCrewId' | 'paused' | 'speed' | 'session'> & { reducedMotion: boolean };
 export type DesktopSceneEvents = { asset: (id: string) => void; crew: (id: string) => void; floor: (point: Point) => void; moved: () => void; pose: (position: Point) => void; art: (ready: boolean) => void };
@@ -24,6 +25,7 @@ export class DesktopScene extends Phaser.Scene {
   private commanderSprite!: Phaser.GameObjects.Image;
   private marks!: Phaser.GameObjects.Graphics;
   private hasAtlas = false;
+  private availableFrames = new Set<string>();
   constructor(state: DesktopSceneState, events: DesktopSceneEvents, private atlasExpected = false) {
     super('desktop-facility'); this.state = state; this.eventsOut = events; this.commander = new Commander(state.view.knownTopology); this.presentationTime = state.view.simTime;
   }
@@ -35,7 +37,8 @@ export class DesktopScene extends Phaser.Scene {
   }
   create() {
     this.hasAtlas = this.textures.exists('facility-v2') && this.textures.get('facility-v2').has('floor_0');
-    this.eventsOut.art(this.hasAtlas);
+    if (this.hasAtlas) this.availableFrames = new Set(this.textures.get('facility-v2').getFrameNames());
+    this.eventsOut.art(this.hasAtlas && this.availableFrames.size >= 111);
     this.marks = this.add.graphics().setDepth(8);
     this.commanderSprite = this.sprite(0, 0, 'commander_s_idle', 'technician').setDepth(20);
     this.fans = [this.sprite(9 * 16, 16, 'fan_0', 'cooling'), this.sprite(12 * 16, 16, 'fan_0', 'cooling')];
@@ -73,9 +76,10 @@ export class DesktopScene extends Phaser.Scene {
   }
   diagnostics() { return { objects: this.children.length, pointerListeners: this.input.listenerCount('pointerdown'), equipment: this.equipment.size, crew: this.workers.size, atlas: this.hasAtlas, position: { ...this.commander.position }, clock: this.clock }; }
   private sprite(x: number, y: number, frame: string, fallback: string) {
-    return this.add.image(x, y, this.hasAtlas ? 'facility-v2' : `desktop-legacy-${fallback}`, this.hasAtlas ? frame : undefined).setOrigin(0);
+    const safeFrame = atlasFrame(frame, this.availableFrames);
+    return this.add.image(x, y, safeFrame ? 'facility-v2' : `desktop-legacy-${fallback}`, safeFrame ?? undefined).setOrigin(0);
   }
-  private frame(sprite: Phaser.GameObjects.Image, name: string) { if (this.hasAtlas && this.textures.get('facility-v2').has(name)) sprite.setFrame(name); }
+  private frame(sprite: Phaser.GameObjects.Image, name: string) { const safeFrame = atlasFrame(name, this.availableFrames); if (safeFrame) sprite.setTexture('facility-v2', safeFrame); }
   private pointer(pointer: Phaser.Input.Pointer) {
     const { view } = this.state, point = { x: Math.floor(pointer.x / 16), y: Math.floor(pointer.y / 16) };
     const crew = view.crew.find(c => { if (c.role === 'remote') return false; const pose = routePosition(c, view.tasks.find(t => t.id === c.taskId), this.presentationTime, view.knownTopology); return Math.abs(pose.x + .5 - pointer.x / 16) < .45 && Math.abs(pose.y + .5 - pointer.y / 16) < .55; });
@@ -104,7 +108,7 @@ export class DesktopScene extends Phaser.Scene {
       let image = this.equipment.get(asset.id);
       if (!image) { image = this.sprite(0, 0, asset.kind === 'generator' ? 'generator_0' : asset.kind, asset.kind === 'cooling' ? 'cooling' : 'rack'); this.equipment.set(asset.id, image); }
       image.setPosition(asset.x * 16, asset.y * 16).setDepth(4).setDisplaySize(asset.width * 16, asset.height * 16);
-      if (this.hasAtlas && !this.badges.has(asset.id)) this.badges.set(asset.id, this.sprite(asset.x * 16 + asset.width * 16 - 8, asset.y * 16, 'badge_unknown', 'rack').setDepth(7));
+      if (this.availableFrames.has('badge_unknown') && !this.badges.has(asset.id)) this.badges.set(asset.id, this.sprite(asset.x * 16 + asset.width * 16 - 8, asset.y * 16, 'badge_unknown', 'rack').setDepth(7));
     }
     for (const [id, image] of this.workers) if (!view.crew.some(c => c.id === id && c.role !== 'remote')) { image.destroy(); this.workers.delete(id); }
     for (const crew of view.crew.filter(c => c.role !== 'remote')) if (!this.workers.has(crew.id)) this.workers.set(crew.id, this.sprite(0, 0, `${crew.role}_s_idle`, 'technician').setDepth(15));
