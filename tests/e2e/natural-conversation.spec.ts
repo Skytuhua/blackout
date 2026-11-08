@@ -28,6 +28,9 @@ test('an actual delivered inspection gets the complete natural reply, with raw e
   await page.getByRole('button', { name: 'Menu', exact: true }).click(); await page.getByRole('button', { name: 'Saved games', exact: true }).click();
   await page.getByRole('combobox', { name: 'Saved game', exact: true }).selectOption(source.runId);
   await page.getByRole('button', { name: 'Resume save', exact: true }).click();
+  await page.locator('.conv-history-window > article.conv-entry-report').last().getByRole('button', { name: 'Read report', exact: true }).click();
+  await expect(page.getByLabel('Message text', { exact: true })).toContainText('Cooling start condition: not met');
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
   await page.getByRole('textbox', { name: 'Message Alex', exact: true }).fill('What does this report mean?');
   await page.getByRole('button', { name: 'Send to Alex', exact: true }).click();
   const entry = page.locator('.conv-history-window > article.conv-entry-live').last();

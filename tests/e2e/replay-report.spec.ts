@@ -28,8 +28,25 @@ test('a real native saved replay opens the original delivered diagnosis and exac
   await page.getByRole('button', { name: 'Close menu', exact: true }).click();
   const original = page.locator(`.conv-history-window > article[data-entry-id="${report.id}"]`);
   await original.getByRole('button', { name: 'Read report', exact: true }).click();
+  await expect(page.getByLabel('Message text', { exact: true })).toContainText('Cooling start condition: not met');
+  await expect(page.getByLabel('Message text', { exact: true })).not.toContainText('Timestamped field report delivered');
   await page.getByRole('combobox', { name: 'Section', exact: true }).selectOption({ label: 'Evidence' });
   await expect(page.getByLabel('Message text', { exact: true })).toContainText('prerequisite ready: false');
   for (const id of report.evidenceIds) await expect(page.getByLabel('Message text', { exact: true })).toContainText(id);
+  expect(calls).toBe(0);
+});
+
+test('a newly delivered live report opens its findings directly without a model request', async ({ page }) => {
+  let calls = 0; await page.route('**/api/llm/turn', route => { calls++; return route.abort(); });
+  await page.goto('/'); await page.getByRole('button', { name: 'Start guided game', exact: true }).click();
+  await page.getByRole('button', { name: 'Menu', exact: true }).click(); await page.getByRole('button', { name: 'Game options', exact: true }).click();
+  await page.getByRole('button', { name: '4\u00d7', exact: true }).click(); await page.getByRole('button', { name: 'Close menu', exact: true }).click();
+  await page.locator('.conv-header').getByRole('button', { name: 'Resume', exact: true }).click();
+  await page.getByRole('button', { name: 'Check cooling controls', exact: true }).click();
+  const report = page.locator('.conv-history-window > article.conv-entry-report').last();
+  await report.getByRole('button', { name: 'Read report', exact: true }).click({ timeout: 20000 });
+  await expect(page.getByLabel('Message text', { exact: true })).toContainText('Check: finished');
+  await expect(page.getByLabel('Message text', { exact: true })).toContainText('Cooling start condition: not met');
+  await expect(page.locator('.conv-assignment')).not.toContainText('Report delivered');
   expect(calls).toBe(0);
 });

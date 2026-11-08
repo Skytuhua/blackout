@@ -2,6 +2,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } f
 import type { ConversationThread } from '../../shared/contracts';
 import type { SavedRunSummary } from '../../persistence/runs';
 import { PagedText } from '../DesktopPaging';
+import { reportFirstSections } from '../conversation/report-findings';
 import './ConversationMenu.css';
 
 export interface ConversationMenuProps {
@@ -66,7 +67,7 @@ function HistoryEntry({ props, thread, entryId }: { props: ConversationMenuProps
   const identity = props.reader ?? { actorId: thread?.actorId, entryId };
   const owner = props.reader ? props.conversations.find(item => item.actorId === identity.actorId) : thread;
   const entry = owner?.entries.find(item => item.id === identity.entryId && item.actorId === owner.actorId);
-  const [sectionId, setSectionId] = useState('full');
+  const [sectionId, setSectionId] = useState(entry?.kind === 'report' ? 'section:findings' : 'full');
   const [proposalId, setProposalId] = useState<string | null>(null);
   const read = useRef(new Set<string>());
   const opened = !!props.reader;
@@ -80,7 +81,9 @@ function HistoryEntry({ props, thread, entryId }: { props: ConversationMenuProps
     read.current.add(key); props.onReadEntries(owner.actorId, [entry.id]);
   }, [shown, entry, owner, props.onReadEntries]);
   if (!entry || !owner) return <><p className="cm-empty">{entryId || props.reader ? 'This entry is no longer available.' : 'No history for this character yet.'}</p>{opened && <button className="cm-reader-back" onClick={props.onCloseEntry}>Back to history</button>}</>;
-  const sections = [{ id: 'full', label: 'Full message', text: entry.text }, ...(entry.sections ?? []).map(item => ({ ...item, id: `section:${item.id}` })), ...(entry.proposals ?? []).filter(item => item.reason).map(item => ({ id: `proposal:${item.id}`, label: `${item.assignedName} action result`, text: `${item.label}\n${item.status}\n${item.reason}` }))];
+  const structured = reportFirstSections(entry).map(item => ({ ...item, id: `section:${item.id}` }));
+  const notice = { id: 'full', label: entry.kind === 'report' ? 'Delivery notice' : 'Full message', text: entry.text };
+  const sections = [...(entry.kind === 'report' ? [...structured, notice] : [notice, ...structured]), ...(entry.proposals ?? []).filter(item => item.reason).map(item => ({ id: `proposal:${item.id}`, label: `${item.assignedName} action result`, text: `${item.label}\n${item.status}\n${item.reason}` }))];
   const section = sections.find(item => item.id === sectionId);
   const proposals = entry.proposals ?? [], proposal = proposalId === null ? proposals[0] : proposals.find(item => item.id === proposalId);
   return <>

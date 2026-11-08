@@ -1,0 +1,11 @@
+# REPORT-FINDINGS-01
+
+Base: 2c1c186f45c6cdc20843f98e877295753bcbe45c. Root owns App/report presentation and the explicitly returned report-reader seam in ConversationGame; speed header/CSS are unchanged by this fix.
+
+The first report screen previously showed only the engine delivery receipt. A production browser regression observed that receipt instead of the delivered cooling findings. New report projection uses only exact cited, delivered observations from the actor-scoped view. It shows known equipment labels, plain field meanings, units, observation/report times and an earlier-report warning. It identifies unmet start conditions without naming a hidden cause or claiming cooling recovery.
+
+Live hydration, native resume and replay use the same projection. Conversation and Menu readers open Findings first. Original delivery text and exact evidence/IDs remain available in separate sections and saved records. Report IDs and read/unread semantics are retained. Model conversation remains freeform; opening a report makes no provider request. Duplicate delivered labels are suppressed only while reading a delivered report; active task progress remains visible.
+
+Observed checks before review: meaningful built-browser RED on the old receipt-only default; six projection tests and 24 record/projection tests pass, preserving exact source bytes and future-report isolation. Nine built Chromium Menu/natural/replay cases passed, followed by explicit native resume/default-findings assertions. Newly delivered live-report proof is recorded separately in the final handoff, as are corrected locator issues and independent review. No live provider, full guide, human, audio or facility-engine acceptance is claimed.
+
+This patch is a prerequisite for the user's single current-facility review site at 4173 with natural chat, reviewed speed controls and sound. The larger map remains off that review build. Hosted legacy-route CI migration and its pending-reply Menu blocker remain separate source/test prerequisites; do not merge red checks or skip tests.
