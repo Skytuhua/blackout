@@ -13,10 +13,10 @@ test('a real native saved replay opens the original delivered diagnosis and exac
   const report = source.dialogue.find(message => message.id === `report-${receipt.taskId}`)!;
   let calls = 0; await page.route('**/api/llm/turn', route => { calls++; return route.abort(); });
   await page.goto('/');
-  await page.evaluate(async record => {
+  await page.evaluate(async ({ runId, serializedRecord }) => {
     const db = await new Promise<IDBDatabase>((resolve, reject) => { const request = indexedDB.open('blackout-local-runs', 1); request.onupgradeneeded = () => { for (const store of ['runs', 'checkpoints']) if (!request.result.objectStoreNames.contains(store)) request.result.createObjectStore(store); }; request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); });
-    await new Promise<void>((resolve, reject) => { const tx = db.transaction('runs', 'readwrite'); tx.objectStore('runs').put(JSON.stringify(record), record.runId); tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); }); db.close();
-  }, source);
+    await new Promise<void>((resolve, reject) => { const tx = db.transaction('runs', 'readwrite'); tx.objectStore('runs').put(serializedRecord, runId); tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); }); db.close();
+  }, { runId: source.runId, serializedRecord: JSON.stringify(source) });
   await page.getByRole('button', { name: 'Start guided game', exact: true }).click();
   await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await page.getByRole('button', { name: 'Saved games', exact: true }).click();
