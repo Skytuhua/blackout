@@ -102,3 +102,19 @@ Ruling: preserve incumbent ConversationGame pixel palette/fonts over generic UIU
 Ruling: independent final review is parent-owned; no nested reviewer is authorized. Authored tests are not independent approval.
 
 Pre-flight: Task 1 exports the frozen leaf; Task 2 reviews that immutable range. No shared writable interface with the coordinator. Host wrapper, pause and background inertness remain external.
+
+## Parent review correction
+
+Fresh independent review of `f9687d2e16b431dbc0e054a4219c5c3096d259bd` found two HIGH issues and one MEDIUM recovery issue: preview measurement stayed on a removed node after reader navigation/resize; a deleted controlled reader had no return to History; removing a selected section/proposal could hide its sole remaining explicit choice. The parent acknowledged the findings and fixed them within the original MENU lease, without restarting an implementation worker or editing host files.
+
+Four separate browser regressions were added before the fix. All four failed against the delivered source (`parent-review-red-complete.json`). The fix reconnects measurement on preview visibility, keeps Back to history for missing controlled readers, and retains selectors when the saved selection is unavailable. It never silently substitutes a report, section or authorization ID.
+
+After the source correction, observed checks passed:
+
+- `MENU_RECEIPT=parent-review-green node tests/ui/conversation-menu/browser-check.mjs --behavior`: all eight behavior groups, including all four original groups and four new regressions; exit 0.
+- `npm test`: 41 files / 254 tests passed.
+- `npm run typecheck`: passed, no diagnostics.
+- `node node_modules/vite/bin/vite.js build --config tests/ui/conversation-menu/vite.config.ts`: passed.
+- `git diff --check`: passed; only the originally leased component, browser check and this handoff changed in the correction.
+
+The corrected immutable head receives a fresh independent recheck before PR publication. No application scene/Menu-wrapper integration, root application browser flow, engine/provider mission or human acceptance is established by these checks. The original 55-state author geometry evidence remains separate from the parent regression checks. Reserved QA evidence is still under the original MENU-01 directory.

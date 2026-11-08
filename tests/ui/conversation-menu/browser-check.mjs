@@ -31,6 +31,77 @@ async function readAll(page, label) {
 }
 try {
   if (process.argv.includes('--behavior') || !process.argv.includes('--visual')) {
+    await check('preview measurement reconnects after reader resize and Back', async () => {
+      const page = await open();
+      const text = 'Cooling controls remain checked. '.repeat(12).slice(0, 235);
+      await page.evaluate(text => {
+        const threads = structuredClone(window.menuFixtureProps.conversations);
+        threads[0].entries[24].text = text;
+        threads[0].entries[24].proposals = [{ ...threads[0].entries[0].proposals[0], status: 'rejected', reason: 'The original action result.' }];
+        window.menuFixture.patch({ conversations: threads });
+      }, text);
+      await button(page, 'History').click(); await settle(page);
+      assert.equal(await button(page, 'Read full message').count(), 0, 'short preview initially fits');
+      await button(page, 'Read action result').click();
+      await page.evaluate(() => { document.documentElement.style.fontSize = '32px'; }); await settle(page);
+      await button(page, 'Back to entry').click(); await settle(page);
+      assert.equal(await button(page, 'Read full message').isVisible(), true, 'replacement preview must be measured at enlarged text');
+      await button(page, 'Read full message').click();
+      assert.equal(await readAll(page, 'Message text'), text);
+      await page.close();
+    });
+    await check('missing controlled reader can return to explicit History navigation', async () => {
+      const page = await open(); await button(page, 'History').click();
+      for (let i = 0; i < 24; i++) await button(page, 'Previous entry').click();
+      await button(page, 'Read report').click();
+      await page.evaluate(() => {
+        const threads = structuredClone(window.menuFixtureProps.conversations);
+        threads[0].entries = threads[0].entries.filter(entry => entry.id !== 'alex-0');
+        window.menuFixture.patch({ conversations: threads });
+      }); await settle(page);
+      assert.equal(await page.getByText('This entry is no longer available.', { exact: true }).isVisible(), true);
+      await button(page, 'Back to history').click();
+      assert.equal(await page.getByLabel('History character').isVisible(), true);
+      assert.equal(await button(page, 'Latest entry').isVisible(), true, 'no silent replacement for the removed entry');
+      await button(page, 'Latest entry').click();
+      assert.equal(await page.locator('.cm-direct-text').filter({ hasText: 'alex whole entry 24.' }).isVisible(), true);
+      assert.equal((await calls(page, 'close-entry')).length, 1);
+      await page.close();
+    });
+    await check('removed selected section keeps Full message explicitly selectable', async () => {
+      const page = await open(); await button(page, 'History').click();
+      for (let i = 0; i < 24; i++) await button(page, 'Previous entry').click();
+      await button(page, 'Read report').click(); await page.getByLabel('Reader section').selectOption('section:original-evidence');
+      await page.evaluate(() => {
+        const threads = structuredClone(window.menuFixtureProps.conversations); threads[0].entries[0].sections = [];
+        window.menuFixture.patch({ conversations: threads });
+      }); await settle(page);
+      assert.equal(await page.getByLabel('Reader section').isVisible(), true, 'Full message remains explicitly selectable');
+      await page.getByLabel('Reader section').selectOption('full');
+      assert.equal(await readAll(page, 'Message text'), await page.evaluate(() => window.menuFixture.longText));
+      await page.close();
+    });
+    await check('removed selected proposal keeps an explicit remaining action choice', async () => {
+      const page = await open(); await button(page, 'History').click();
+      for (let i = 0; i < 24; i++) await button(page, 'Previous entry').click();
+      await page.evaluate(() => {
+        const threads = structuredClone(window.menuFixtureProps.conversations);
+        threads[0].entries[0].proposals.push({ id: 'removed-proposal-B', label: 'Check recovery', assignedName: 'Sam', status: 'ready' });
+        window.menuFixture.patch({ conversations: threads });
+      }); await settle(page);
+      await page.getByLabel('Proposed action').selectOption('removed-proposal-B');
+      await page.evaluate(() => {
+        const threads = structuredClone(window.menuFixtureProps.conversations);
+        threads[0].entries[0].proposals = threads[0].entries[0].proposals.filter(proposal => proposal.id !== 'removed-proposal-B');
+        window.menuFixture.patch({ conversations: threads });
+      }); await settle(page);
+      assert.equal(await page.getByLabel('Proposed action').isVisible(), true, 'remaining action is selectable without substituting authority');
+      assert.deepEqual(await calls(page, 'proposal'), []);
+      await page.getByLabel('Proposed action').selectOption('opaque-original-proposal-id');
+      await button(page, 'Check controls · Jules').click();
+      assert.deepEqual(await calls(page, 'proposal'), [{ name: 'proposal', args: ['opaque-original-proposal-id'] }]);
+      await page.close();
+    });
     await check('history retains >20 entries, exact report/proposal, only selected reads, stable late updates', async () => {
       const page = await open(); await button(page, 'History').click();
       await settle(page);

@@ -37,12 +37,12 @@ const kindNames = { player: 'You', order: 'Order', system: 'Update', live: 'Cowo
 const time = (at: number) => `T+${Math.floor(at / 60)}:${String(at % 60).padStart(2, '0')}`;
 
 /** Measure with the exact reader typography; short text never needs PagedText. */
-function useTextFits(text: string) {
+function useTextFits(text: string, visible = true) {
   const measure = useRef<HTMLDivElement>(null);
   const [fits, setFits] = useState<boolean | null>(null);
   useLayoutEffect(() => {
     const element = measure.current;
-    if (!element) return;
+    if (!visible || !element) return;
     const update = () => {
       if (element.clientWidth && element.clientHeight) setFits(element.scrollHeight <= element.clientHeight + 1 && element.scrollWidth <= element.clientWidth + 1);
     };
@@ -50,7 +50,7 @@ function useTextFits(text: string) {
     const observer = new ResizeObserver(update); observer.observe(element);
     document.fonts.addEventListener('loadingdone', update);
     return () => { observer.disconnect(); document.fonts.removeEventListener('loadingdone', update); };
-  }, [text]);
+  }, [text, visible]);
   return { measure, fits };
 }
 
@@ -69,9 +69,9 @@ function HistoryEntry({ props, thread, entryId }: { props: ConversationMenuProps
   const [sectionId, setSectionId] = useState('full');
   const [proposalId, setProposalId] = useState<string | null>(null);
   const read = useRef(new Set<string>());
-  const { measure, fits } = useTextFits(entry?.text ?? '');
-  const long = !!entry && (entry.kind === 'report' || !!entry.sections?.length || entry.text.length > 240 || fits === false);
   const opened = !!props.reader;
+  const { measure, fits } = useTextFits(entry?.text ?? '', !opened);
+  const long = !!entry && (entry.kind === 'report' || !!entry.sections?.length || entry.text.length > 240 || fits === false);
   const shown = !!entry && (opened || !long && fits === true);
   useEffect(() => {
     if (!shown || !entry?.unread || !owner) return;
@@ -79,14 +79,14 @@ function HistoryEntry({ props, thread, entryId }: { props: ConversationMenuProps
     if (read.current.has(key)) return;
     read.current.add(key); props.onReadEntries(owner.actorId, [entry.id]);
   }, [shown, entry, owner, props.onReadEntries]);
-  if (!entry || !owner) return <p className="cm-empty">{entryId || props.reader ? 'This entry is no longer available.' : 'No history for this character yet.'}</p>;
+  if (!entry || !owner) return <><p className="cm-empty">{entryId || props.reader ? 'This entry is no longer available.' : 'No history for this character yet.'}</p>{opened && <button className="cm-reader-back" onClick={props.onCloseEntry}>Back to history</button>}</>;
   const sections = [{ id: 'full', label: 'Full message', text: entry.text }, ...(entry.sections ?? []).map(item => ({ ...item, id: `section:${item.id}` })), ...(entry.proposals ?? []).filter(item => item.reason).map(item => ({ id: `proposal:${item.id}`, label: `${item.assignedName} action result`, text: `${item.label}\n${item.status}\n${item.reason}` }))];
   const section = sections.find(item => item.id === sectionId);
   const proposals = entry.proposals ?? [], proposal = proposalId === null ? proposals[0] : proposals.find(item => item.id === proposalId);
   return <>
     <p className="cm-meta">{owner.name} · {kindNames[entry.kind]} · <time>{time(entry.at)}</time></p>
     {opened ? <>
-      <div className="cm-row"><button className="cm-reader-back" onClick={props.onCloseEntry}>Back to entry</button>{sections.length > 1 && <select aria-label="Reader section" value={sectionId} onChange={event => setSectionId(event.target.value)}>{!section && <option value={sectionId}>Section no longer available</option>}{sections.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>}</div>
+      <div className="cm-row"><button className="cm-reader-back" onClick={props.onCloseEntry}>Back to entry</button>{(sections.length > 1 || !section) && <select aria-label="Reader section" value={sectionId} onChange={event => setSectionId(event.target.value)}>{!section && <option value={sectionId}>Section no longer available</option>}{sections.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>}</div>
       <ReaderText key={sectionId} text={section?.text ?? 'This section is no longer available. Choose Full message.'} label="Message text" />
     </> : <>
       <div className="cm-entry-preview">
@@ -94,7 +94,7 @@ function HistoryEntry({ props, thread, entryId }: { props: ConversationMenuProps
         {long ? <><p>{entry.summary && entry.summary.length <= 100 ? entry.summary : 'A longer message is available.'}</p><button className="cm-open-entry" onClick={() => props.onOpenEntry(owner.actorId, entry.id)}>{entry.kind === 'report' ? 'Read report' : 'Read full message'}</button></> : <p className="cm-direct-text">{entry.text}</p>}
       </div>
       {!!proposals.length && <div className="cm-proposals">
-        {proposals.length > 1 && <select aria-label="Proposed action" value={proposal?.id ?? ''} onChange={event => setProposalId(event.target.value)}><option value="" disabled>Choose an action</option>{proposals.map(item => <option key={item.id} value={item.id}>{item.label} · {item.assignedName}</option>)}</select>}
+        {(proposals.length > 1 || !proposal) && <select aria-label="Proposed action" value={proposal?.id ?? ''} onChange={event => setProposalId(event.target.value)}><option value="" disabled>Choose an action</option>{proposals.map(item => <option key={item.id} value={item.id}>{item.label} · {item.assignedName}</option>)}</select>}
         {proposal ? <div className="cm-row"><button className="cm-primary" disabled={props.busy || proposal.status !== 'ready'} onClick={() => { if (!props.busy && proposal.status === 'ready') props.onExecuteProposal(proposal.id); }}>{proposal.label} · {proposal.assignedName}</button><span className="cm-meta">{proposal.status === 'ready' ? 'Awaiting your order' : proposal.status}</span>{proposal.reason && <button onClick={() => props.onOpenEntry(owner.actorId, entry.id)}>Read action result</button>}</div> : <p>This action is no longer available.</p>}
       </div>}
     </>}
