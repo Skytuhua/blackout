@@ -5,9 +5,10 @@ const number = z.number().finite();
 const seconds = number.nonnegative();
 const version = z.literal(1);
 const object = z.strictObject;
+export const INTEGRATION_CONTRACT_VERSION = 2;
 export const PointSchema = object({ x: number, y: number });
 export const RoleSchema = z.enum(['player', 'facilities', 'electrical', 'remote', 'debrief']);
-export const ActionSchema = z.enum(['inspect', 'independent_reading', 'repair_cooling', 'restart_cooling', 'pause_batch', 'resume_batch', 'set_batch_ceiling', 'verify_recovery', 'cancel_task', 'reset_ups']);
+export const ActionSchema = z.enum(['inspect', 'independent_reading', 'repair_cooling', 'restart_cooling', 'pause_batch', 'resume_batch', 'set_batch_ceiling', 'verify_recovery', 'cancel_task', 'reset_ups', 'move_crew']);
 export const AssetSchema = object({ id, label: z.string(), kind: z.enum(['rack', 'cooling', 'ups', 'controller', 'generator', 'distribution']), x: number, y: number, width: number.positive(), height: number.positive(), serviceTile: PointSchema, dependencies: z.array(id) });
 export const CrewSchema = object({ id, name: z.string(), role: z.enum(['facilities', 'electrical', 'remote']), x: number, y: number, speed: number.positive(), taskId: id.nullable() });
 export const TopologySchema = object({ width: number.int().positive(), height: number.int().positive(), tileMeters: number.positive(), walkable: z.array(PointSchema), assets: z.array(AssetSchema) });
@@ -18,12 +19,19 @@ export const ProfileSchema = object({
 });
 export const ExternalEventSchema = object({ id, at: seconds.int(), kind: z.enum(['utility_loss', 'utility_restore', 'generator_ready', 'transfer_complete', 'cooling_control_fault', 'workload_pulse_start', 'workload_pulse_end']), value: number.nullable() });
 export const ScenarioSpecSchema = object({
-  schemaVersion: version, id, contentVersion: id, procedureVersion: id, title: z.string(), description: z.string(), seed: number.int().nonnegative(), topology: TopologySchema, crew: z.array(CrewSchema), profile: ProfileSchema,
+  schemaVersion: version, id, contentVersion: id, procedureVersion: id, mode: z.enum(['practice', 'mission']).optional(), title: z.string(), description: z.string(), seed: number.int().nonnegative(), topology: TopologySchema, crew: z.array(CrewSchema), profile: ProfileSchema,
   workload: object({ critical: number.nonnegative(), interactive: number.nonnegative(), batch: number.nonnegative(), catchupCeiling: number.nonnegative() }),
   externalEvents: z.array(ExternalEventSchema), mission: object({ windowSeconds: seconds.positive().int(), criticalLossSeconds: seconds.positive().int(), stabilityHoldSeconds: seconds.positive().int(), verificationMaxAgeSeconds: seconds.positive().int(), recoveryRestartSeconds: seconds, repairSeconds: seconds, inspectSeconds: seconds, remoteSeconds: seconds, verifySeconds: seconds }),
 });
 export const ObservationSchema = object({ id, assetId: id, source: id, field: id, value: z.union([number, z.string().max(2000), z.boolean(), z.null()]), units: z.string().max(60), observedAt: seconds, receivedAt: seconds, quality: z.enum(['reported', 'independent', 'estimated', 'unknown']) });
-export const ActionIntentSchema = object({ action: ActionSchema, targetId: id, atSimTime: seconds, args: object({ technicianId: id.optional(), ceiling: number.min(0).max(100).optional(), taskId: id.optional() }) });
+const destination = object({ x: number.int().nonnegative(), y: number.int().nonnegative() });
+const actionArgs = object({ technicianId: id.optional(), ceiling: number.min(0).max(100).optional(), taskId: id.optional(), destination: destination.optional() });
+const actionIdentity = { targetId: id, atSimTime: seconds };
+export const OperationalActionIntentSchema = object({ ...actionIdentity, action: ActionSchema.exclude(['move_crew']), args: actionArgs });
+export const ActionIntentSchema = z.discriminatedUnion('action', [
+  OperationalActionIntentSchema,
+  object({ ...actionIdentity, action: z.literal('move_crew'), args: actionArgs.extend({ destination }) }),
+]);
 export const ActionRequestSchema = object({ schemaVersion: version, runId: id, requestId: id, actorId: id, intent: ActionIntentSchema, expectedEntityVersions: z.record(id, number.int().nonnegative()), idempotencyKey: id });
 export const CommandReceiptSchema = object({ schemaVersion: version, runId: id, requestId: id, actorId: id, status: z.enum(['queued', 'accepted', 'rejected', 'applied']), reason: id, taskId: id.nullable(), eta: seconds.nullable(), evidenceIds: z.array(id), observedAt: seconds });
 export const TaskSchema = object({ id, actorId: id, targetId: id, action: ActionSchema, status: z.enum(['queued', 'traveling', 'inspecting', 'working', 'blocked', 'completed', 'canceled']), startedAt: seconds, arrivalAt: seconds, completesAt: seconds, progress: number.min(0).max(1), path: z.array(PointSchema), reason: z.string().nullable() });

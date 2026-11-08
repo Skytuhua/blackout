@@ -1,14 +1,15 @@
 import OpenAI from 'openai';
 import type { Response, ResponseCreateParamsNonStreaming, ResponseInput } from 'openai/resources/responses/responses';
 import { z } from 'zod';
-import { AgentResponseSchema, ActionIntentSchema, ToolIntentSchema } from '../../src/shared/schemas';
+import { AgentResponseSchema, OperationalActionIntentSchema, ToolIntentSchema } from '../../src/shared/schemas';
 import type { GatewayStart, ToolIntent, AgentResponse, Observation, PublicToolResult } from '../../src/shared/contracts';
 import { latestObservations } from '../../src/llm/context';
 export type Transport = (params: ResponseCreateParamsNonStreaming, signal: AbortSignal) => Promise<Response>;
 export type History = ResponseInput;
 // Provider-only strict schemas make optional action arguments explicitly nullable.
 const args = z.strictObject({ technicianId: z.string().nullable(), ceiling: z.number().min(0).max(100).nullable(), taskId: z.string().nullable() });
-const action = ActionIntentSchema.extend({ args });
+// Navigation stays player-only; provider arguments use explicit nullable fields.
+const action = OperationalActionIntentSchema.extend({ args });
 const finalSchema = AgentResponseSchema.extend({ proposals: z.array(action).max(3) });
 const toolArgs = z.strictObject({ targetId: z.string().min(1).max(120), action: action.nullable() });
 const schema = (value: z.ZodType) => { const { $schema: _, ...rest } = z.toJSONSchema(value); return rest; };

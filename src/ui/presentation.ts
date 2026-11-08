@@ -18,6 +18,7 @@ export function readingStatus(observation: Observation | null, simTime: number):
 }
 
 export function makeAction(affordance: KnowledgeView['affordances'][number], simTime: number, technicianId: string, extra: { ceiling?: number; taskId?: string } = {}): ActionIntent | null {
+  if (affordance.action === 'move_crew') return null; // Movement needs an explicit map destination.
   if (!affordance.enabled || (affordance.technicianIds.length > 0 && !affordance.technicianIds.includes(technicianId))) return null;
   if (affordance.action === 'set_batch_ceiling' && (extra.ceiling === undefined || !Number.isFinite(extra.ceiling) || extra.ceiling < 0 || extra.ceiling > 100)) return null;
   if (affordance.action === 'cancel_task' && !extra.taskId) return null;

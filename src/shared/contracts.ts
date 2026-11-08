@@ -1,5 +1,6 @@
 import type { z } from 'zod';
 import type * as s from './schemas';
+import type { ReactNode } from 'react';
 export type Point = z.infer<typeof s.PointSchema>;
 export type Asset = z.infer<typeof s.AssetSchema>;
 export type Crew = z.infer<typeof s.CrewSchema>;
@@ -44,4 +45,45 @@ export interface OperationalViewProps {
   onAction: (intent: ActionIntent) => void;
   onInspect: (assetId: string) => void;
   onAskCoworker: (actorId: string, message: string) => void;
+}
+
+export type DesktopPanel = 'equipment' | 'command' | 'radio' | 'objectives' | 'replay' | 'help' | null;
+export type TutorialEvent = 'commander_moved' | 'equipment_opened' | 'crew_selected' | 'timestamp_read';
+export interface DesktopRadioExchange {
+  start: GatewayStart;
+  view: KnowledgeView;
+  targetId: string | null;
+  reply: GatewayResponse;
+  tools: PublicToolResult[];
+  intents: ToolIntent[];
+  calls: ProviderCall[];
+  durationMs: number;
+}
+export interface DesktopGameProps {
+  view: KnowledgeView;
+  session: 'welcome' | 'practice' | 'mission';
+  selectedAssetId: string | null;
+  selectedCrewId: string | null;
+  panel: DesktopPanel;
+  paused: boolean;
+  speed: 1 | 2 | 4;
+  busy: boolean;
+  radioBusy: boolean;
+  notice: string;
+  error: string;
+  coach: { step: number; total: number; title: string; text: string; target: string | null } | null;
+  exchange: DesktopRadioExchange | null;
+  replayContent?: ReactNode;
+  onSelectAsset: (id: string) => void;
+  onSelectCrew: (id: string | null) => void;
+  onPanelChange: (panel: DesktopPanel) => void;
+  onAction: (intent: ActionIntent) => void;
+  onAskCoworker: (actorId: string, message: string) => void;
+  onCancelCoworker: () => void;
+  onPause: () => void;
+  onSpeed: (speed: 1 | 2 | 4) => void;
+  onRetry: () => void;
+  onStartPractice: () => void;
+  onStartMission: () => void;
+  onTutorialEvent: (event: TutorialEvent) => void;
 }

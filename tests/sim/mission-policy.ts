@@ -1,10 +1,11 @@
 import type { Action, ActionRequest, KnowledgeView, SimulationEngine } from '../../src/shared/contracts';
+import { ActionIntentSchema } from '../../src/shared/schemas';
 
 let requestCounter = 0;
 export function request(engine: SimulationEngine, action: Action, targetId: string, args: ActionRequest['intent']['args'] = {}, actorId = 'player', key?: string): ActionRequest {
   const view = engine.observe(actorId);
   const id = key ?? `request-${requestCounter++}`;
-  return { schemaVersion: 1, runId: view.runId, requestId: id, actorId, idempotencyKey: id, expectedEntityVersions: view.observedEntityVersions, intent: { action, targetId, atSimTime: view.simTime, args } };
+  return { schemaVersion: 1, runId: view.runId, requestId: id, actorId, idempotencyKey: id, expectedEntityVersions: view.observedEntityVersions, intent: ActionIntentSchema.parse({ action, targetId, atSimTime: view.simTime, args }) };
 }
 
 export function latest(view: KnowledgeView, assetId: string, field: string) {
@@ -25,7 +26,7 @@ export function successfulPolicy(engine: SimulationEngine, limit = 600) {
     const readings = view.knownTopology.assets.filter(a => a.kind === 'rack').map(a => latest(view, a.id, 'inlet_temperature_c'));
     const cool = readings.every(o => o && typeof o.value === 'number' && o.value < 26 && view.simTime - o.observedAt <= 10);
     const independent = view.observations.some(o => o.quality === 'independent');
-    const dispatched = (action: Action, targetId: string) => view.tasks.some(task => task.action === action && task.targetId === targetId && task.status !== 'canceled');
+    const dispatched = (action: Exclude<Action, 'move_crew'>, targetId: string) => view.tasks.some(task => task.action === action && task.targetId === targetId && task.status !== 'canceled');
     const actions: [Action, string, boolean, ActionRequest['intent']['args']?][] = [
       ['pause_batch', 'site', stopped && !paused && !repaired && !dispatched('pause_batch', 'site')],
       ['inspect', 'controller', stopped && !inspected && !dispatched('inspect', 'controller')],

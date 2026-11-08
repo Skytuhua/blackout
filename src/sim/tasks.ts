@@ -6,11 +6,11 @@ import { hasUpstream, resolvePower } from './systems/power';
 
 export type Emit = (type: string, ids: string[], payload?: Record<string, string | number | boolean | null | string[]>, visibility?: 'public' | 'actor' | 'forensic', actorIds?: string[]) => void;
 export const active = (task: EngineTask) => !['completed', 'canceled'].includes(task.public.status);
-const remoteActions: Action[] = ['pause_batch', 'resume_batch', 'set_batch_ceiling', 'verify_recovery'];
+const remoteActions: Exclude<Action, 'move_crew'>[] = ['pause_batch', 'resume_batch', 'set_batch_ceiling', 'verify_recovery'];
 
 export function requiredRole(state: EngineState, intent: ActionIntent): Crew['role'] | null {
   const asset = state.scenario.topology.assets.find(a => a.id === intent.targetId);
-  if (remoteActions.includes(intent.action)) return intent.targetId === 'site' || (asset?.kind === 'rack' && intent.action !== 'verify_recovery') ? 'remote' : null;
+  if (intent.action !== 'move_crew' && remoteActions.includes(intent.action)) return intent.targetId === 'site' || (asset?.kind === 'rack' && intent.action !== 'verify_recovery') ? 'remote' : null;
   if (!asset) return null;
   if (intent.action === 'reset_ups') return asset.kind === 'ups' ? 'electrical' : null;
   if (intent.action === 'repair_cooling' || intent.action === 'restart_cooling') return ['cooling', 'controller'].includes(asset.kind) ? 'facilities' : null;
@@ -179,7 +179,7 @@ export function deliverReports(state: EngineState, at: number, emit: Emit) {
 }
 
 export function affordances(state: EngineState, actorId: string, at: number): KnowledgeView['affordances'] {
-  const actions = (kind: string): Action[] => kind === 'rack' ? ['inspect', 'independent_reading', 'pause_batch', 'resume_batch', 'set_batch_ceiling']
+  const actions = (kind: string): Exclude<Action, 'move_crew'>[] => kind === 'rack' ? ['inspect', 'independent_reading', 'pause_batch', 'resume_batch', 'set_batch_ceiling']
     : kind === 'cooling' || kind === 'controller' ? ['inspect', 'repair_cooling', 'restart_cooling'] : kind === 'ups' ? ['inspect', 'reset_ups'] : ['inspect'];
   const pairs = [...state.scenario.topology.assets.flatMap(asset => actions(asset.kind).map(action => ({ action, targetId: asset.id }))), ...remoteActions.map(action => ({ action, targetId: 'site' }))];
   const result = pairs.map(({ action, targetId }) => {

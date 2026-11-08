@@ -1,0 +1,28 @@
+{
+  "integrationContractVersion": 2,
+  "engineWireSchemaVersion": 1,
+  "savedHostFormatVersion": 2,
+  "scenarioContentVersion": "hot-restart-layout-v2",
+  "movement": {
+    "action": "move_crew",
+    "targetId": "alex",
+    "atSimTime": 0,
+    "args": {
+      "destination": {
+        "x": 4,
+        "y": 5
+      }
+    }
+  },
+  "commanderSpawn": {
+    "x": 10,
+    "y": 6
+  },
+  "atlas": {
+    "image": "facility-v2.png",
+    "manifest": "facility-v2.json",
+    "width": 512,
+    "height": 512,
+    "frames": 111
+  }
+}
