@@ -151,15 +151,17 @@ export default function App() {
     if (jobs.current.size || commandPending.current || transitioning.current || hostPending.current) return;
     deferredMenuCapture.current = null; void capture(false);
   }
-  function toggleMenu() { const open = !menuOpenRef.current; if (open) menuOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; menuOpenRef.current = open; setMenuOpen(open); if (open) { manualPaused.current = true; pauseLive(); void refreshSaves(); if (!replayActive && sessionRef.current === 'mission') { if (jobs.current.size || commandPending.current) deferredMenuCapture.current = { generation: generation.current, sourceGeneration: sourceGeneration.current }; else void capture(false); } } else deferredMenuCapture.current = null; }
+  function toggleMenu() { const open = !menuOpenRef.current; if (open) menuOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; menuOpenRef.current = open; setMenuOpen(open); if (open) { manualPaused.current = true; pauseLive(); void refreshSaves(); if (!replayActive && sessionRef.current === 'mission' && !hostPending.current) { if (jobs.current.size || commandPending.current) deferredMenuCapture.current = { generation: generation.current, sourceGeneration: sourceGeneration.current }; else void capture(false); } } else deferredMenuCapture.current = null; }
   // Existing save/replay lifecycle follows below; normal UI receives scoped views only.
   async function capture(save: boolean) {
     const client = simulation.current, recorder = archive.current, token = generation.current;
-    if (!client || !recorder || sessionRef.current !== 'mission' || replayActive || commandPending.current || transitioning.current) return;
+    if (!client || !recorder || sessionRef.current !== 'mission' || replayActive || commandPending.current || transitioning.current || hostPending.current) return;
     const request = ++sourceGeneration.current; hostPending.current = true;
-    pauseLive(); setBusy(true);
+    pauseLive();
+    if (save && jobs.current.size) setNotice('Waiting for the reply before saving. You can still restart.');
     try {
       await cancelCoworkers(false); if (token !== generation.current || request !== sourceGeneration.current) return;
+      setBusy(true);
       const record = recorder.build(await client.record()); if (token !== generation.current || request !== sourceGeneration.current) return;
       if (save) { await (await getStore()).saveRun(record); if (token !== generation.current || request !== sourceGeneration.current) return; setNotice('Mission saved locally with its original observations, orders and radio transcript.'); }
       setSource(record); setLedger(buildOutcomeLedger(engineRecordOf(record))); setComparison(null);
