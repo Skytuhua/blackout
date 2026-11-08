@@ -8,14 +8,14 @@ import type { ProviderCall } from './diagnostics';
 import { validAction } from './validation';
 
 export type CoworkerResult = { start: GatewayStart; targetId: string | null; view: KnowledgeView; reply: Exclude<GatewayResponse, { kind: 'tool_request' }>; tools: PublicToolResult[]; intents: ToolIntent[]; calls: ProviderCall[]; durationMs: number; recording: RecordedInteraction | null; authorizations: ProposalAuthorization[] };
-export type CoworkerRequest = { simulation: Pick<SimulationClient, 'observe' | 'command'>; runId: string; actorId: string; targetId: string | null; message: string; signal: AbortSignal; interactionMode?: 'advisory'; getSimTime?: () => number; onTool?: (intent: ToolIntent, result: PublicToolResult) => Promise<void> };
+export type CoworkerRequest = { simulation: Pick<SimulationClient, 'observe' | 'command'>; runId: string; requestId?: string; actorId: string; targetId: string | null; message: string; signal: AbortSignal; interactionMode?: 'advisory'; getSimTime?: () => number; onTool?: (intent: ToolIntent, result: PublicToolResult) => Promise<void> };
 
 export async function runCoworker(input: CoworkerRequest): Promise<CoworkerResult> {
   const began = performance.now();
   let view = await input.simulation.observe(input.actorId);
   const role = view.crew.find(c => c.id === input.actorId)?.role;
   if (!role || view.runId !== input.runId || view.actorId !== input.actorId) throw new Error('stale_or_invalid_actor');
-  const start: GatewayStart = { kind: 'start', runId: input.runId, requestId: crypto.randomUUID(), actorId: input.actorId, role, message: input.message, view: scopeKnowledge(view, input.targetId ? [input.targetId] : []), procedures: procedures.filter(p => view.allowedProcedureIds.includes(p.id)), promptVersion: 'coworker-v1', ...(input.interactionMode ? { interactionMode: input.interactionMode } : {}) };
+  const start: GatewayStart = { kind: 'start', runId: input.runId, requestId: input.requestId ?? crypto.randomUUID(), actorId: input.actorId, role, message: input.message, view: scopeKnowledge(view, input.targetId ? [input.targetId] : []), procedures: procedures.filter(p => view.allowedProcedureIds.includes(p.id)), promptVersion: 'coworker-v1', ...(input.interactionMode ? { interactionMode: input.interactionMode } : {}) };
   const context: ScopedContext = { start, simulation: input.simulation, signal: input.signal };
   const tools: PublicToolResult[] = [], intents: ToolIntent[] = [];
   const calls: ProviderCall[] = [];

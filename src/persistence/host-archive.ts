@@ -64,6 +64,7 @@ export class HostArchive {
       if (first.kind === 'start') provenance.promptVersion = first.promptVersion;
       for (const turn of interaction.turns) if (turn.call) provenance.model = turn.call.model;
     }
-    return validateSavedRun({ ...structuredClone(record), schemaVersion: 2, dialogue: [...dialogue.values()].sort((a, b) => a.at - b.at), provenance, lineage: structuredClone(this.lineage), interactions: structuredClone(this.interactions) });
+    const interactions = [...this.interactions.slice(0, this.source?.interactions.length ?? 0), ...[...this.requests.values()].sort((a, b) => a.turns[0].atSimTime - b.turns[0].atSimTime)];
+    return validateSavedRun({ ...structuredClone(record), schemaVersion: 2, dialogue: [...dialogue.values()].sort((a, b) => a.at - b.at), provenance, lineage: structuredClone(this.lineage), interactions: structuredClone(interactions) });
   }
 }
