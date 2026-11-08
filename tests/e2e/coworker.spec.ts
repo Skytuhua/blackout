@@ -23,13 +23,15 @@ test('gateway inspection uses the real worker; factual records and explicit prop
   await page.route('**/api/llm/turn', async route => {
     const input = route.request().postDataJSON() as GatewayInput; turns.push(input);
     const reply: GatewayResponse = turns.length === 1 ? { kind: 'tool_request', runId: input.runId, requestId: input.requestId, actorId: input.actorId, interactionId: 'mock-inspection', intent: { runId: input.runId, requestId: input.requestId, actorId: input.actorId, interactionId: 'mock-inspection', callId: 'inspect', tool: 'inspect_asset', targetId: 'cooling-1', action: { action: 'inspect', targetId: 'cooling-1', atSimTime: input.view.simTime, args: { technicianId: 'alex' } } } } : final(input, turns.length > 2);
-    await route.fulfill({ json: reply, headers: { 'X-Blackout-Call': JSON.stringify({ receiptId: `mock-receipt-${turns.length}`, runId: input.runId, requestId: input.requestId, actorId: input.actorId, model: 'mock-actual-model', inputTokens: 40, outputTokens: 13, durationMs: 2, status: 'completed' }) } });
+    await route.fulfill({ json: reply, headers: { 'X-Blackout-Call': JSON.stringify({ receiptId: `mock-receipt-${turns.length}`, provider: 'openai', responseId: `mock-response-${turns.length}`, runId: input.runId, requestId: input.requestId, actorId: input.actorId, model: 'mock-actual-model', inputTokens: 40, outputTokens: 13, durationMs: 2, status: 'completed' }) } });
   });
   await begin(page); await ask(page, 'Inspect the selected equipment.');
   await expect.poll(() => turns.length).toBe(2);
   await expect(page.getByRole('region', { name: 'Coworker response', exact: true })).toContainText('Live coworker');
   await expect(page.locator('.bo-crew')).toContainText('traveling');
   await expect(page.getByRole('region', { name: 'Coworker response', exact: true })).toContainText('observed 0:00');
+  await page.getByText('Response provenance', { exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Coworker response', exact: true })).toContainText('Observed model: mock-actual-model. 2 provider call receipt(s).');
   await page.getByRole('combobox', { name: 'Simulation speed', exact: true }).selectOption('4');
   await page.getByRole('button', { name: 'Resume simulation', exact: true }).click();
   for (let tick = 1; tick <= 10; tick++) {

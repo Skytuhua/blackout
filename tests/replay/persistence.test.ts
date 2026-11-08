@@ -1,10 +1,13 @@
 import { expect, it } from 'vitest';
 import { serializeRun, deserializeRun, serializeCheckpoint, deserializeCheckpoint, openRunStore } from '../../src/persistence/runs';
 import { recordedRun } from './fixtures';
+import { engineRecordOf } from '../../src/persistence/saved-record';
 
 it('round-trips validated serialized records and checkpoints without accepting corrupt/versioned data', () => {
   const record = recordedRun();
-  expect(deserializeRun(serializeRun(record))).toEqual(record);
+  const saved = deserializeRun(serializeRun(record));
+  expect(saved.schemaVersion).toBe(2);
+  expect(engineRecordOf(saved)).toEqual(record);
   expect(deserializeCheckpoint(serializeCheckpoint(record.finalCheckpoint))).toEqual(record.finalCheckpoint);
   expect(() => deserializeRun('{')).toThrow(/CORRUPT/);
   expect(() => deserializeCheckpoint('null')).toThrow(/CORRUPT/);

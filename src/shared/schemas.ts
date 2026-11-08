@@ -69,6 +69,18 @@ export const GatewayStartSchema = object({ kind: z.literal('start'), ...gatewayI
 export const GatewayContinueSchema = object({ kind: z.literal('continue'), ...gatewayIdentity, interactionId: id, expectedCallId: id, view: KnowledgeViewSchema, result: PublicToolResultSchema });
 export const GatewayInputSchema = z.discriminatedUnion('kind', [GatewayStartSchema, GatewayContinueSchema]);
 
+export const ProviderCallSchema = object({
+  receiptId: id, provider: z.literal('openai'), responseId: id.nullable(),
+  ...gatewayIdentity, model: id, inputTokens: number.int().nonnegative().nullable(), outputTokens: number.int().nonnegative().nullable(),
+  durationMs: number.int().nonnegative(), status: z.string().max(30),
+});
+export const RecordedInteractionSchema = object({
+  turns: z.array(object({ atSimTime: seconds.int(), input: GatewayInputSchema, reply: GatewayResponseSchema.nullable(), call: ProviderCallSchema.nullable(), toolResult: PublicToolResultSchema.nullable() })).min(1).max(3),
+  end: object({ atSimTime: seconds.int(), reason: z.enum(['final', 'fallback', 'canceled', 'reset', 'interrupted']), reply: z.union([GatewayResponseSchema.options[1], GatewayResponseSchema.options[2]]).nullable(), durationMs: number.int().nonnegative() }),
+});
+// Host provenance is versioned separately from deterministic engine/checkpoint history.
+export const SavedRunRecordSchema = RunRecordSchema.extend({ schemaVersion: z.literal(2), lineage: z.array(object({ runId: id, throughSimTime: seconds.int() })), interactions: z.array(RecordedInteractionSchema) });
+
 export const jsonSchemas = {
   action: z.toJSONSchema(ActionIntentSchema), agentResponse: z.toJSONSchema(AgentResponseSchema),
   knowledgeView: z.toJSONSchema(KnowledgeViewSchema), gateway: z.toJSONSchema(GatewayInputSchema),

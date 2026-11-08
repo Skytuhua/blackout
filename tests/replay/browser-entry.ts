@@ -1,6 +1,10 @@
 import { initialize, restore } from '../../src/sim/engine';
 import { hotRestart } from '../../src/content/scenarios/hot-restart';
 import { openRunStore } from '../../src/persistence/runs';
+import { engineRecordOf } from '../../src/persistence/saved-record';
+import { scopeKnowledge } from '../../src/llm/context';
+import { procedures } from '../../src/content/procedures';
+import type { GatewayStart, GatewayResponse } from '../../src/shared/contracts';
 import { deterministicHash, verifyReplay } from '../../src/sim/replay';
 import { request } from '../sim/mission-policy';
 
@@ -35,6 +39,12 @@ const api = {
     try {
       assert((await store.listRuns()).length === 0 && (await store.listCheckpoints()).length === 0, 'Fresh profile starts empty');
       await store.saveRun(record); await store.saveCheckpoint(record.finalCheckpoint);
+      const upgraded = await store.loadRun(record.runId);
+      assert(upgraded?.schemaVersion === 2 && upgraded.interactions.length === 0, 'Legacy save upgrades without invented history');
+      if (!upgraded) throw new Error('Missing legacy upgrade');
+      const start: GatewayStart = { kind: 'start', runId: record.runId, requestId: 'native-saved-turn', actorId: 'alex', role: 'facilities', message: 'What is known?', view: scopeKnowledge(engine.observe('alex'), ['rack-8']), procedures, promptVersion: 'coworker-v1' };
+      const reply: GatewayResponse = { kind: 'fallback', runId: start.runId, requestId: start.requestId, actorId: start.actorId, mode: 'scripted', reason: 'scripted_mode', message: 'Use permitted observations.', facts: [] };
+      await store.saveRun({ ...upgraded, interactions: [{ turns: [{ atSimTime: 1, input: start, reply, call: null, toolResult: null }], end: { atSimTime: 1, reason: 'fallback', reply, durationMs: 0 } }] });
       assert((await store.listRuns())[0]?.runId === record.runId, 'Committed run listed');
       assert((await store.listCheckpoints())[0]?.simTime === 1, 'Committed checkpoint listed');
       engine.step(99);
@@ -48,7 +58,8 @@ const api = {
       assert(record && checkpoint, 'Both persisted across actual browser restart');
       if (!record || !checkpoint) throw new Error('Missing persisted run');
       assert(deterministicHash(checkpoint) === expected.initialHash, 'Checkpoint survives restart exactly');
-      assert(verifyReplay(record, 'browser-replayed').matches, 'Loaded run is deterministically replayable');
+      assert(record.schemaVersion === 2 && record.interactions.length === 1 && record.interactions[0].turns[0].input.requestId === 'native-saved-turn' && record.interactions[0].turns[0].call === null, 'V2 exact scoped transcript survives native restart with metadata still unknown');
+      assert(verifyReplay(engineRecordOf(record), 'browser-replayed').matches, 'Loaded run is deterministically replayable');
       const resumed = restore(checkpoint, 'browser-resumed'); resumed.step(99);
       assert(deterministicHash(resumed.snapshot()) === expected.continuedHash, 'Reloaded travel/knowledge resumes exactly');
       await store.saveRun(resumed.exportRecord());
