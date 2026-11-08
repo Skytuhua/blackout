@@ -10,6 +10,7 @@ export class SimulationClient {
   private speed: 1 | 2 | 4 = 1;
   private timer: ReturnType<typeof setInterval> | undefined;
   private advancing = false;
+  private terminal = false;
   constructor(private worker: Worker = new Worker(new URL('./simulation.worker.ts', import.meta.url), { type: 'module' })) {
     worker.onmessage = (event: MessageEvent<unknown>) => {
       const parsed = WorkerReplySchema.safeParse(event.data);
@@ -22,7 +23,11 @@ export class SimulationClient {
       if (reply.runId !== pending.expectedRunId || ('view' in reply && reply.view.runId !== pending.expectedRunId)) { pending.reject(new Error('stale_run')); return; }
       if (reply.kind === 'error') { pending.reject(new Error(reply.code)); return; }
       if (reply.kind === 'restored') this.runId = reply.runId;
-      if ('view' in reply) this.listeners.forEach(({ actorId, listener }) => { if (reply.view.actorId === actorId) listener(reply.view); });
+      if ('view' in reply) {
+        this.terminal = ['success', 'failure'].includes(reply.view.mission.status);
+        if (this.terminal) this.pause();
+        this.listeners.forEach(({ actorId, listener }) => { if (reply.view.actorId === actorId) listener(reply.view); });
+      }
       pending.resolve(reply);
     };
     worker.onerror = () => this.rejectPending('The simulation worker stopped. Reload to retry.');
@@ -48,7 +53,7 @@ export class SimulationClient {
   async advance(ticks: number) { const reply = await this.send({ kind: 'advance', ticks }); if (reply.kind !== 'advanced') throw new Error('Unexpected worker reply'); return reply.view; }
   pause() { this.paused = true; if (this.timer) clearInterval(this.timer); this.timer = undefined; }
   resume() {
-    if (!this.paused) return;
+    if (!this.paused || this.terminal) return;
     this.paused = false;
     this.timer = setInterval(() => { if (this.advancing) return; this.advancing = true; void this.advance(this.speed).catch(() => this.pause()).finally(() => { this.advancing = false; }); }, 1000);
   }

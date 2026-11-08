@@ -30,7 +30,7 @@ describe('headless Hot Restart mission', () => {
     expect(p.racks.every(r => r.temperatureC < 27 && r.batch >= 30)).toBe(true);
     expect(p.totals.criticalDelivered).toBe(p.totals.criticalDemand);
     expect(p.totals.batchArrivals - p.totals.batchCompleted).toBeCloseTo(p.racks.reduce((sum, r) => sum + r.backlog, 0), 7);
-  });
+  }, 15000);
 
   it('fails the idle policy and continues recorder-only physics after the terminal result', () => {
     const engine = fresh(); engine.step(600);

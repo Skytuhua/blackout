@@ -2,7 +2,7 @@
 
 Updated: 7 November 2026.
 
-G0 merged and independently reviewed; UI fixture under review. The visible shell is a development fixture, not a playable mission. Public repository: https://github.com/Skytuhua/blackout. No production atlas, live tool cycle or recording is claimed.
+G0, physical simulation, mission engine, pixel fixture UI and bounded gateway are merged and reviewed. The real production worker/host now pass local offline mission controls: success t331 and idle failure t505, exact terminal stopping, paused dispatch and fresh retry. The playable-host PR is awaiting its final gate. Public repository: https://github.com/Skytuhua/blackout. Live worker/model cycle, replay and persistence remain unfinished.
 
 ## Task queue
 
@@ -11,13 +11,13 @@ G0 merged and independently reviewed; UI fixture under review. The visible shell
 | PLAN-01: solo/parallel master revision | Coordinator | User decisions and planning reviews | Prepared | Master plan, ownership, contracts, gates, and task packets. |
 | REPO-00: public repository seed | Coordinator | Authorized repository-creation capability | Integrated: 6cf1bac | Actual public URL and initial commit; verify public read access. |
 | CORE-00: foundation and contract version 1 | Coordinator | Plan | Integrated: fb8e798 (PR1) | Lockfile, scripts, schema-valid fixtures, production shell build, worker round trip. |
-| CONTENT-01: Hot Restart data | Coordinator | CORE-00 | Initial data; feasibility pending SIM-02 | Profile, topology, procedures, one declared seed, objectives, permitted-knowledge policy. |
-| SIM-01: physical reference cases | Simulation worker | CORE-00 | Queued | Equilibrium, cooling-loss, recovery, battery-energy, and capacity checks. |
-| SIM-02: full mission behavior | Simulation worker | SIM-01 and CONTENT-01 | Queued | Crew/task timing, observations, protection, success/failure/timeout/reset traces. |
-| UI-01: runtime masters and fixture UI | Game/UI worker, coordinator corrections | CORE-00 | Ready for integration after review corrections (PR2) | Native/3× sprite review, selection/dispatch flow, accessible controls. |
-| AI-01: gateway and mock tool cycle | OpenAI worker | CORE-00 | Queued | Strict schemas, bounded transport, fallback, usage/race checks. |
-| UI-02: real mission and radio integration | Game/UI worker | SIM-02 and UI-01 | Queued | Complete offline mission using actual worker and projected views. |
-| AI-02: real coworker tool cycle | OpenAI worker | G1 and available API credentials | Queued | Authenticated request, valid inspection receipt, completed observation, grounded response. |
+| CONTENT-01: Hot Restart data | Coordinator | CORE-00 | Feasible public-evidence response verified | Profile, topology, procedures, one declared seed, objectives, permitted-knowledge policy. |
+| SIM-01: physical reference cases | Simulation worker | CORE-00 | Merged PR4: 04603bf | Equilibrium, cooling-loss, recovery, battery-energy, and capacity checks. |
+| SIM-02: full mission behavior | Simulation worker | SIM-01 and CONTENT-01 | Merged PR6: 770fff3 | Crew/task timing, observations, protection, success/failure/timeout/reset traces. |
+| UI-01: runtime masters and fixture UI | Game/UI worker, coordinator corrections | CORE-00 | Merged PR2: be52b64 | Native/3× sprite review, selection/dispatch flow, accessible controls. |
+| AI-01: gateway and mock tool cycle | OpenAI worker | CORE-00 | Merged PR5: 49cb850 | Strict schemas, bounded transport, fallback, usage/race checks. |
+| UI-02: real mission and radio integration | Coordinator host; UI worker mobile follow-up | SIM-02 and UI-01 | Local offline controls pass; mobile drawer/targets separately leased | Complete offline mission using actual worker and projected views. |
+| AI-02: real coworker tool cycle | OpenAI worker | G1 and available API credentials | Context fix merged PR7: 3264911; live cycle pending | Authenticated request, valid inspection receipt, completed observation, grounded response. |
 | REPLAY-01: saved run and earlier-cap comparison | Replay worker with transferred path lease | G1 and frozen snapshot contract | Queued | Deterministic hash, saved-run reload, valid and unsupported continuation cases. |
 | UI-03: factual debrief and comparison view | Game/UI worker | REPLAY-01 ledger contracts | Queued | Engine-derived chart/timeline and correct supported-horizon labeling. |
 | AI-03: grounded debrief and timing sample | OpenAI worker | Outcome ledger and AI-02 | Queued | Grounded explanation, ten representative interaction measurements, fallback evidence. |
@@ -33,7 +33,7 @@ Repository publication is not a prerequisite for local foundation work. Keep rep
 
 The coordinator appends the task ID, integrated commit, exact command or manual check, observed result, evidence path, and reviewer. A planned or written test is not a passing test. Replace this section's empty state only after observing real execution.
 
-No implementation evidence recorded yet.
+PRs 1–7 contain reviewed foundation, UI, CI, physical/mission simulation and gateway changes. Review dispositions are in `docs/reviews/`; implementation receipts are in `docs/handoffs/`. Current playable-host checks use actual production Chromium controls and a real simulation worker, with authored scripted coworkers. See `docs/reviews/CORE-01.md` for the scope and limits.
 
 ## Time checkpoints
 
