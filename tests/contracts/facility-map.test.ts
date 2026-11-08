@@ -36,5 +36,10 @@ it('rejects orphan membership, duplicate rooms, unreachable service cells and un
     (t: typeof topology) => { t.rooms.push(t.rooms[0]); },
     (t: typeof topology) => { t.walkable = t.walkable.filter(p => p.x !== t.assets[0].serviceTile.x || p.y !== t.assets[0].serviceTile.y); },
     (t: typeof topology) => { t.connections[0].toId = 'missing'; },
+    (t: typeof topology) => { t.assets[0].x += 0.25; },
+    (t: typeof topology) => { t.walkable.push({ x: 100, y: -1 }); },
+    (t: typeof topology) => { t.walkable.push({ x: 1.25, y: 8 }); },
+    (t: typeof topology) => { Object.assign(t.assets[1], { x: t.assets[0].x, y: t.assets[0].y }); },
+    (t: typeof topology) => { t.rooms.push({ ...t.rooms[0], id: 'overlapping-room' }); },
   ]) { const changed = structuredClone(topology); mutate(changed); expect(FacilityTopologySchema.safeParse(changed).success).toBe(false); }
 });
