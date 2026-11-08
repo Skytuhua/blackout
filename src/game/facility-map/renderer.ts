@@ -77,7 +77,15 @@ export class FacilityRenderer {
       const wall = b && (x === b.x || y === b.y || x === b.x + b.width - 1 || y === b.y + b.height - 1) && !doors.has(`${x},${y}`);
       const equipment = topology.assets.some(a => x >= a.x && x < a.x + a.width && y >= a.y && y < a.y + a.height);
       if (wall) this.sprite(ctx, y === b.y || y === b.y + b.height - 1 ? 'wall_0' : 'wall_1', x * 16, y * 16);
-      else if (walkable.has(`${x},${y}`) || equipment) this.sprite(ctx, (x * 7 + y * 3) % 13 === 0 ? 'floor_1' : 'floor_0', x * 16, y * 16);
+      else if (walkable.has(`${x},${y}`) || equipment) {
+        const variant = !equipment && (x * 3 + y * 5) % 31 === 0 ? 'floor_2' : (x * 7 + y * 3) % 13 === 0 ? 'floor_1' : 'floor_0';
+        this.sprite(ctx, variant, x * 16, y * 16);
+      }
+      // Static wall fittings are decoration, never equipment or route obstacles.
+      if (wall && !equipment && !walkable.has(`${x},${y}`)) {
+        if (y === b.y && x > b.x && x < b.x + b.width - 1 && (x - b.x) % 3 === 1) this.sprite(ctx, 'infra_1', x * 16, y * 16);
+        else if (x === b.x && y > b.y && y < b.y + b.height - 1 && (y - b.y) % 4 === 2) this.sprite(ctx, 'fixture_5', x * 16, y * 16);
+      }
       if (doors.has(`${x},${y}`)) { ctx.fillStyle = '#45d5e8'; ctx.fillRect(x * 16 + 2, y * 16 + 13, 12, 2); }
     }
   }

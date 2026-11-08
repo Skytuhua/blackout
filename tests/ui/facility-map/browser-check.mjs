@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 
 const origin = process.env.FACILITY_FIXTURE_ORIGIN ?? 'http://127.0.0.1:5194';
-const out = '.local/facility-map-01'; mkdirSync(out, { recursive: true });
+const out = process.env.FACILITY_FIXTURE_OUTPUT ?? '.local/facility-map-01'; mkdirSync(out, { recursive: true });
 const browser = await chromium.launch({ headless: true });
 const results = [], failures = [];
 const check = async (name, run) => {
@@ -54,7 +54,7 @@ async function layout(page) {
     }
     if (w.width <= 0 || w.height <= 0 || w.left < s.left - 1 || w.top < s.top - 1 || w.right > s.right + 1 || w.bottom > s.bottom + 1) problems.push('canvas fit');
     const scale = w.width / canvas.width;
-    if (scale >= 1 && Math.abs(scale - Math.round(scale)) > .01) problems.push('noninteger scale above native');
+    if (Math.abs(w.width / canvas.width - w.height / canvas.height) > .01) problems.push('map aspect ratio');
     return { problems, stage: [r.width, r.height], world: [w.width, w.height], scale, fontSize: getComputedStyle(root.querySelector('button')).fontSize };
   });
   assert.deepEqual(result.problems, []);
