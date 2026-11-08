@@ -6,7 +6,7 @@ import { actorIds, evidence, evidenceConditions, isActor, latest, publicSummary,
 import { actionPlan, active, advanceTasks, affordances, cancelTask, deliverReports, requiredRole, reserveTask, taskArgumentError, taskResources, workSeconds, type Emit } from './tasks';
 import { isWalkablePath, isWalkablePosition, pathMeters, positionAlong, route } from './navigation';
 
-export const ENGINE_VERSION = 'sim-02-v1';
+export const ENGINE_VERSION = 'sim-desktop-v2';
 const phase: Record<ScenarioSpec['externalEvents'][number]['kind'], number> = {
   utility_loss: 10, utility_restore: 10, generator_ready: 20, transfer_complete: 30,
   cooling_control_fault: 40, workload_pulse_start: 50, workload_pulse_end: 50,
@@ -17,6 +17,7 @@ function schedule(spec: ScenarioSpec) {
 }
 
 function validateTopology(spec: ScenarioSpec) {
+  if (spec.mode === 'practice' && spec.externalEvents.length) throw new Error('Practice cannot schedule external disturbances.');
   const assets = spec.topology.assets;
   const ids = new Set(assets.map(a => a.id));
   if (ids.size !== assets.length || ids.has('site') || assets.some(a => a.dependencies.some(id => !ids.has(id)))) throw new Error('Invalid topology asset references.');
@@ -36,11 +37,13 @@ function initialState(scenario: ScenarioSpec): EngineState {
     scenario, physical, initialPhysical: structuredClone(physical), eventCursor: 0, nextSequence: 0, boundaryConsumed: false,
     crew: structuredClone(scenario.crew), tasks: [], reservations: {}, entityVersions: Object.fromEntries(['site', ...scenario.topology.assets.map(a => a.id), ...scenario.crew.map(c => c.id)].map(id => [id, 0])),
     observations: [], messages: [], pendingReports: [], nextObservation: 0, lastSensorAt: -1,
-    mission: { status: 'active', reason: null, stabilitySeconds: 0, criticalLossSeconds: 0, heldAt: null, evidenceHoldSeconds: Object.fromEntries(['player', ...scenario.crew.map(c => c.id)].map(id => [id, 0])) },
+    mission: { status: scenario.mode === 'practice' ? 'practice' : 'active', reason: null, stabilitySeconds: 0, criticalLossSeconds: 0, heldAt: null, evidenceHoldSeconds: Object.fromEntries(['player', ...scenario.crew.map(c => c.id)].map(id => [id, 0])) },
     commands: [], events: [], telemetry: [{ simTime: 0, hottestTemperatureC: Math.max(...physical.racks.map(r => r.temperatureC)), criticalServedFraction: 1, batchBacklog: 0 }], idempotency: [],
   };
   sampleSensors(state, 0);
-  state.messages.push({ message: { id: 'briefing', at: 0, speaker: 'system', text: 'Select cooling, check reading timestamps, then dispatch a qualified inspection. Protect critical service while retaining deferred work. Verify recovery before restoring workload.', evidenceIds: [], mode: 'system' }, actorIds: actorIds(state) });
+  state.messages.push({ message: { id: 'briefing', at: 0, speaker: 'system', text: scenario.mode === 'practice'
+    ? 'This healthy facility has no incident deadline. Practice moving crew, inspect timestamps, and wait for travel, work and delivered reports. Pause and adjust speed while learning the controls.'
+    : 'Select cooling, check reading timestamps, then dispatch a qualified inspection. Protect critical service while retaining deferred work. Verify recovery before restoring workload.', evidenceIds: [], mode: 'system' }, actorIds: actorIds(state) });
   return state;
 }
 
@@ -52,6 +55,7 @@ export function initialize(spec: ScenarioSpec, runId: string): SimulationEngine 
 
 function validateRestoredState(state: EngineState, at: number) {
   validateTopology(state.scenario);
+  if ((state.scenario.mode === 'practice') !== (state.mission.status === 'practice')) throw new Error('Invalid checkpoint mission mode.');
   const matches = (kind: string, actual: { id: string }[]) => JSON.stringify(state.scenario.topology.assets.filter(a => a.kind === kind).map(a => a.id)) === JSON.stringify(actual.map(a => a.id));
   for (const physical of [state.physical, state.initialPhysical]) {
     if (!matches('rack', physical.racks) || !matches('ups', physical.ups) || !matches('cooling', physical.cooling) || physical.ups.some(u => u.energyKwh > state.scenario.profile.upsEnergyKwh)) throw new Error('Checkpoint physical identity or energy mismatch.');
@@ -76,17 +80,20 @@ function validateRestoredState(state: EngineState, at: number) {
     const command = state.commands.find(c => c.receipt.taskId === pub.id && c.receipt.status === 'accepted');
     if (taskArgumentError(state, task.intent) || !command || command.actorId !== task.requestedBy || command.at !== pub.startedAt || JSON.stringify(command.intent) !== JSON.stringify(task.intent)) throw new Error('Invalid checkpoint task arguments or accepted command.');
     if (!worker || pub.actorId !== worker.id || !actors.includes(task.requestedBy) || pub.targetId !== task.intent.targetId || pub.action !== task.intent.action || pub.startedAt > at || pub.arrivalAt < pub.startedAt || pub.completesAt !== pub.arrivalAt + task.workSeconds || task.traveledMeters > task.distanceMeters) throw new Error('Invalid checkpoint task identity or time.');
-    if (worker.role !== requiredRole(state, task.intent) || (worker.role !== 'remote' && task.intent.args.technicianId !== worker.id) || !['player', worker.id].includes(task.requestedBy) || task.workSeconds !== workSeconds(state, pub.action) || JSON.stringify(task.resources) !== JSON.stringify(taskResources(task.intent))) throw new Error('Invalid checkpoint task qualification or duration.');
+    const moving = task.intent.action === 'move_crew';
+    if (worker.role !== requiredRole(state, task.intent) || (moving ? worker.role === 'remote' || worker.id !== task.intent.targetId || task.requestedBy !== 'player'
+      : worker.role !== 'remote' && task.intent.args.technicianId !== worker.id) || !['player', worker.id].includes(task.requestedBy) || task.workSeconds !== workSeconds(state, pub.action) || JSON.stringify(task.resources) !== JSON.stringify(taskResources(task.intent))) throw new Error('Invalid checkpoint task qualification or duration.');
     const asset = state.scenario.topology.assets.find(a => a.id === pub.targetId);
-    if (worker.role !== 'remote' && (!asset || !isWalkablePath(state.scenario, pub.path, asset.serviceTile))) throw new Error('Invalid checkpoint task path.');
+    const endpoint = task.intent.action === 'move_crew' ? task.intent.args.destination : asset?.serviceTile;
+    if (worker.role !== 'remote' && (!endpoint || !isWalkablePath(state.scenario, pub.path, endpoint))) throw new Error('Invalid checkpoint task path.');
     if (worker.role === 'remote' && (pub.path.length || task.distanceMeters !== 0 || task.traveledMeters !== 0 || pub.arrivalAt !== pub.startedAt)) throw new Error('Invalid checkpoint remote travel.');
     if (worker.role !== 'remote' && (Math.abs(pathMeters(state.scenario, pub.path) - task.distanceMeters) > 1e-8 || pub.arrivalAt !== pub.startedAt + Math.ceil(task.distanceMeters / worker.speed))) throw new Error('Invalid checkpoint travel timing.');
     if (pub.status === 'completed' && (pub.completesAt > at || pub.progress !== 1 || Math.abs(task.traveledMeters - task.distanceMeters) > 1e-8)) throw new Error('Invalid checkpoint completed task timing or progress.');
     if (active(task)) {
-      if (state.mission.status !== 'active' || workers.has(worker.id) || worker.taskId !== pub.id || pub.completesAt <= at) throw new Error('Invalid checkpoint worker reservation.');
+      if (!['active', 'practice'].includes(state.mission.status) || workers.has(worker.id) || worker.taskId !== pub.id || pub.completesAt <= at) throw new Error('Invalid checkpoint worker reservation.');
       workers.add(worker.id);
       const expectedStatus = at < pub.arrivalAt ? 'traveling' : ['inspect', 'independent_reading'].includes(pub.action) ? 'inspecting' : 'working';
-      const expectedProgress = task.workSeconds === 0 ? 1 : Math.max(0, (at - pub.arrivalAt) / task.workSeconds);
+      const expectedProgress = at < pub.arrivalAt ? 0 : task.workSeconds === 0 ? 1 : Math.max(0, (at - pub.arrivalAt) / task.workSeconds);
       if (pub.status !== expectedStatus || Math.abs(pub.progress - expectedProgress) > 1e-8) throw new Error('Invalid checkpoint work progress.');
       for (const resource of task.resources) {
         if (!(resource in state.entityVersions) || reservations[resource]) throw new Error('Invalid checkpoint resource reservation.');
@@ -261,7 +268,7 @@ function createEngine(state: EngineState, runId: string, initialTime: number): S
       const view: KnowledgeView = {
         schemaVersion: 1, runId, actorId, simTime, viewHash: 'pending', knownTopology: spec.topology, crew: state.crew,
         observations: evidence(state, actorId), tasks: state.tasks.map(t => t.public), messages: state.messages.filter(m => m.actorIds.includes(actorId)).map(m => m.message), allowedProcedureIds: ['hot-restart-v1'], observedEntityVersions: state.entityVersions,
-        affordances: affordances(state, actorId, simTime), objectives: [
+        affordances: affordances(state, actorId, simTime), objectives: spec.mode === 'practice' ? [] : [
           objective('prerequisite', 'Verify the cooling prerequisite is restored', conditions.prerequisite),
           objective('service', 'Critical demand fully served with no overload', conditions.service),
           objective('temperature', 'Verify every inlet below the warning threshold', conditions.thermal),
@@ -269,7 +276,7 @@ function createEngine(state: EngineState, runId: string, initialTime: number): S
           { id: 'stability', label: `Hold verified recovery for ${spec.mission.stabilityHoldSeconds} seconds`, state: allKnown ? (state.mission.evidenceHoldSeconds[actorId] >= spec.mission.stabilityHoldSeconds ? 'complete' : 'in_progress') : 'awaiting_verification' },
           objective('verification', 'Receive a fresh authorized final recovery report', verification?.value === true && simTime - verification.observedAt <= spec.mission.verificationMaxAgeSeconds),
         ], summary: publicSummary(state, actorId),
-        mission: { status: state.mission.status, reason: state.mission.reason, stabilitySeconds: allKnown ? state.mission.evidenceHoldSeconds[actorId] : null, windowSeconds: spec.mission.windowSeconds },
+        mission: { status: state.mission.status, reason: state.mission.reason, stabilitySeconds: spec.mode !== 'practice' && allKnown ? state.mission.evidenceHoldSeconds[actorId] : null, windowSeconds: spec.mode === 'practice' ? 0 : spec.mission.windowSeconds },
       };
       let hash = 2166136261;
       for (const c of JSON.stringify(view)) hash = Math.imul(hash ^ c.charCodeAt(0), 16777619) >>> 0;
