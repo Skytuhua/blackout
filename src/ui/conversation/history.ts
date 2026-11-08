@@ -15,7 +15,7 @@ export function wholeEntryPages(entries: { id: string; height: number }[], avail
 export function entryPresentation(entry: Pick<ConversationEntry, 'kind' | 'text' | 'summary' | 'sections'>, oversized = false) {
   if (['live', 'fallback', 'order', 'system'].includes(entry.kind)) return {
     reader: false,
-    text: entry.text.length <= 260 && !oversized ? entry.text : 'A detailed reply is saved in Menu → History.',
+    text: entry.text.length <= (entry.kind === 'live' ? 281 : 260) && !oversized ? entry.text : 'A detailed reply is saved in Menu → History.',
   };
   const reader = oversized || entry.text.length > 260 || !!entry.sections?.length;
   return { reader, text: reader ? !oversized && entry.summary && entry.summary.length <= 260 ? entry.summary : entry.kind === 'report' ? 'A detailed report is available.' : 'A longer message is available.' : entry.text };

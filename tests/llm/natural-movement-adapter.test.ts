@@ -75,7 +75,7 @@ it('retains older cited evidence in v4 even when a newer reading has the same so
 it('fits a real mid-mission Sam conversation and its continuation without losing the scoped evidence', () => {
   const engine = initialize(hotRestart, 'a785f355-e33a-4b76-a44c-7144108ec7d5');
   successfulPolicy(engine, 300);
-  const view = scopeKnowledge(engine.observe('sam'), ['controller', 'cooling-1', 'cooling-2', 'rack-1'], [], true);
+  const view = scopeKnowledge(engine.observe('sam'), ['controller', 'cooling-1', 'cooling-2', 'rack-1'], [], true, true);
   const start = projectCoworkerContext({ kind: 'start', runId: view.runId, requestId: 'd0571c9c-86f9-4310-b0db-e96e92fdf855', actorId: 'sam', role: 'remote', message: 'Can you walk to rack 1?', view, procedures, promptVersion: 'coworker-v4', interactionMode: 'conversation' });
   const initial = initialHistory(start);
   const tokens = (history: typeof initial) => Math.ceil(Buffer.byteLength(JSON.stringify(parameters(start, history, 1)), 'utf8') / 2);
@@ -89,7 +89,7 @@ it('fits a real mid-mission Sam conversation and its continuation without losing
     const result = { runId: start.runId, requestId: start.requestId, actorId: 'sam', interactionId: 'interaction', callId, status: 'completed' as const, reason: 'observations', receipt: null, procedureText: null, observations };
     history = appendOutput(history, { output: [{ type: 'function_call', call_id: callId, name: 'read_observations', arguments: JSON.stringify({ targetId: asset, action: null }) }] } as Response);
     history = appendToolResult(history, callId, result, true);
-    const fresh = { ...start, view: scopeKnowledge(engine.observe('sam'), ['controller', 'cooling-1', 'cooling-2', 'rack-1', 'rack-2'], observations.map(o => o.id), true) };
+    const fresh = { ...start, view: scopeKnowledge(engine.observe('sam'), ['controller', 'cooling-1', 'cooling-2', 'rack-1', 'rack-2'], observations.map(o => o.id), true, true) };
     history = appendFreshView(history, fresh);
     expect(tokens(history)).toBeLessThanOrEqual(6000);
     const latest = JSON.parse((history.at(-1) as { content: string }).content).view;

@@ -52,7 +52,7 @@ export function initialHistory(start: GatewayStart): History {
     }
     return [y, runs];
   });
-  return [{ role: 'user', content: JSON.stringify({ ...context, ...(v4 ? { procedures: context.procedures.map(p => ({ id: p.id })) } : {}), speaker: start.actorId, view: {
+  return [{ role: 'user', content: JSON.stringify({ ...(v4 ? { actorId: start.actorId, role: start.role, message: start.message, procedures: context.procedures.map(p => ({ id: p.id })) } : { ...context, speaker: start.actorId }), view: {
     ...(!v4 ? { runId: view.runId, actorId: view.actorId, viewHash: view.viewHash } : {}), simTime: view.simTime,
     assets: view.knownTopology.assets.map(a => v4 ? [a.id, a.label, a.kind, [a.serviceTile.x, a.serviceTile.y]] : usesNaturalConversation(start) ? [a.id, a.label, a.kind] : [a.id, a.kind]),
     ...(v4 ? { assetFields: ['id', 'label', 'kind', 'serviceTile'], walkableRows } : {}),
@@ -62,7 +62,7 @@ export function initialHistory(start: GatewayStart): History {
     tasks: view.tasks.map(t => usesConversationPolicy(start) ? [t.id, t.actorId, t.targetId, t.action, t.status, t.progress, t.reason] : [t.id, t.actorId, t.targetId, t.action, t.status, t.startedAt, t.arrivalAt, t.completesAt, t.progress, t.reason]),
     ...(!v4 ? { allowedProcedureIds: view.allowedProcedureIds, observedEntityVersions: view.observedEntityVersions } : {}),
     ...(v4 ? { affordanceFields: ['action', 'targetId', 'technicianIds', 'travelSeconds', 'workSeconds', 'optional reason'], affordances: compactAffordances,
-      messageFields: ['id', 'at', 'speaker', 'text', 'evidenceIds', 'mode', 'conversationActorId', 'conversationKind'], messages: view.messages.slice(-4).map(m => [m.id, m.at, m.speaker, m.text, m.evidenceIds, m.mode, m.conversationActorId ?? null, m.conversationKind ?? null]) }
+      messageFields: ['id', 'at', 'speaker', 'text', 'mode'], messages: view.messages.slice(-4).map(m => [m.id, m.at, m.speaker, m.text, m.mode]) }
       : { affordances: view.affordances.filter(a => a.enabled), messages: view.messages.slice(-4) }), mission: view.mission,
   } }) }];
 }
