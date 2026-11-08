@@ -1,0 +1,9 @@
+{
+  "pinnedBase": "8b1f4242bbdf38db0633f8fca39bf555bc2d20da",
+  "receivedMasterCommit": "88ee8f0b8493b56e949ebbbbf8f4d9a8c7544de7",
+  "hashedGitBlobsVerified": 24,
+  "allRecordedHashesMatchStagedGitBytes": true,
+  "stagedOwnershipVerified": true,
+  "gitDiffCheck": "pass",
+  "note": "Asset-local eol=lf preserves exact hash custody through Windows checkout. Proof file itself is added after this snapshot."
+}

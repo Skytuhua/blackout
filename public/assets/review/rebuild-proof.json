@@ -1,0 +1,8 @@
+{
+  "command": "node public/assets/source/build.mjs",
+  "exitCode": 0,
+  "hashManifestBefore": "58563d220bff9533f76f929d6e46ce9a8a4fc3d81eeabc0a2c8d1b30a080b8cd",
+  "hashManifestAfter": "58563d220bff9533f76f929d6e46ce9a8a4fc3d81eeabc0a2c8d1b30a080b8cd",
+  "byteIdenticalDeliverables": true,
+  "providerCalls": 0
+}

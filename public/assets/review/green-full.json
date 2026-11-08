@@ -1,0 +1,16 @@
+{
+  "stage": "complete",
+  "frames": 111,
+  "width": 512,
+  "height": 512,
+  "rgba": true,
+  "binaryAlpha": true,
+  "paletteColors": 28,
+  "opaquePixels": 23497,
+  "sourcePixelMatch": true,
+  "paddingPx": 2,
+  "custodyFiles": 6,
+  "hashedDeliverables": 24,
+  "visualAcceptance": "not asserted",
+  "runtimeIntegration": "not exercised by asset validation"
+}

@@ -39,7 +39,7 @@ export function validate({masters=false}={}) {
   const names=Object.keys(manifest.frames);
   if(!masters) assert.deepEqual(names.sort(),Object.keys(expected).sort(),'exactly the 111 contracted names');
   else for(const name of ['floor_0','wall_0','wall_1','rack','cooling','fan_0','commander_s_idle','portrait_commander']) assert.ok(names.includes(name),`missing master ${name}`);
-  const used=new Set(), occupied=new Map(); let opaque=0;
+  const used=new Set(), occupied=new Map(), bodies=new Set(); let opaque=0;
   for(let p=0;p<atlas.pixels.length;p+=4){const a=atlas.pixels[p+3];assert.ok(a===0||a===255,'binary alpha');if(a){used.add('#'+atlas.pixels.subarray(p,p+3).toString('hex'));opaque++;}else assert.equal(atlas.pixels.readUInt32BE(p),0,'transparent pixels must have zero RGB');}
   for(const color of used)assert.ok(source.palette.includes(color),`off-palette ${color}`);
   for(const [name,sprite] of Object.entries(manifest.frames)) {
@@ -52,11 +52,16 @@ export function validate({masters=false}={}) {
     assert.ok(sprite.layer&&Object.hasOwn(sprite,'footprint'));
     assert.ok(source.frames[name]?.origin,'explicit source origin');
     const rows=source.frames[name].pixels;assert.equal(rows.length,h);
+    for(let yy=y;yy<y+h;yy++)for(let xx=x;xx<x+w;xx++)bodies.add(yy*512+xx);
     let coverage=0;
     for(let sy=0;sy<h;sy++) {assert.equal(rows[sy].length,w);for(let sx=0;sx<w;sx++){const id=rows[sy][sx], offset=((y+sy)*512+x+sx)*4;const want=id<0?[0,0,0,0]:[...Buffer.from(source.palette[id].slice(1),'hex'),255];assert.deepEqual([...atlas.pixels.subarray(offset,offset+4)],want,`${name} editable-source pixel ${sx},${sy}`);if(id>=0)coverage++;}}
     assert.ok(coverage>=w*h*0.14,`${name} recognizable nonempty coverage`);
     for(let yy=y-1;yy<=y+h;yy++) for(let xx=x-1;xx<=x+w;xx++){const id=yy*512+xx;if(occupied.has(id))assert.fail(`frame gap overlap: ${name} and ${occupied.get(id)}`);occupied.set(id,name);if(xx<x||xx>=x+w||yy<y||yy>=y+h)assert.equal(atlas.pixels[id*4+3],0,`${name} empty padding`);}
   }
+  for(let p=0;p<atlas.pixels.length;p+=4)if(atlas.pixels[p+3])assert.ok(bodies.has(p/4),'opaque pixel outside named frame');
+  const seal=JSON.parse(read('source/master-seal.json'));
+  for(const[name,hash]of Object.entries(seal.frames))assert.equal(sha(Buffer.from(JSON.stringify(source.frames[name]))),hash,`${name} approved master preservation`);
+  for(const[path,hash]of Object.entries(seal.review))assert.equal(sha(read(path)),hash,`${path} approved contact sheet preservation`);
   const custody=JSON.parse(read('source/provenance.json'));
   assert.equal(custody.mode,'built-in image_gen');assert.equal(custody.baseCommit,'8b1f4242bbdf38db0633f8fca39bf555bc2d20da');
   assert.ok(custody.generations.length>=1,'actual generated raster provenance');

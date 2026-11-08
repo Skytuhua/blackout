@@ -20,9 +20,17 @@ function label(img,text,x,y){for(const c of text.toUpperCase()){const glyph=glyp
 function sheet(list,stem,columns=8){const img=raster(columns*64,Math.ceil(list.length/columns)*58);for(let i=0;i<list.length;i++){const name=list[i],tile=indexed(source.frames[name].pixels,source.palette),x=(i%columns)*64,y=Math.floor(i/columns)*58;paste(img,tile,x+Math.floor((64-tile.width)/2),y+2);for(let j=0;j<name.length;j+=15)label(img,name.slice(j,j+15),x+2,y+36+Math.floor(j/15)*7);}encode(root+`review/${stem}-native.png`,img);encode(root+`review/${stem}-3x.png`,scale(img,3));}
 const masters=['floor_0','wall_0','wall_1','wall_2','rack','cooling','fan_0','commander_s_idle','portrait_commander'];
 sheet(masters,'masters');sheet(names,'atlas-contact');
-const animated=names.filter(name=>/_(walk[01]|work[01])$|^fan_|^generator_/.test(name));if(animated.length)sheet(animated,'animation-strip');
+const animated=names.filter(name=>/_(walk[01]|work[01])$|^fan_|^generator_/.test(name));
+if(names.length===111){
+  const groups=[{label:'FAN 167MS',names:[0,1,2,3].map(i=>`fan_${i}`)},{label:'GENERATOR 250MS',names:[0,1,2].map(i=>`generator_${i}`)}];
+  for(const who of ['commander','facilities','electrical'])for(const dir of ['n','e','s','w'])groups.push({label:`${who}_${dir}`,names:['idle','walk0','walk1','work0','work1'].map(pose=>`${who}_${dir}_${pose}`)});
+  const strip=raster(320,groups.length*44+14);
+  ['FRAME0','FRAME1','FRAME2','FRAME3','FRAME4'].forEach((text,i)=>label(strip,text,112+i*40,2));
+  groups.forEach((group,row)=>{const y=14+row*44;label(strip,group.label,2,y+8);group.names.forEach((name,i)=>{const tile=indexed(source.frames[name].pixels,source.palette);paste(strip,tile,112+i*40,y);});});
+  encode(root+'review/animation-strip-native.png',strip);encode(root+'review/animation-strip-3x.png',scale(strip,3));
+}else if(animated.length)sheet(animated,'animation-strip');
 const provenance=json('source/provenance.json');
 provenance.files=provenance.files.map(item=>({...item,sha256:hash(item.path)}));save('source/provenance.json',provenance);
-const artifacts=['facility-v2.png','facility-v2.json','source/sprites.json','source/provenance.json','review/masters-native.png','review/masters-3x.png','review/atlas-contact-native.png','review/atlas-contact-3x.png',...(animated.length?['review/animation-strip-native.png','review/animation-strip-3x.png']:[])];
+const artifacts=['facility-v2.png','facility-v2.json','source/sprites.json','source/provenance.json','review/masters-native.png','review/masters-3x.png','review/atlas-contact-native.png','review/atlas-contact-3x.png',...(animated.length?['review/animation-strip-native.png','review/animation-strip-3x.png']:[]),'source/master-seal.json','source/condition.mjs','source/complete.mjs','source/raster.mjs','source/build.mjs','source/validate.mjs','review/validation-checks.mjs','source/README.md','source/master-prompt.txt','source/crew-prompt.txt','source/environment-prompt.txt','source/generated-masters-original.png','source/generated-crew-original.png','source/generated-environment-original.png'];
 save('review/hashes.json',{algorithm:'SHA-256',files:artifacts.map(path=>({path,sha256:hash(path)}))});
 console.log(`Built ${names.length} sprites from editable source; nearest-neighbor contact sheets and custody hashes exported.`);

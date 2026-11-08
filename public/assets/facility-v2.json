@@ -198,6 +198,1680 @@
       "layer": "portrait",
       "durationMs": 0,
       "source": "source/sprites.json#portrait_commander"
+    },
+    "floor_1": {
+      "frame": {
+        "x": 308,
+        "y": 2,
+        "w": 16,
+        "h": 16
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": null,
+      "layer": "floor",
+      "durationMs": 0,
+      "source": "source/sprites.json#floor_1"
+    },
+    "floor_2": {
+      "frame": {
+        "x": 342,
+        "y": 2,
+        "w": 16,
+        "h": 16
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": null,
+      "layer": "floor",
+      "durationMs": 0,
+      "source": "source/sprites.json#floor_2"
+    },
+    "wall_3": {
+      "frame": {
+        "x": 376,
+        "y": 2,
+        "w": 16,
+        "h": 16
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": {
+        "width": 16,
+        "height": 16
+      },
+      "layer": "wall",
+      "durationMs": 0,
+      "source": "source/sprites.json#wall_3"
+    },
+    "wall_4": {
+      "frame": {
+        "x": 410,
+        "y": 2,
+        "w": 16,
+        "h": 16
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": {
+        "width": 16,
+        "height": 16
+      },
+      "layer": "wall",
+      "durationMs": 0,
+      "source": "source/sprites.json#wall_4"
+    },
+    "wall_5": {
+      "frame": {
+        "x": 444,
+        "y": 2,
+        "w": 16,
+        "h": 16
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": {
+        "width": 16,
+        "height": 16
+      },
+      "layer": "wall",
+      "durationMs": 0,
+      "source": "source/sprites.json#wall_5"
+    },
+    "wall_6": {
+      "frame": {
+        "x": 478,
+        "y": 2,
+        "w": 16,
+        "h": 16
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": {
+        "width": 16,
+        "height": 16
+      },
+      "layer": "wall",
+      "durationMs": 0,
+      "source": "source/sprites.json#wall_6"
+    },
+    "wall_7": {
+      "frame": {
+        "x": 2,
+        "y": 36,
+        "w": 16,
+        "h": 16
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": {
+        "width": 16,
+        "height": 16
+      },
+      "layer": "wall",
+      "durationMs": 0,
+      "source": "source/sprites.json#wall_7"
+    },
+    "wall_8": {
+      "frame": {
+        "x": 36,
+        "y": 36,
+        "w": 16,
+        "h": 16
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": {
+        "width": 16,
+        "height": 16
+      },
+      "layer": "wall",
+      "durationMs": 0,
+      "source": "source/sprites.json#wall_8"
+    },
+    "wall_9": {
+      "frame": {
+        "x": 70,
+        "y": 36,
+        "w": 16,
+        "h": 16
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": {
+        "width": 16,
+        "height": 16
+      },
+      "layer": "wall",
+      "durationMs": 0,
+      "source": "source/sprites.json#wall_9"
+    },
+    "infra_0": {
+      "frame": {
+        "x": 104,
+        "y": 36,
+        "w": 16,
+        "h": 16
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": null,
+      "layer": "infrastructure",
+      "durationMs": 0,
+      "source": "source/sprites.json#infra_0"
+    },
+    "infra_1": {
+      "frame": {
+        "x": 138,
+        "y": 36,
+        "w": 16,
+        "h": 16
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": null,
+      "layer": "infrastructure",
+      "durationMs": 0,
+      "source": "source/sprites.json#infra_1"
+    },
+    "infra_2": {
+      "frame": {
+        "x": 172,
+        "y": 36,
+        "w": 16,
+        "h": 16
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": null,
+      "layer": "infrastructure",
+      "durationMs": 0,
+      "source": "source/sprites.json#infra_2"
+    },
+    "infra_3": {
+      "frame": {
+        "x": 206,
+        "y": 36,
+        "w": 16,
+        "h": 16
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": null,
+      "layer": "infrastructure",
+      "durationMs": 0,
+      "source": "source/sprites.json#infra_3"
+    },
+    "infra_4": {
+      "frame": {
+        "x": 240,
+        "y": 36,
+        "w": 16,
+        "h": 16
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": null,
+      "layer": "infrastructure",
+      "durationMs": 0,
+      "source": "source/sprites.json#infra_4"
+    },
+    "infra_5": {
+      "frame": {
+        "x": 274,
+        "y": 36,
+        "w": 16,
+        "h": 16
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": null,
+      "layer": "infrastructure",
+      "durationMs": 0,
+      "source": "source/sprites.json#infra_5"
+    },
+    "infra_6": {
+      "frame": {
+        "x": 308,
+        "y": 36,
+        "w": 16,
+        "h": 16
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": null,
+      "layer": "infrastructure",
+      "durationMs": 0,
+      "source": "source/sprites.json#infra_6"
+    },
+    "infra_7": {
+      "frame": {
+        "x": 342,
+        "y": 36,
+        "w": 16,
+        "h": 16
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": null,
+      "layer": "infrastructure",
+      "durationMs": 0,
+      "source": "source/sprites.json#infra_7"
+    },
+    "infra_8": {
+      "frame": {
+        "x": 376,
+        "y": 36,
+        "w": 16,
+        "h": 16
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": null,
+      "layer": "infrastructure",
+      "durationMs": 0,
+      "source": "source/sprites.json#infra_8"
+    },
+    "infra_9": {
+      "frame": {
+        "x": 410,
+        "y": 36,
+        "w": 16,
+        "h": 16
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": null,
+      "layer": "infrastructure",
+      "durationMs": 0,
+      "source": "source/sprites.json#infra_9"
+    },
+    "fixture_0": {
+      "frame": {
+        "x": 444,
+        "y": 36,
+        "w": 16,
+        "h": 16
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": null,
+      "layer": "fixture",
+      "durationMs": 0,
+      "source": "source/sprites.json#fixture_0"
+    },
+    "fixture_1": {
+      "frame": {
+        "x": 478,
+        "y": 36,
+        "w": 16,
+        "h": 16
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": null,
+      "layer": "fixture",
+      "durationMs": 0,
+      "source": "source/sprites.json#fixture_1"
+    },
+    "fixture_2": {
+      "frame": {
+        "x": 2,
+        "y": 70,
+        "w": 16,
+        "h": 16
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": null,
+      "layer": "fixture",
+      "durationMs": 0,
+      "source": "source/sprites.json#fixture_2"
+    },
+    "fixture_3": {
+      "frame": {
+        "x": 36,
+        "y": 70,
+        "w": 16,
+        "h": 16
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": null,
+      "layer": "fixture",
+      "durationMs": 0,
+      "source": "source/sprites.json#fixture_3"
+    },
+    "fixture_4": {
+      "frame": {
+        "x": 70,
+        "y": 70,
+        "w": 16,
+        "h": 16
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": null,
+      "layer": "fixture",
+      "durationMs": 0,
+      "source": "source/sprites.json#fixture_4"
+    },
+    "fixture_5": {
+      "frame": {
+        "x": 104,
+        "y": 70,
+        "w": 16,
+        "h": 16
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": null,
+      "layer": "fixture",
+      "durationMs": 0,
+      "source": "source/sprites.json#fixture_5"
+    },
+    "ups": {
+      "frame": {
+        "x": 138,
+        "y": 70,
+        "w": 16,
+        "h": 32
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": {
+        "width": 16,
+        "height": 32
+      },
+      "layer": "equipment",
+      "durationMs": 0,
+      "source": "source/sprites.json#ups"
+    },
+    "controller": {
+      "frame": {
+        "x": 172,
+        "y": 70,
+        "w": 16,
+        "h": 16
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": {
+        "width": 16,
+        "height": 16
+      },
+      "layer": "equipment",
+      "durationMs": 0,
+      "source": "source/sprites.json#controller"
+    },
+    "distribution": {
+      "frame": {
+        "x": 206,
+        "y": 70,
+        "w": 16,
+        "h": 16
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": {
+        "width": 16,
+        "height": 16
+      },
+      "layer": "equipment",
+      "durationMs": 0,
+      "source": "source/sprites.json#distribution"
+    },
+    "generator_0": {
+      "frame": {
+        "x": 240,
+        "y": 70,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": {
+        "width": 32,
+        "height": 32
+      },
+      "layer": "equipment",
+      "durationMs": 250,
+      "source": "source/sprites.json#generator_0"
+    },
+    "generator_1": {
+      "frame": {
+        "x": 274,
+        "y": 70,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": {
+        "width": 32,
+        "height": 32
+      },
+      "layer": "equipment",
+      "durationMs": 250,
+      "source": "source/sprites.json#generator_1"
+    },
+    "generator_2": {
+      "frame": {
+        "x": 308,
+        "y": 70,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": {
+        "width": 32,
+        "height": 32
+      },
+      "layer": "equipment",
+      "durationMs": 250,
+      "source": "source/sprites.json#generator_2"
+    },
+    "cart": {
+      "frame": {
+        "x": 342,
+        "y": 70,
+        "w": 16,
+        "h": 16
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": {
+        "width": 16,
+        "height": 16
+      },
+      "layer": "equipment",
+      "durationMs": 0,
+      "source": "source/sprites.json#cart"
+    },
+    "portrait_facilities": {
+      "frame": {
+        "x": 376,
+        "y": 70,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": null,
+      "layer": "portrait",
+      "durationMs": 0,
+      "source": "source/sprites.json#portrait_facilities"
+    },
+    "portrait_electrical": {
+      "frame": {
+        "x": 410,
+        "y": 70,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": null,
+      "layer": "portrait",
+      "durationMs": 0,
+      "source": "source/sprites.json#portrait_electrical"
+    },
+    "portrait_it": {
+      "frame": {
+        "x": 444,
+        "y": 70,
+        "w": 32,
+        "h": 32
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": null,
+      "layer": "portrait",
+      "durationMs": 0,
+      "source": "source/sprites.json#portrait_it"
+    },
+    "fan_1": {
+      "frame": {
+        "x": 478,
+        "y": 70,
+        "w": 16,
+        "h": 16
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": null,
+      "layer": "subpart",
+      "durationMs": 167,
+      "source": "source/sprites.json#fan_1"
+    },
+    "fan_2": {
+      "frame": {
+        "x": 2,
+        "y": 104,
+        "w": 16,
+        "h": 16
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": null,
+      "layer": "subpart",
+      "durationMs": 167,
+      "source": "source/sprites.json#fan_2"
+    },
+    "fan_3": {
+      "frame": {
+        "x": 36,
+        "y": 104,
+        "w": 16,
+        "h": 16
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": null,
+      "layer": "subpart",
+      "durationMs": 167,
+      "source": "source/sprites.json#fan_3"
+    },
+    "commander_n_idle": {
+      "frame": {
+        "x": 70,
+        "y": 104,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 0,
+      "source": "source/sprites.json#commander_n_idle"
+    },
+    "commander_n_walk0": {
+      "frame": {
+        "x": 104,
+        "y": 104,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 167,
+      "source": "source/sprites.json#commander_n_walk0"
+    },
+    "commander_n_work0": {
+      "frame": {
+        "x": 138,
+        "y": 104,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 250,
+      "source": "source/sprites.json#commander_n_work0"
+    },
+    "commander_n_walk1": {
+      "frame": {
+        "x": 172,
+        "y": 104,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 167,
+      "source": "source/sprites.json#commander_n_walk1"
+    },
+    "commander_n_work1": {
+      "frame": {
+        "x": 206,
+        "y": 104,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 250,
+      "source": "source/sprites.json#commander_n_work1"
+    },
+    "commander_e_idle": {
+      "frame": {
+        "x": 240,
+        "y": 104,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 0,
+      "source": "source/sprites.json#commander_e_idle"
+    },
+    "commander_e_walk0": {
+      "frame": {
+        "x": 274,
+        "y": 104,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 167,
+      "source": "source/sprites.json#commander_e_walk0"
+    },
+    "commander_e_work0": {
+      "frame": {
+        "x": 308,
+        "y": 104,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 250,
+      "source": "source/sprites.json#commander_e_work0"
+    },
+    "commander_e_walk1": {
+      "frame": {
+        "x": 342,
+        "y": 104,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 167,
+      "source": "source/sprites.json#commander_e_walk1"
+    },
+    "commander_e_work1": {
+      "frame": {
+        "x": 376,
+        "y": 104,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 250,
+      "source": "source/sprites.json#commander_e_work1"
+    },
+    "commander_s_walk0": {
+      "frame": {
+        "x": 410,
+        "y": 104,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 167,
+      "source": "source/sprites.json#commander_s_walk0"
+    },
+    "commander_s_work0": {
+      "frame": {
+        "x": 444,
+        "y": 104,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 250,
+      "source": "source/sprites.json#commander_s_work0"
+    },
+    "commander_s_walk1": {
+      "frame": {
+        "x": 478,
+        "y": 104,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 167,
+      "source": "source/sprites.json#commander_s_walk1"
+    },
+    "commander_s_work1": {
+      "frame": {
+        "x": 2,
+        "y": 138,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 250,
+      "source": "source/sprites.json#commander_s_work1"
+    },
+    "commander_w_idle": {
+      "frame": {
+        "x": 36,
+        "y": 138,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 0,
+      "source": "source/sprites.json#commander_w_idle"
+    },
+    "commander_w_walk0": {
+      "frame": {
+        "x": 70,
+        "y": 138,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 167,
+      "source": "source/sprites.json#commander_w_walk0"
+    },
+    "commander_w_work0": {
+      "frame": {
+        "x": 104,
+        "y": 138,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 250,
+      "source": "source/sprites.json#commander_w_work0"
+    },
+    "commander_w_walk1": {
+      "frame": {
+        "x": 138,
+        "y": 138,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 167,
+      "source": "source/sprites.json#commander_w_walk1"
+    },
+    "commander_w_work1": {
+      "frame": {
+        "x": 172,
+        "y": 138,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 250,
+      "source": "source/sprites.json#commander_w_work1"
+    },
+    "facilities_n_idle": {
+      "frame": {
+        "x": 206,
+        "y": 138,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 0,
+      "source": "source/sprites.json#facilities_n_idle"
+    },
+    "facilities_n_walk0": {
+      "frame": {
+        "x": 240,
+        "y": 138,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 167,
+      "source": "source/sprites.json#facilities_n_walk0"
+    },
+    "facilities_n_work0": {
+      "frame": {
+        "x": 274,
+        "y": 138,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 250,
+      "source": "source/sprites.json#facilities_n_work0"
+    },
+    "facilities_n_walk1": {
+      "frame": {
+        "x": 308,
+        "y": 138,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 167,
+      "source": "source/sprites.json#facilities_n_walk1"
+    },
+    "facilities_n_work1": {
+      "frame": {
+        "x": 342,
+        "y": 138,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 250,
+      "source": "source/sprites.json#facilities_n_work1"
+    },
+    "facilities_e_idle": {
+      "frame": {
+        "x": 376,
+        "y": 138,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 0,
+      "source": "source/sprites.json#facilities_e_idle"
+    },
+    "facilities_e_walk0": {
+      "frame": {
+        "x": 410,
+        "y": 138,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 167,
+      "source": "source/sprites.json#facilities_e_walk0"
+    },
+    "facilities_e_work0": {
+      "frame": {
+        "x": 444,
+        "y": 138,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 250,
+      "source": "source/sprites.json#facilities_e_work0"
+    },
+    "facilities_e_walk1": {
+      "frame": {
+        "x": 478,
+        "y": 138,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 167,
+      "source": "source/sprites.json#facilities_e_walk1"
+    },
+    "facilities_e_work1": {
+      "frame": {
+        "x": 2,
+        "y": 172,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 250,
+      "source": "source/sprites.json#facilities_e_work1"
+    },
+    "facilities_s_idle": {
+      "frame": {
+        "x": 36,
+        "y": 172,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 0,
+      "source": "source/sprites.json#facilities_s_idle"
+    },
+    "facilities_s_walk0": {
+      "frame": {
+        "x": 70,
+        "y": 172,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 167,
+      "source": "source/sprites.json#facilities_s_walk0"
+    },
+    "facilities_s_work0": {
+      "frame": {
+        "x": 104,
+        "y": 172,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 250,
+      "source": "source/sprites.json#facilities_s_work0"
+    },
+    "facilities_s_walk1": {
+      "frame": {
+        "x": 138,
+        "y": 172,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 167,
+      "source": "source/sprites.json#facilities_s_walk1"
+    },
+    "facilities_s_work1": {
+      "frame": {
+        "x": 172,
+        "y": 172,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 250,
+      "source": "source/sprites.json#facilities_s_work1"
+    },
+    "facilities_w_idle": {
+      "frame": {
+        "x": 206,
+        "y": 172,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 0,
+      "source": "source/sprites.json#facilities_w_idle"
+    },
+    "facilities_w_walk0": {
+      "frame": {
+        "x": 240,
+        "y": 172,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 167,
+      "source": "source/sprites.json#facilities_w_walk0"
+    },
+    "facilities_w_work0": {
+      "frame": {
+        "x": 274,
+        "y": 172,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 250,
+      "source": "source/sprites.json#facilities_w_work0"
+    },
+    "facilities_w_walk1": {
+      "frame": {
+        "x": 308,
+        "y": 172,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 167,
+      "source": "source/sprites.json#facilities_w_walk1"
+    },
+    "facilities_w_work1": {
+      "frame": {
+        "x": 342,
+        "y": 172,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 250,
+      "source": "source/sprites.json#facilities_w_work1"
+    },
+    "electrical_n_idle": {
+      "frame": {
+        "x": 376,
+        "y": 172,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 0,
+      "source": "source/sprites.json#electrical_n_idle"
+    },
+    "electrical_n_walk0": {
+      "frame": {
+        "x": 410,
+        "y": 172,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 167,
+      "source": "source/sprites.json#electrical_n_walk0"
+    },
+    "electrical_n_work0": {
+      "frame": {
+        "x": 444,
+        "y": 172,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 250,
+      "source": "source/sprites.json#electrical_n_work0"
+    },
+    "electrical_n_walk1": {
+      "frame": {
+        "x": 478,
+        "y": 172,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 167,
+      "source": "source/sprites.json#electrical_n_walk1"
+    },
+    "electrical_n_work1": {
+      "frame": {
+        "x": 2,
+        "y": 206,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 250,
+      "source": "source/sprites.json#electrical_n_work1"
+    },
+    "electrical_e_idle": {
+      "frame": {
+        "x": 36,
+        "y": 206,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 0,
+      "source": "source/sprites.json#electrical_e_idle"
+    },
+    "electrical_e_walk0": {
+      "frame": {
+        "x": 70,
+        "y": 206,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 167,
+      "source": "source/sprites.json#electrical_e_walk0"
+    },
+    "electrical_e_work0": {
+      "frame": {
+        "x": 104,
+        "y": 206,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 250,
+      "source": "source/sprites.json#electrical_e_work0"
+    },
+    "electrical_e_walk1": {
+      "frame": {
+        "x": 138,
+        "y": 206,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 167,
+      "source": "source/sprites.json#electrical_e_walk1"
+    },
+    "electrical_e_work1": {
+      "frame": {
+        "x": 172,
+        "y": 206,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 250,
+      "source": "source/sprites.json#electrical_e_work1"
+    },
+    "electrical_s_idle": {
+      "frame": {
+        "x": 206,
+        "y": 206,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 0,
+      "source": "source/sprites.json#electrical_s_idle"
+    },
+    "electrical_s_walk0": {
+      "frame": {
+        "x": 240,
+        "y": 206,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 167,
+      "source": "source/sprites.json#electrical_s_walk0"
+    },
+    "electrical_s_work0": {
+      "frame": {
+        "x": 274,
+        "y": 206,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 250,
+      "source": "source/sprites.json#electrical_s_work0"
+    },
+    "electrical_s_walk1": {
+      "frame": {
+        "x": 308,
+        "y": 206,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 167,
+      "source": "source/sprites.json#electrical_s_walk1"
+    },
+    "electrical_s_work1": {
+      "frame": {
+        "x": 342,
+        "y": 206,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 250,
+      "source": "source/sprites.json#electrical_s_work1"
+    },
+    "electrical_w_idle": {
+      "frame": {
+        "x": 376,
+        "y": 206,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 0,
+      "source": "source/sprites.json#electrical_w_idle"
+    },
+    "electrical_w_walk0": {
+      "frame": {
+        "x": 410,
+        "y": 206,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 167,
+      "source": "source/sprites.json#electrical_w_walk0"
+    },
+    "electrical_w_work0": {
+      "frame": {
+        "x": 444,
+        "y": 206,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 250,
+      "source": "source/sprites.json#electrical_w_work0"
+    },
+    "electrical_w_walk1": {
+      "frame": {
+        "x": 478,
+        "y": 206,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 167,
+      "source": "source/sprites.json#electrical_w_walk1"
+    },
+    "electrical_w_work1": {
+      "frame": {
+        "x": 2,
+        "y": 240,
+        "w": 12,
+        "h": 16
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "footprint": null,
+      "layer": "character",
+      "durationMs": 250,
+      "source": "source/sprites.json#electrical_w_work1"
+    },
+    "badge_unknown": {
+      "frame": {
+        "x": 36,
+        "y": 240,
+        "w": 8,
+        "h": 8
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": null,
+      "layer": "badge",
+      "durationMs": 0,
+      "source": "source/sprites.json#badge_unknown"
+    },
+    "badge_stale": {
+      "frame": {
+        "x": 70,
+        "y": 240,
+        "w": 8,
+        "h": 8
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": null,
+      "layer": "badge",
+      "durationMs": 0,
+      "source": "source/sprites.json#badge_stale"
+    },
+    "badge_active": {
+      "frame": {
+        "x": 104,
+        "y": 240,
+        "w": 8,
+        "h": 8
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": null,
+      "layer": "badge",
+      "durationMs": 0,
+      "source": "source/sprites.json#badge_active"
+    },
+    "badge_warning": {
+      "frame": {
+        "x": 138,
+        "y": 240,
+        "w": 8,
+        "h": 8
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": null,
+      "layer": "badge",
+      "durationMs": 0,
+      "source": "source/sprites.json#badge_warning"
+    },
+    "badge_failed": {
+      "frame": {
+        "x": 172,
+        "y": 240,
+        "w": 8,
+        "h": 8
+      },
+      "anchor": {
+        "x": 0,
+        "y": 0
+      },
+      "footprint": null,
+      "layer": "badge",
+      "durationMs": 0,
+      "source": "source/sprites.json#badge_failed"
     }
   }
 }

@@ -3,19 +3,19 @@
   "files": [
     {
       "path": "facility-v2.png",
-      "sha256": "e59813e5f50803a4968f435ef9a548a58ace22bd91abfc5f159b046cc7e4f172"
+      "sha256": "b0e844a4db73a2bea7e8af3985c68d1cc1a6f37b831d5dcecdeec30001c9ad35"
     },
     {
       "path": "facility-v2.json",
-      "sha256": "19f44119ddb25daf1c8be1c6832c796d6d2f309d329cc8c4db369dd1ec275aa3"
+      "sha256": "6570dc23aaaf3c9dd0d5ee872aa2199277651a485de92e318adf9251907cc5fe"
     },
     {
       "path": "source/sprites.json",
-      "sha256": "b45878c818699a4624ef1e3bfd0ff6dc85c86e8e41f787f148918481ecfbf1a5"
+      "sha256": "7205182dab4c1870aacf4400a859c64106fba3d49673df6869bc90902ee83c31"
     },
     {
       "path": "source/provenance.json",
-      "sha256": "429352d7c08e2c1bc8b6a1397015d9b2308bb7ee6ac1944ec0596b1249259251"
+      "sha256": "157900d33f0b9543a6ef3f9f967574da0bea8a605f063695d31e3f77f2c09751"
     },
     {
       "path": "review/masters-native.png",
@@ -27,19 +27,75 @@
     },
     {
       "path": "review/atlas-contact-native.png",
-      "sha256": "1fa9c0ac3629a7d3bc14fbb3af78e38e89108b5b3bc95c78c47ee86f9c49ce75"
+      "sha256": "2baced7ab0d2a163c543c7d20b76ac4cc50ebec1bdaff7b68144b44d3e9b0153"
     },
     {
       "path": "review/atlas-contact-3x.png",
-      "sha256": "4c63b239ef398f002cb285cf58c666f441d125435fa3747c8b35e9adefc5f9e5"
+      "sha256": "abdc3a469766929438b9898abb2b1d7279dbf7b6197b6f4115067c637a29aaf9"
     },
     {
       "path": "review/animation-strip-native.png",
-      "sha256": "1559b8cbf4ffa9970af030a7c4762eb30126df9d6d37ff07b8566efaac0ed910"
+      "sha256": "ab813f3af75014509d52949700fba83d1b9d1852a51174771ed90d6bdf343902"
     },
     {
       "path": "review/animation-strip-3x.png",
-      "sha256": "52bd7a6774b5f04a35b3d9596187ac793ccde839386282ff37dbc1de5527b2f0"
+      "sha256": "e1d55e880ad947d85bf36cadcb63370167b7d3708c9fd75fe962a98cf157134c"
+    },
+    {
+      "path": "source/master-seal.json",
+      "sha256": "f1d511f9589145a82885c31b2adfd5f67d3bcbfefc60eca4ed9e0a46123337e4"
+    },
+    {
+      "path": "source/condition.mjs",
+      "sha256": "b1846147c0fd35510bbe3e052cccf4b013d0392937c79179bc732175857ed06e"
+    },
+    {
+      "path": "source/complete.mjs",
+      "sha256": "756af2845a2a823fe03b7eb2a22a95a1db57e37fc6fa81e75efb39d0deddfd86"
+    },
+    {
+      "path": "source/raster.mjs",
+      "sha256": "06702f1b29aad63ecaf8b023f8e5dce561dc65675a11a6b8c9d12fba73a1ce00"
+    },
+    {
+      "path": "source/build.mjs",
+      "sha256": "40bc6fa71efabec5a53c72358f70c034793f251dd4287dff98e1bf286b9aaddc"
+    },
+    {
+      "path": "source/validate.mjs",
+      "sha256": "80454cf7959beee20ed21a8437a20b56b0bd66dca8525d1b7c61f1001ef0d9e3"
+    },
+    {
+      "path": "review/validation-checks.mjs",
+      "sha256": "5e4368a773ee878d6fe1c563492fd774b241d32d5479095681556b892fdff464"
+    },
+    {
+      "path": "source/README.md",
+      "sha256": "bc3239c8922f06f27dbc48e1e703472841eb2ec419ab5080ee8f15df10678f75"
+    },
+    {
+      "path": "source/master-prompt.txt",
+      "sha256": "537e3cdb944f0ea8af5e803afa1ff72892e1fb5be014b4801843763a6032be12"
+    },
+    {
+      "path": "source/crew-prompt.txt",
+      "sha256": "934f0ac98140affc93864487294ac70e81e0bb95f009b415984115a09d3249a5"
+    },
+    {
+      "path": "source/environment-prompt.txt",
+      "sha256": "c64059ba6cf70b8f14bdce69472f4bfcbd24ffe2e27bf44e9fbf51e138aede5d"
+    },
+    {
+      "path": "source/generated-masters-original.png",
+      "sha256": "139e56ac27fb9bda9ca2b37d840fe1f3477158b193faa2a2785612b3a111f86a"
+    },
+    {
+      "path": "source/generated-crew-original.png",
+      "sha256": "35ed3907c4ee03d9ee5ab2fa12587ac4b32460b971f6307dbf03bb89a67767e5"
+    },
+    {
+      "path": "source/generated-environment-original.png",
+      "sha256": "a17311c3323219d2389e4c432c4af0f54178d2134c1c0e9a62b99ad5e001dbc6"
     }
   ]
 }
