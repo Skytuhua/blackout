@@ -14,5 +14,5 @@ export function wholeEntryPages(entries: { id: string; height: number }[], avail
 
 export function entryPresentation(entry: Pick<ConversationEntry, 'kind' | 'text' | 'summary' | 'sections'>, oversized = false) {
   const reader = oversized || entry.text.length > 260 || !!entry.sections?.length;
-  return { reader, text: reader ? entry.summary && entry.summary.length <= 260 ? entry.summary : entry.kind === 'report' ? 'A detailed report is available.' : 'A longer message is available.' : entry.text };
+  return { reader, text: reader ? !oversized && entry.summary && entry.summary.length <= 260 ? entry.summary : entry.kind === 'report' ? 'A detailed report is available.' : 'A longer message is available.' : entry.text };
 }
