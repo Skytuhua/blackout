@@ -147,11 +147,11 @@ export default function App() {
   function flushDeferredMenuCapture() {
     const pending = deferredMenuCapture.current;
     if (!pending) return;
-    if (!menuOpenRef.current || pending.generation !== generation.current || pending.sourceGeneration !== sourceGeneration.current || replayClient.current || sessionRef.current !== 'mission') { deferredMenuCapture.current = null; return; }
+    if (!menuOpenRef.current || pending.generation !== generation.current || pending.sourceGeneration !== sourceGeneration.current || sessionRef.current !== 'mission') { deferredMenuCapture.current = null; return; }
     if (jobs.current.size || commandPending.current || transitioning.current || hostPending.current) return;
     deferredMenuCapture.current = null; void capture(false);
   }
-  function toggleMenu() { const open = !menuOpenRef.current; if (open) menuOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; menuOpenRef.current = open; setMenuOpen(open); if (open) { manualPaused.current = true; pauseLive(); void refreshSaves(); if (!replayActive && sessionRef.current === 'mission') { if (jobs.current.size) deferredMenuCapture.current = { generation: generation.current, sourceGeneration: sourceGeneration.current }; else void capture(false); } } else deferredMenuCapture.current = null; }
+  function toggleMenu() { const open = !menuOpenRef.current; if (open) menuOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; menuOpenRef.current = open; setMenuOpen(open); if (open) { manualPaused.current = true; pauseLive(); void refreshSaves(); if (!replayActive && sessionRef.current === 'mission') { if (jobs.current.size || commandPending.current) deferredMenuCapture.current = { generation: generation.current, sourceGeneration: sourceGeneration.current }; else void capture(false); } } else deferredMenuCapture.current = null; }
   // Existing save/replay lifecycle follows below; normal UI receives scoped views only.
   async function capture(save: boolean) {
     const client = simulation.current, recorder = archive.current, token = generation.current;
