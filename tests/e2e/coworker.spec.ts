@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { ActionIntent, GatewayInput, GatewayResponse } from '../../src/shared/contracts';
-import { advanceTo, begin, closeMenu, equipment, latestEntry, latestReceipt, menu, radio, readPages, readReport, replySection, selectActor, suggested } from './desktop-helpers';
+import { advanceTo, begin, closeMenu, elapsed, equipment, latestEntry, latestReceipt, menu, radio, readPages, readReport, replySection, selectActor, suggested } from './desktop-helpers';
 
 // Request mode, never player prose, selects the documented wire/authorization semantics.
 // A continuation inherits the originating start mode; v2 remains proposal-only.
@@ -345,5 +345,38 @@ test('pending save cannot be silently displaced by replaying an older save', asy
     release(); await expect(dialog).toContainText('Mission saved locally');
     const times = await page.evaluate(() => new Promise<number[]>((resolve, reject) => { const open = indexedDB.open('blackout-local-runs'); open.onerror = () => reject(open.error); open.onsuccess = () => { const db = open.result; const request = db.transaction('runs').objectStore('runs').getAll(); request.onsuccess = () => { resolve(request.result.map((text: string) => JSON.parse(text).finalCheckpoint.simTime)); db.close(); }; request.onerror = () => reject(request.error); }; }));
     expect(times).toContain(3);
+  } finally { release(); }
+});
+
+
+test('queued save preserves an actively running clock after replies finish', async ({ page }) => {
+  const arrived: string[] = []; const releases: Record<string, () => void> = {};
+  await page.route('**/api/llm/turn', async route => { const actor = route.request().postDataJSON().actorId; arrived.push(actor); await new Promise<void>(resolve => { releases[actor] = resolve; }); await route.abort().catch(() => {}); });
+  try {
+    await begin(page); let dialog = await menu(page); await dialog.getByLabel('Guidance').uncheck(); await closeMenu(page);
+    await radio(page, 'First question', 'alex'); await expect.poll(() => arrived).toContain('alex');
+    dialog = await menu(page); await dialog.getByRole('button', { name: 'Save game', exact: true }).click(); await closeMenu(page);
+    await radio(page, 'Second question', 'sam'); await expect.poll(() => arrived).toContain('sam');
+    await page.locator('.conv-header').getByRole('button', { name: 'Resume', exact: true }).click();
+    await page.clock.fastForward(2000); await expect.poll(() => elapsed(page)).toBeGreaterThan(0);
+    releases.alex(); releases.sam();
+    await expect.poll(() => page.evaluate(() => new Promise<number>((resolve, reject) => { const open = indexedDB.open('blackout-local-runs'); open.onerror = () => reject(open.error); open.onsuccess = () => { const db = open.result; const request = db.transaction('runs').objectStore('runs').count(); request.onsuccess = () => { resolve(request.result); db.close(); }; request.onerror = () => reject(request.error); }; }))).toBe(1);
+    await expect(page.locator('.conv-header').getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
+  } finally { Object.values(releases).forEach(release => release()); }
+});
+
+test('failed queued save clears waiting message and keeps fresh review evidence', async ({ page }) => {
+  await page.addInitScript(() => { const original = IDBObjectStore.prototype.put; IDBObjectStore.prototype.put = function(...args) { if ((window as any).__denySave && this.name === 'runs') throw new DOMException('Injected storage failure', 'QuotaExceededError'); return original.apply(this, args); }; });
+  let release!: () => void; let requestId = ''; const gate = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/api/llm/turn', async route => { requestId = route.request().postDataJSON().requestId; await gate; await route.abort().catch(() => {}); });
+  try {
+    await begin(page); let dialog = await menu(page); await expect(dialog.getByRole('button', { name: 'Save game', exact: true })).toBeEnabled(); await closeMenu(page);
+    await radio(page, 'New question', 'alex'); await expect.poll(() => requestId).not.toBe('');
+    dialog = await menu(page); await dialog.getByRole('button', { name: 'Save game', exact: true }).click(); await page.evaluate(() => { (window as any).__denySave = true; }); release();
+    await expect(dialog.getByRole('alert')).toContainText('Could not save or review');
+    await expect(dialog).not.toContainText('Waiting for the reply before saving');
+    await dialog.getByRole('button', { name: 'Replay and results', exact: true }).click();
+    await dialog.getByRole('combobox', { name: 'After action section' }).selectOption('provenance');
+    expect(await readPages(page, 'Original wire transcript')).toContain(requestId);
   } finally { release(); }
 });
