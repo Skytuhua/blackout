@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Blackout synthetic motion fixture</title>
+    <style>
+      body { margin: 24px; color: #dceaf2; background: #07111b; font: 16px/1.5 sans-serif; }
+      h1 { font-size: 22px; margin: 0 0 8px; }
+      p { margin: 0 0 16px; max-width: 76ch; }
+      canvas { display: block; image-rendering: pixelated; image-rendering: crisp-edges; }
+    </style>
+  </head>
+  <body>
+    <h1>Synthetic crew and facility motion</h1>
+    <p id="state">Fixture only. Alex inspects cooling controls; Jules is idle. Cooling 01 and Rack A1 have fresh running evidence. Other equipment remains quiet.</p>
+    <div id="world"></div>
+    <script type="module" src="./fixture.ts"></script>
+  </body>
+</html>
