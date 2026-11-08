@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type MouseEvent } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type MouseEvent, type PointerEvent, type KeyboardEvent } from 'react';
 import type { FacilityMapProps } from '../../shared/facility-map';
 import type { DemoProjection } from '../facility-demo-projection';
 import { onPublicFloor } from '../desktop-world';
@@ -8,7 +8,8 @@ import './map.css';
 
 type DemoMapDetails = Extract<DemoProjection, { status: 'available' }>;
 export function FacilityMap(props: FacilityMapProps & { demo?: DemoMapDetails }) {
-  const { view, selectedRoomId, selectedAssetId, selectedActorId, onSelectRoom, onSelectAsset } = props;
+  const { view, selectedAssetId, selectedActorId, onSelectRoom, onSelectAsset } = props;
+  const selectedRoomId = props.demo ? null : props.selectedRoomId;
   const topology = view.knownTopology, room = topology.rooms.find(r => r.id === selectedRoomId);
   const bounds = roomViewport(topology, selectedRoomId), id = useId();
   const stage = useRef<HTMLDivElement>(null), world = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null), navMeasure = useRef<HTMLDivElement>(null);
@@ -18,12 +19,64 @@ export function FacilityMap(props: FacilityMapProps & { demo?: DemoMapDetails })
   const [equipmentPage, setEquipmentPage] = useState(0);
   const [kind, setKind] = useState<ConnectionKind>('power'), [art, setArt] = useState<'loading' | 'ready' | 'error'>('loading');
   const [systemReduced, setSystemReduced] = useState(false);
-  const state = { ...props, reducedMotion: props.reducedMotion || systemReduced, illustrative: Boolean(props.demo) };
+  const [camera, setCamera] = useState({ zoom: 1, x: 0, y: 0 });
+  const drag = useRef<{ pointer: number; x: number; y: number; startX: number; startY: number; moved: boolean } | null>(null);
+  const suppressClick = useRef(false);
+  const state = { ...props, selectedRoomId, reducedMotion: props.reducedMotion || systemReduced, illustrative: Boolean(props.demo) };
   const fitted = fitMap(box.width, box.height, { width: bounds.width * 16, height: bounds.height * 16 });
   const assets = room ? topology.assets.filter(a => a.roomId === room.id) : [];
   const compact = box.width > 0 && (box.width / box.fontSize < 50 || navWidth > box.width);
   const pageSize = box.fontSize >= 28 ? 1 : Math.max(1, Math.min(4, Math.floor((box.width - 160) / (box.fontSize * 11))));
   const pages = Math.max(1, Math.ceil(assets.length / pageSize)), page = Math.min(equipmentPage, pages - 1);
+
+  function bounded(next: typeof camera) {
+    const zoom = Math.max(1, Math.min(4, next.zoom));
+    const xLimit = Math.max(0, (fitted.width * zoom - (box.width + 16)) / 2);
+    const yLimit = Math.max(0, (fitted.height * zoom - (box.height + 16)) / 2);
+    return { zoom, x: Math.max(-xLimit, Math.min(xLimit, next.x)), y: Math.max(-yLimit, Math.min(yLimit, next.y)) };
+  }
+  const boundedRef = useRef(bounded); boundedRef.current = bounded;
+  const changeZoom = (factor: number) => setCamera(current => boundedRef.current({ ...current, zoom: current.zoom * factor }));
+  const resetCamera = () => setCamera({ zoom: 1, x: 0, y: 0 });
+  useEffect(resetCamera, [view.runId]);
+  useEffect(() => { setCamera(current => boundedRef.current(current)); }, [box.width, box.height]);
+  useEffect(() => {
+    if (!props.demo) return;
+    const element = stage.current!;
+    const wheel = (event: WheelEvent) => { event.preventDefault(); if (event.deltaY) changeZoom(event.deltaY < 0 ? 1.25 : 1 / 1.25); };
+    element.addEventListener('wheel', wheel, { passive: false });
+    return () => element.removeEventListener('wheel', wheel);
+  }, [Boolean(props.demo)]);
+
+  function startDrag(event: PointerEvent<HTMLDivElement>) {
+    if (!props.demo || event.button !== 0 || event.target !== canvas.current) return;
+    suppressClick.current = false;
+    drag.current = { pointer: event.pointerId, x: event.clientX, y: event.clientY, startX: camera.x, startY: camera.y, moved: false };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+  function moveDrag(event: PointerEvent<HTMLDivElement>) {
+    const current = drag.current;
+    if (!current || current.pointer !== event.pointerId) return;
+    const dx = event.clientX - current.x, dy = event.clientY - current.y;
+    if (Math.hypot(dx, dy) > 4) current.moved = true;
+    if (current.moved) setCamera(value => boundedRef.current({ ...value, x: current.startX + dx, y: current.startY + dy }));
+  }
+  function endDrag(event: PointerEvent<HTMLDivElement>) {
+    const current = drag.current;
+    if (!current || current.pointer !== event.pointerId) return;
+    suppressClick.current = current.moved || event.type === 'pointercancel';
+    drag.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+  }
+  function keyMap(event: KeyboardEvent<HTMLDivElement>) {
+    if (!props.demo || event.target !== event.currentTarget) return;
+    const directions: Record<string, [number, number]> = { ArrowLeft: [40, 0], ArrowRight: [-40, 0], ArrowUp: [0, 40], ArrowDown: [0, -40] };
+    if (directions[event.key]) {
+      event.preventDefault(); const [x, y] = directions[event.key];
+      setCamera(current => boundedRef.current({ ...current, x: current.x + x, y: current.y + y }));
+    } else if (['+', '=', '-'].includes(event.key)) { event.preventDefault(); changeZoom(event.key === '-' ? 1 / 1.25 : 1.25); }
+    else if (event.key === 'Home') { event.preventDefault(); resetCamera(); }
+  }
 
   useEffect(() => {
     const index = assets.findIndex(a => a.id === selectedAssetId);
@@ -44,7 +97,8 @@ export function FacilityMap(props: FacilityMapProps & { demo?: DemoMapDetails })
     observer.observe(element); return () => observer.disconnect();
   }, []);
   useEffect(() => {
-    const measure = navMeasure.current!;
+    const measure = navMeasure.current;
+    if (!measure) return;
     const observer = new ResizeObserver(entries => setNavWidth(entries[0].contentRect.width));
     observer.observe(measure); return () => observer.disconnect();
   }, []);
@@ -89,14 +143,16 @@ export function FacilityMap(props: FacilityMapProps & { demo?: DemoMapDetails })
     return () => fonts?.removeEventListener('loadingdone', arrangeLabels);
   }, []);
 
-  function selectFromMap(event: MouseEvent<HTMLCanvasElement>) {
-    const rect = event.currentTarget.getBoundingClientRect();
+  function selectFromMap(event: MouseEvent<HTMLElement>) {
+    if (suppressClick.current) { suppressClick.current = false; return; }
+    const rect = canvas.current?.getBoundingClientRect();
+    if (!rect) return;
     if (!rect.width || !rect.height) return;
     const x = bounds.x + (event.clientX - rect.left) / rect.width * bounds.width;
     const y = bounds.y + (event.clientY - rect.top) / rect.height * bounds.height;
     const asset = topology.assets.find(a => x >= a.x && x < a.x + a.width && y >= a.y && y < a.y + a.height);
     if (asset) { onSelectAsset(asset.id); return; }
-    if (!room) {
+    if (!room && !props.demo) {
       const hit = topology.rooms.find(r => x >= r.bounds.x && x < r.bounds.x + r.bounds.width && y >= r.bounds.y && y < r.bounds.y + r.bounds.height);
       if (hit) onSelectRoom(hit.id);
     }
@@ -105,14 +161,20 @@ export function FacilityMap(props: FacilityMapProps & { demo?: DemoMapDetails })
   const upstream = topology.connections.find(c => c.fromId === topology.sharedUpstream.id)?.points[0];
   return <section className="facility-map" aria-label="Public facility map" data-room={room?.id ?? 'overview'} data-art={art} data-compact={compact} data-demo={Boolean(props.demo)}>
     {props.demo && <p className="fm-demo-description">Additional rooms are visual only and cannot be entered.</p>}
-    <nav className="fm-rooms" aria-label="Facility rooms">
+    {!props.demo && <nav className="fm-rooms" aria-label="Facility rooms">
       <div className="fm-rooms-measure" ref={navMeasure} aria-hidden="true"><span>Overview</span>{topology.rooms.map(r => <span key={r.id}>{r.label}</span>)}</div>
       <button type="button" aria-pressed={!room} onClick={() => onSelectRoom(null)}>Overview</button>
       {topology.rooms.map(r => <button key={r.id} type="button" hidden={compact} aria-pressed={r.id === room?.id} onClick={() => onSelectRoom(r.id)}>{r.label}</button>)}
       {compact && <label className="fm-room-select">Room <select aria-label="Room view" value={room?.id ?? ''} onChange={e => onSelectRoom(e.target.value || null)}>
         <option value="">Overview</option>{topology.rooms.map(r => <option key={r.id} value={r.id}>{r.label.split(' ').map(word => word[0]).join('')} · {r.label}</option>)}
       </select></label>}
-    </nav>
+    </nav>}
+    {props.demo && <nav className="fm-map-controls" aria-label="Map controls">
+      <button type="button" aria-label="Zoom in" onClick={() => changeZoom(1.25)}>+</button>
+      <button type="button" aria-label="Zoom out" onClick={() => changeZoom(1 / 1.25)}>−</button>
+      <button type="button" aria-label="Reset view" onClick={resetCamera}>Reset</button>
+      <span className="fm-map-hint" id={`${id}-map-hint`}>Drag or use arrow keys to pan · Scroll to zoom</span>
+    </nav>}
     {!props.demo && <div className="fm-toolbar">
       <strong>{room?.label ?? 'Facility overview'}</strong>
       <label htmlFor={`${id}-connections`}>Connections <select aria-label="Connections" id={`${id}-connections`} value={kind} onChange={e => setKind(e.target.value as ConnectionKind)}>
@@ -120,12 +182,10 @@ export function FacilityMap(props: FacilityMapProps & { demo?: DemoMapDetails })
       </select></label>
       <span className="fm-topology-note">Known layout · flow unconfirmed</span>
     </div>}
-    <div className="fm-stage" ref={stage}>
-      <div className="fm-world" ref={world} style={{ width: fitted.width, height: fitted.height }}>
-        <canvas ref={canvas} width={bounds.width * 16} height={bounds.height * 16} aria-hidden="true" onClick={selectFromMap} />
-        {props.demo && !room && props.demo.unavailableAreas.map(area => <div key={area.id} data-demo-unavailable aria-hidden="true" className="fm-demo-unavailable" style={{ left: `${area.bounds.x / topology.width * 100}%`, top: `${area.bounds.y / topology.height * 100}%`, width: `${area.bounds.width / topology.width * 100}%`, height: `${area.bounds.height / topology.height * 100}%` }}>
-          {(area.id === 'left' || area.id === 'right' ? [0, 1] : [0]).map(part => <span key={part} data-demo-room className="fm-demo-room-label" style={{ top: area.id === 'left' || area.id === 'right' ? `${part * 50 + 50}%` : '100%' }}>Visual only</span>)}
-        </div>)}
+    <div className="fm-stage" ref={stage} {...(props.demo ? { role: 'region', 'aria-label': 'Facility map', 'aria-describedby': `${id}-map-hint`, tabIndex: 0 } : {})} onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag} onKeyDown={keyMap} onClick={props.demo ? selectFromMap : undefined}>
+      <div className="fm-world" ref={world} style={{ width: fitted.width, height: fitted.height, ...(props.demo ? { transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.zoom})` } : {}) }}>
+        <canvas ref={canvas} width={bounds.width * 16} height={bounds.height * 16} aria-hidden="true" onClick={props.demo ? undefined : selectFromMap} />
+        {props.demo && !room && props.demo.unavailableAreas.map(area => <div key={area.id} data-demo-unavailable aria-hidden="true" className="fm-demo-unavailable" style={{ left: `${area.bounds.x / topology.width * 100}%`, top: `${area.bounds.y / topology.height * 100}%`, width: `${area.bounds.width / topology.width * 100}%`, height: `${area.bounds.height / topology.height * 100}%` }} />)}
         {!room && topology.rooms.map(r => <span key={r.id} className="fm-room-label" title={r.label} style={{ left: `${(r.bounds.x + r.bounds.width / 2) / topology.width * 100}%`, top: `${(r.bounds.y + r.bounds.height - 1) / topology.height * 100}%` }}>{compact ? r.label.split(' ').map(word => word[0]).join('') : r.label}</span>)}
         {!room && upstream && <span className="fm-upstream-mark" style={{ left: `${(upstream.x + .5) / topology.width * 100}%`, top: `${(upstream.y + 1) / topology.height * 100}%` }}>Shared upstream</span>}
         {assets.map((a, i) => <span key={a.id} className="fm-asset-label" style={{ left: `${(a.x + a.width / 2 - bounds.x) / bounds.width * 100}%`, top: `${(a.y + a.height - bounds.y) / bounds.height * 100}%` }}>{a.kind === 'rack' && !compact ? a.label.replace(/^Rack /, '') : i + 1}</span>)}

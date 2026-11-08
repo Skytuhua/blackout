@@ -3,6 +3,9 @@ import atlas from '../../../public/assets/facility-v2.json';
 import { FacilityRenderer } from '../../../src/game/facility-map/renderer';
 import { createFacilityMapFixture } from '../../../src/shared/facility-map-fixture';
 import type { FacilityMapProps } from '../../../src/shared/facility-map';
+import { createFacilityDemoProjector } from '../../../src/game/facility-demo-projection';
+import { initialize } from '../../../src/sim/engine';
+import { hotRestart } from '../../../src/content/scenarios/hot-restart';
 
 let pending: Map<number, FrameRequestCallback>, nextId: number, now: number;
 let frames: string[];
@@ -36,6 +39,19 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('renderer review regressions', () => {
+  it('furnishes each illustrative room with static racks without changing real topology', () => {
+    const demo = createFacilityDemoProjector()(initialize(hotRestart, 'decorative-render').observe('player'));
+    if (demo.status !== 'available') throw new Error(demo.reason);
+    const snapshot = structuredClone(demo.view.knownTopology);
+    const state = { ...props(), view: demo.view, illustrative: true };
+    const { renderer } = mount(state);
+    const regions = [[0, 0, 14, 14], [0, 14, 14, 14], [34, 0, 14, 14], [34, 14, 14, 14], [14, 0, 20, 8], [14, 20, 20, 8]];
+    for (const [x, y, width, height] of regions) {
+      expect(painted.some(p => p.name === 'rack' && p.x >= x * 16 && p.x < (x + width) * 16 && p.y >= y * 16 && p.y < (y + height) * 16)).toBe(true);
+    }
+    expect(demo.view.knownTopology).toEqual(snapshot);
+    renderer.destroy();
+  });
   it('draws Sam only when his actual position is on the public floor', () => {
     const state = props(); const sam = state.view.crew.find(c => c.id === 'sam')!;
     sam.x = -1; sam.y = -1;

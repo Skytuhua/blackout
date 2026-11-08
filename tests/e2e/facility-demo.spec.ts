@@ -6,7 +6,8 @@ test('large demo map shows real equipment and keeps other areas unavailable', as
   const map = page.getByRole('region', { name: 'Public facility map' });
   await expect(map).toHaveAttribute('data-art', 'ready');
   await expect(page.getByText(/Only the current facility is simulated/)).toBeVisible();
-  await map.getByRole('button', { name: 'Overview', exact: true }).click();
+  await expect(map.getByRole('button', { name: 'Overview', exact: true })).toHaveCount(0);
+  await expect(map.getByRole('button', { name: 'Current simulated facility', exact: true })).toHaveCount(0);
   await expect(map.locator('[data-demo-unavailable]')).toHaveCount(4);
   await expect(map.locator('canvas')).toHaveAttribute('data-illustrative', 'true');
   await equipment(page, 'controller');

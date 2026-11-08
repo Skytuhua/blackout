@@ -17,7 +17,7 @@ describe('public facility map', () => {
     const demo = createFacilityDemoProjector()(initialize(hotRestart, 'decorative-map').observe('player'));
     if (demo.status !== 'available') throw new Error(demo.reason);
     const html = renderToStaticMarkup(<FacilityMap {...props({ view: demo.view, selectedRoomId: null })} demo={demo} />);
-    expect((html.match(/data-demo-room=/g) ?? [])).toHaveLength(6);
+    expect(html).not.toContain('class="fm-demo-room-label"');
     expect(html).toContain('Additional rooms are visual only and cannot be entered.');
     expect(demo.view.knownTopology.rooms).toHaveLength(1);
     expect(demo.view.knownTopology.connections).toHaveLength(0);

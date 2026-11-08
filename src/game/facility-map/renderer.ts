@@ -76,11 +76,22 @@ export class FacilityRenderer {
       // Decorative rooms never enter the public topology or act as command targets.
       const rooms = [ { x: 0, y: 0, w: 14, h: 14 }, { x: 0, y: 14, w: 14, h: 14 }, { x: 34, y: 0, w: 14, h: 14 }, { x: 34, y: 14, w: 14, h: 14 }, { x: 14, y: 0, w: 20, h: 8 }, { x: 14, y: 20, w: 20, h: 8 } ];
       ctx.globalAlpha = .55;
+      ctx.filter = 'grayscale(1)';
       for (const room of rooms) for (let y = room.y; y < room.y + room.h; y++) for (let x = room.x; x < room.x + room.w; x++) {
         const wall = x === room.x || y === room.y || x === room.x + room.w - 1 || y === room.y + room.h - 1;
         this.sprite(ctx, wall ? (y === room.y || y === room.y + room.h - 1 ? 'wall_0' : 'wall_1') : (x + y) % 13 === 0 ? 'floor_1' : 'floor_0', x * 16, y * 16);
         if (wall && y === room.y && (x - room.x) % 4 === 2) this.sprite(ctx, 'infra_1', x * 16, y * 16);
       }
+      // Monochrome, static silhouettes carry no equipment state or live indicators.
+      for (const room of rooms) {
+        for (const row of room.h > 8 ? [2, 7] : [2]) {
+          for (let x = room.x + 2; x < room.x + room.w - 4; x += 2) this.sprite(ctx, 'rack', x * 16, (room.y + row) * 16);
+        }
+        this.sprite(ctx, 'cooling', (room.x + room.w - 4) * 16, (room.y + 2) * 16);
+        this.sprite(ctx, 'ups', (room.x + room.w - 3) * 16, (room.y + room.h - 4) * 16);
+        this.sprite(ctx, 'controller', (room.x + 1) * 16, (room.y + 1) * 16);
+      }
+      ctx.filter = 'none';
       ctx.globalAlpha = 1;
     }
     const walkable = new Set(topology.walkable.map(p => `${p.x},${p.y}`));
