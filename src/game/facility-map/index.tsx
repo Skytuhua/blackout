@@ -1,10 +1,12 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type MouseEvent } from 'react';
 import type { FacilityMapProps } from '../../shared/facility-map';
+import type { DemoProjection } from '../facility-demo-projection';
 import { assetEvidence, fitMap, roomViewport } from './model';
 import { FacilityRenderer, type ConnectionKind } from './renderer';
 import './map.css';
 
-export function FacilityMap(props: FacilityMapProps) {
+type DemoMapDetails = Extract<DemoProjection, { status: 'available' }>;
+export function FacilityMap(props: FacilityMapProps & { demo?: DemoMapDetails }) {
   const { view, selectedRoomId, selectedAssetId, selectedActorId, onSelectRoom, onSelectAsset } = props;
   const topology = view.knownTopology, room = topology.rooms.find(r => r.id === selectedRoomId);
   const bounds = roomViewport(topology, selectedRoomId), id = useId();
@@ -15,7 +17,7 @@ export function FacilityMap(props: FacilityMapProps) {
   const [equipmentPage, setEquipmentPage] = useState(0);
   const [kind, setKind] = useState<ConnectionKind>('power'), [art, setArt] = useState<'loading' | 'ready' | 'error'>('loading');
   const [systemReduced, setSystemReduced] = useState(false);
-  const state = { ...props, reducedMotion: props.reducedMotion || systemReduced };
+  const state = { ...props, reducedMotion: props.reducedMotion || systemReduced, illustrative: Boolean(props.demo) };
   const fitted = fitMap(box.width, box.height, { width: bounds.width * 16, height: bounds.height * 16 });
   const assets = room ? topology.assets.filter(a => a.roomId === room.id) : [];
   const compact = box.width > 0 && (box.width / box.fontSize < 50 || navWidth > box.width);
@@ -46,7 +48,7 @@ export function FacilityMap(props: FacilityMapProps) {
     observer.observe(measure); return () => observer.disconnect();
   }, []);
   useEffect(() => {
-    const instance = new FacilityRenderer(canvas.current!, world.current!, latest.current); renderer.current = instance;
+    const instance = new FacilityRenderer(canvas.current!, world.current!, { ...latest.current, illustrative: Boolean(latest.current.demo) }); renderer.current = instance;
     const image = new Image();
     image.onload = () => { instance.setAtlas(image); setArt('ready'); };
     image.onerror = () => setArt('error');
@@ -100,7 +102,7 @@ export function FacilityMap(props: FacilityMapProps) {
   }
 
   const upstream = topology.connections.find(c => c.fromId === topology.sharedUpstream.id)?.points[0];
-  return <section className="facility-map" aria-label="Public facility map" data-room={room?.id ?? 'overview'} data-art={art} data-compact={compact}>
+  return <section className="facility-map" aria-label="Public facility map" data-room={room?.id ?? 'overview'} data-art={art} data-compact={compact} data-demo={Boolean(props.demo)}>
     <nav className="fm-rooms" aria-label="Facility rooms">
       <div className="fm-rooms-measure" ref={navMeasure} aria-hidden="true"><span>Overview</span>{topology.rooms.map(r => <span key={r.id}>{r.label}</span>)}</div>
       <button type="button" aria-pressed={!room} onClick={() => onSelectRoom(null)}>Overview</button>
@@ -109,16 +111,17 @@ export function FacilityMap(props: FacilityMapProps) {
         <option value="">Overview</option>{topology.rooms.map(r => <option key={r.id} value={r.id}>{r.label.split(' ').map(word => word[0]).join('')} · {r.label}</option>)}
       </select></label>}
     </nav>
-    <div className="fm-toolbar">
+    {!props.demo && <div className="fm-toolbar">
       <strong>{room?.label ?? 'Facility overview'}</strong>
       <label htmlFor={`${id}-connections`}>Connections <select aria-label="Connections" id={`${id}-connections`} value={kind} onChange={e => setKind(e.target.value as ConnectionKind)}>
         <option value="power">Power</option><option value="control">Controls</option><option value="cooling_supply">Cooling supply</option><option value="cooling_return">Cooling return</option>
       </select></label>
       <span className="fm-topology-note">Known layout · flow unconfirmed</span>
-    </div>
+    </div>}
     <div className="fm-stage" ref={stage}>
       <div className="fm-world" ref={world} style={{ width: fitted.width, height: fitted.height }}>
         <canvas ref={canvas} width={bounds.width * 16} height={bounds.height * 16} aria-hidden="true" onClick={selectFromMap} />
+        {props.demo && !room && props.demo.unavailableAreas.map(area => <div key={area.id} data-demo-unavailable aria-hidden="true" className="fm-demo-unavailable" style={{ left: `${area.bounds.x / topology.width * 100}%`, top: `${area.bounds.y / topology.height * 100}%`, width: `${area.bounds.width / topology.width * 100}%`, height: `${area.bounds.height / topology.height * 100}%` }} />)}
         {!room && topology.rooms.map(r => <span key={r.id} className="fm-room-label" title={r.label} style={{ left: `${(r.bounds.x + r.bounds.width / 2) / topology.width * 100}%`, top: `${(r.bounds.y + r.bounds.height - 1) / topology.height * 100}%` }}>{compact ? r.label.split(' ').map(word => word[0]).join('') : r.label}</span>)}
         {!room && upstream && <span className="fm-upstream-mark" style={{ left: `${(upstream.x + .5) / topology.width * 100}%`, top: `${(upstream.y + 1) / topology.height * 100}%` }}>Shared upstream</span>}
         {assets.map((a, i) => <span key={a.id} className="fm-asset-label" style={{ left: `${(a.x + a.width / 2 - bounds.x) / bounds.width * 100}%`, top: `${(a.y + a.height - bounds.y) / bounds.height * 100}%` }}>{a.kind === 'rack' && !compact ? a.label.replace(/^Rack /, '') : i + 1}</span>)}
@@ -126,7 +129,7 @@ export function FacilityMap(props: FacilityMapProps) {
       </div>
       {art !== 'ready' && <p className="fm-art-status" role="status">{art === 'error' ? 'Map artwork unavailable. Room and equipment controls remain available.' : 'Loading facility artwork…'}</p>}
     </div>
-    <div className="fm-equipment" role="group" aria-label={room ? `${room.label} equipment` : 'Overview information'}>
+    {!props.demo && <div className="fm-equipment" role="group" aria-label={room ? `${room.label} equipment` : 'Overview information'}>
       <div className="fm-equipment-items">{room ? assets.length ? assets.map((asset, index) => {
         const evidence = assetEvidence(view.observations.filter(o => o.assetId === asset.id), view.simTime);
         return <button key={asset.id} type="button" hidden={index < page * pageSize || index >= (page + 1) * pageSize} aria-pressed={asset.id === selectedAssetId} onClick={() => onSelectAsset(asset.id)} title={evidence.readings || 'No delivered reading'}>
@@ -138,13 +141,13 @@ export function FacilityMap(props: FacilityMapProps) {
         <span>{page + 1} / {pages}</span>
         <button type="button" aria-label="Next equipment page" disabled={page === pages - 1} onClick={() => setEquipmentPage(page + 1)}>Next</button>
       </div>}
-    </div>
-    <footer className="fm-footer">
+    </div>}
+    {!props.demo && <footer className="fm-footer">
       <div className="fm-crew" aria-label="Public crew assignments">{view.crew.map(c => {
         const task = view.tasks.find(t => t.id === c.taskId && t.actorId === c.id), target = topology.assets.find(a => a.id === task?.targetId);
         return <span key={c.id} data-selected={c.id === selectedActorId}>{c.name} · {c.role === 'remote' ? 'remote' : task ? `${task.status}${target ? ` · ${target.label}` : ''}` : 'ready'}</span>;
       })}</div>
       <span className="fm-upstream">{topology.sharedUpstream.label}</span>
-    </footer>
+    </footer>}
   </section>;
 }

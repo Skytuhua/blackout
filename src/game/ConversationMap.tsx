@@ -4,12 +4,14 @@ import type { DesktopScene, DesktopSceneState } from './DesktopScene';
 import { fitWorld, routePosition } from './desktop-world';
 import { DesktopPortrait } from './DesktopPortrait';
 import { NearbyEquipment } from './NearbyEquipment';
+import { FacilityMap } from './facility-map';
+import { createFacilityDemoProjector, selectDemoAsset, selectDemoRoom } from './facility-demo-projection';
 
 const sceneKey = Symbol.for('blackout.conversation.scene');
 const sceneHost = (element: HTMLElement) => element as unknown as Record<symbol, DesktopScene | undefined>;
 export const conversationSceneFor = (element: HTMLElement) => sceneHost(element)[sceneKey];
 
-export function ConversationMap(props: ConversationGameProps) {
+function LegacyConversationMap(props: ConversationGameProps & { projectionNotice?: string }) {
   const stage = useRef<HTMLDivElement>(null), host = useRef<HTMLDivElement>(null), scene = useRef<DesktopScene | null>(null);
   const latest = useRef(props); latest.current = props;
   const [art, setArt] = useState('loading');
@@ -35,10 +37,37 @@ export function ConversationMap(props: ConversationGameProps) {
   const asset = props.view.knownTopology.assets.find(item => item.id === props.selectedAssetId);
   return <section className="conv-map" aria-label="Facility world">
     <NearbyEquipment {...props} />
+    {props.projectionNotice && <p className="conv-demo-notice" role="status">{props.projectionNotice}</p>}
     <div className="conv-stage" ref={stage}><div ref={host} className="conv-canvas" data-art={art} role="img" aria-label="Facility equipment. Select known equipment for conversation context. Crew travel follows accepted tasks.">
       {props.view.crew.filter(crew => crew.role !== 'remote').map(crew => { const pose = routePosition(crew, props.view.tasks.find(task => task.id === crew.taskId), props.view.simTime, props.view.knownTopology); const thread = props.conversations.find(item => item.actorId === crew.id); return <span key={crew.id} className="conv-map-name" style={{ left: `${(pose.x + .5) / props.view.knownTopology.width * 100}%`, top: `${pose.y / props.view.knownTopology.height * 100}%` }} aria-hidden="true">{thread?.name ?? crew.name}</span>; })}
     </div></div>
     <div className="conv-map-caption">{art === 'fallback' ? <span>Development art</span> : null}<label>Context<select aria-label="Equipment context" value={asset?.id ?? ''} onChange={event => { if (event.target.value) props.onSelectAsset(event.target.value); }}><option value="">Select equipment</option>{props.view.knownTopology.assets.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label></div>
     <div key={props.view.runId} className="conv-map-crew" aria-label="Team assignments">{props.conversations.map(thread => <div key={thread.actorId} data-actor={thread.actorId}><DesktopPortrait role={thread.role === 'Cooling' ? 'facilities' : thread.role === 'Power' ? 'electrical' : 'remote'} /><div><strong>{thread.name}</strong><span>{thread.assignment.label}</span></div></div>)}</div>
   </section>;
+}
+
+function DemoConversationMap(props: ConversationGameProps) {
+  const [project] = useState(createFacilityDemoProjector);
+  const [roomId, setRoomId] = useState<string | null>(() => { const initial = project(props.view); return initial.status === 'available' ? initial.roomId : null; });
+  const latest = useRef(props); latest.current = props;
+  const projection = project(props.view);
+  if (projection.status !== 'available') return <LegacyConversationMap {...props} projectionNotice={projection.reason} />;
+  const asset = props.view.knownTopology.assets.find(item => item.id === props.selectedAssetId);
+  const runId = props.view.runId;
+  return <section className="conv-map" aria-label="Facility world">
+    <NearbyEquipment {...props} />
+    <p className="conv-demo-notice" role="note">{projection.notice}</p>
+    <div className="conv-stage">
+      <FacilityMap view={projection.view} demo={projection} selectedRoomId={roomId} selectedAssetId={props.selectedAssetId}
+        selectedActorId={props.selectedActorId} paused={props.paused} speed={props.speed} reducedMotion={false}
+        onSelectRoom={id => { const current = latest.current.view; const selection = selectDemoRoom(current, runId, id); if (selection.accepted) setRoomId(selection.roomId); }}
+        onSelectAsset={id => { const current = latest.current.view; const selected = selectDemoAsset(current, runId, id); if (selected) latest.current.onSelectAsset(selected); }} />
+    </div>
+    <div className="conv-map-caption" data-demo="true"><label>Context<select aria-label="Equipment context" value={asset?.id ?? ''} onChange={event => { const selected = selectDemoAsset(latest.current.view, runId, event.target.value); if (selected) latest.current.onSelectAsset(selected); }}><option value="">Select equipment</option>{props.view.knownTopology.assets.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label></div>
+    <div key={props.view.runId} className="conv-map-crew" aria-label="Team assignments">{props.conversations.map(thread => <div key={thread.actorId} data-actor={thread.actorId}><DesktopPortrait role={thread.role === 'Cooling' ? 'facilities' : thread.role === 'Power' ? 'electrical' : 'remote'} /><div><strong>{thread.name}</strong><span>{thread.assignment.label}</span></div></div>)}</div>
+  </section>;
+}
+
+export function ConversationMap(props: ConversationGameProps) {
+  return <DemoConversationMap key={props.view.runId} {...props} />;
 }

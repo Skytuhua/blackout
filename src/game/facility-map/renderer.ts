@@ -4,6 +4,7 @@ import { routePosition } from '../desktop-world';
 import { assetEvidence, PresentationClock, roomViewport } from './model';
 
 export type ConnectionKind = FacilityTopology['connections'][number]['kind'];
+export type FacilityRenderState = FacilityMapProps & { illustrative?: boolean };
 const colors: Record<ConnectionKind, string> = { power: '#f4b860', control: '#ca70ea', cooling_supply: '#45d5e8', cooling_return: '#92a8b7' };
 let nextRendererId = 0;
 
@@ -11,7 +12,7 @@ let nextRendererId = 0;
 export class FacilityRenderer {
   readonly id = ++nextRendererId;
   readonly clock = new PresentationClock();
-  private state: FacilityMapProps;
+  private state: FacilityRenderState;
   private kind: ConnectionKind = 'power';
   private atlas: HTMLImageElement | null = null;
   private terrain: HTMLCanvasElement;
@@ -20,22 +21,24 @@ export class FacilityRenderer {
   private lastFrame: number | null = null;
   private disposed = false;
   private poses = new Map<string, { x: number; y: number; facing: string }>();
-  constructor(private canvas: HTMLCanvasElement, private labels: HTMLElement, state: FacilityMapProps) {
+  constructor(private canvas: HTMLCanvasElement, private labels: HTMLElement, state: FacilityRenderState) {
     this.state = state;
     this.terrain = document.createElement('canvas');
     canvas.dataset.rendererId = String(this.id);
     this.update(state, 'power');
   }
   setAtlas(image: HTMLImageElement) { if (!this.disposed) { this.atlas = image; this.topology = null; this.update(this.state, this.kind); } }
-  update(state: FacilityMapProps, kind: ConnectionKind) {
+  update(state: FacilityRenderState, kind: ConnectionKind) {
     const reset = state.view.runId !== this.state.view.runId || state.view.simTime < this.state.view.simTime;
     if (reset) this.poses.clear();
     this.clock.receive(state.view.runId, state.view.simTime);
+    const appearanceChanged = state.illustrative !== this.state.illustrative;
     this.state = state; this.kind = kind;
+    this.canvas.dataset.illustrative = String(Boolean(state.illustrative));
     const b = roomViewport(state.view.knownTopology, state.selectedRoomId);
     if (this.canvas.width !== b.width * 16) this.canvas.width = b.width * 16;
     if (this.canvas.height !== b.height * 16) this.canvas.height = b.height * 16;
-    if (this.topology !== state.view.knownTopology) this.buildTerrain();
+    if (this.topology !== state.view.knownTopology || appearanceChanged) this.buildTerrain();
     this.cancel(); this.draw(); this.schedule();
   }
   destroy() { this.disposed = true; this.cancel(); this.atlas = null; this.terrain.width = 0; this.terrain.height = 0; this.poses.clear(); }
@@ -86,7 +89,7 @@ export class FacilityRenderer {
         if (y === b.y && x > b.x && x < b.x + b.width - 1 && (x - b.x) % 3 === 1) this.sprite(ctx, 'infra_1', x * 16, y * 16);
         else if (x === b.x && y > b.y && y < b.y + b.height - 1 && (y - b.y) % 4 === 2) this.sprite(ctx, 'fixture_5', x * 16, y * 16);
       }
-      if (doors.has(`${x},${y}`)) { ctx.fillStyle = '#45d5e8'; ctx.fillRect(x * 16 + 2, y * 16 + 13, 12, 2); }
+      if (!this.state.illustrative && doors.has(`${x},${y}`)) { ctx.fillStyle = '#45d5e8'; ctx.fillRect(x * 16 + 2, y * 16 + 13, 12, 2); }
     }
   }
   private draw() {

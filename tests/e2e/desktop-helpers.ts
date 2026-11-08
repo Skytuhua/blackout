@@ -6,7 +6,7 @@ export const names = { alex: 'Alex', jules: 'Jules', sam: 'Sam' } as const;
 export type Actor = keyof typeof names;
 
 export async function elapsed(page: Page) {
-  const match = (await page.locator('.conv-header time').innerText()).match(/^(\d+):(\d+)$/);
+  const match = (await page.locator('.conv-header:visible time, .conv-compact-toolbar:visible time').innerText()).match(/^(\d+):(\d+)$/);
   if (!match) throw new Error('Mission clock unavailable.');
   return Number(match[1]) * 60 + Number(match[2]);
 }
@@ -16,8 +16,8 @@ export async function begin(page: Page, practice = false) {
   await page.clock.install({ time: new Date(date.getTime() - 60000) }); await page.clock.pauseAt(date);
   await page.goto('/');
   await page.getByRole('button', { name: practice ? 'Practice' : 'Start guided game', exact: true }).click();
-  await page.locator('.conv-header').getByRole('button', { name: 'Pause', exact: true }).click();
-  await expect(page.locator('.conv-canvas')).toHaveAttribute('data-art', 'atlas');
+  await page.locator('.conv-header:visible, .conv-compact-toolbar:visible').getByRole('button', { name: 'Pause', exact: true }).click();
+  await expect(page.locator('.facility-map[data-art="ready"], .conv-canvas[data-art="atlas"]')).toHaveCount(1);
   expect(await elapsed(page)).toBe(0);
 }
 export async function menu(page: Page, section?: string) {
@@ -87,7 +87,7 @@ export async function readReport(page: Page, actor: Actor, taskId: string, secti
   const report = page.locator('.conv-history-window > article[data-entry-id="report-' + taskId + '"]');
   await expect(report).toBeVisible();
   await report.getByRole('button', { name: 'Read report', exact: true }).click();
-  await page.getByRole('combobox', { name: 'Section', exact: true }).selectOption({ label: section });
+  await page.getByRole('combobox', { name: 'Section', exact: true }).selectOption({ label: section === 'Full message' ? 'Delivery notice' : section });
   const text = await readPages(page, 'Message text');
   await page.getByLabel(names[actor] + ' message reader', { exact: true }).getByRole('button', { name: 'Back', exact: true }).click();
   return text;
