@@ -9,7 +9,7 @@ for (const [width, height] of [[1280, 720], [1366, 768], [1920, 1080], [640, 360
   await expect(map).toHaveAttribute('data-art', 'ready');
   await expect(map.getByRole('button', { name: 'Overview', exact: true })).toHaveCount(0);
   await expect(map.getByText('Visual only', { exact: true })).toHaveCount(0);
-  await expect(page.getByText(/Only the current facility is simulated/)).toBeVisible();
+  await expect(page.getByText(/Only the current facility is simulated/)).toHaveCount(0);
   const canvas = map.locator('canvas'), box = await canvas.boundingBox();
   if (!box) throw new Error('Map canvas is not visible');
   await canvas.click({ position: { x: box.width / 12, y: box.height / 4 } });

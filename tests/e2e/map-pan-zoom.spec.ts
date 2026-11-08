@@ -72,3 +72,34 @@ test('zoom, wheel, drag and keyboard pan preserve selection of real equipment', 
   await expect(page.getByRole('combobox', { name: 'Equipment context', exact: true })).toHaveValue('controller');
   await expect.poll(() => page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.scrollHeight])).toEqual([1280, 720]);
 });
+
+test('the fully zoomed-out map allows a small bounded pan without selecting equipment', async ({ page }) => {
+  const map = await openMap(page);
+  const surface = map.getByLabel('Facility map', { exact: true });
+  const canvas = map.locator('canvas');
+  const initial = await canvas.boundingBox();
+  if (!initial) throw new Error('Map canvas unavailable');
+  const projection = createFacilityDemoProjector()(initialize(hotRestart, 'minimum-zoom').observe('player'));
+  if (projection.status !== 'available') throw new Error(projection.reason);
+  const controller = projection.view.knownTopology.assets.find(asset => asset.id === 'controller')!;
+  const x = initial.x + (controller.x + controller.width / 2) / projection.view.knownTopology.width * initial.width;
+  const y = initial.y + (controller.y + controller.height / 2) / projection.view.knownTopology.height * initial.height;
+  await page.mouse.move(x, y); await page.mouse.down();
+  await page.mouse.move(x + 20, y + 15, { steps: 4 }); await page.mouse.up();
+  await expect.poll(async () => (await canvas.boundingBox())!.x - initial.x).toBeCloseTo(20, 0);
+  await expect.poll(async () => (await canvas.boundingBox())!.y - initial.y).toBeCloseTo(15, 0);
+  await expect(page.getByRole('combobox', { name: 'Equipment context', exact: true })).toHaveValue('');
+  await surface.focus(); await page.keyboard.press('ArrowRight');
+  const moved = await canvas.boundingBox();
+  expect(moved!.x).toBeLessThan(initial.x);
+  await page.mouse.move(x - 20, y + 15); await page.mouse.down();
+  await page.mouse.move(x + 380, y + 215, { steps: 4 }); await page.mouse.up();
+  const bounded = await canvas.boundingBox();
+  expect(bounded!.x - initial.x).toBeLessThanOrEqual(32);
+  expect(bounded!.y - initial.y).toBeLessThanOrEqual(32);
+  await map.getByRole('button', { name: 'Reset view', exact: true }).click();
+  await expect.poll(async () => (await canvas.boundingBox())!.x).toBeCloseTo(initial.x, 0);
+  await expect.poll(async () => (await canvas.boundingBox())!.y).toBeCloseTo(initial.y, 0);
+  await expect(map.getByText('Current simulated facility', { exact: true })).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.scrollHeight])).toEqual([1280, 720]);
+});

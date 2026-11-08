@@ -18,7 +18,7 @@ describe('public facility map', () => {
     if (demo.status !== 'available') throw new Error(demo.reason);
     const html = renderToStaticMarkup(<FacilityMap {...props({ view: demo.view, selectedRoomId: null })} demo={demo} />);
     expect(html).not.toContain('class="fm-demo-room-label"');
-    expect(html).toContain('Additional rooms are visual only and cannot be entered.');
+    expect(html).toContain('Some areas and equipment are decorative.');
     expect(demo.view.knownTopology.rooms).toHaveLength(1);
     expect(demo.view.knownTopology.connections).toHaveLength(0);
   });
