@@ -32,6 +32,7 @@ export default function App() {
   const generation = useRef(0), transitioning = useRef(false), commandPending = useRef(false), jobs = useRef(new Map<string, RadioJob>());
   const sourceGeneration = useRef(0), hostPending = useRef(false), listGeneration = useRef(0);
   const deferredMenuCapture = useRef<{ generation: number; sourceGeneration: number } | null>(null);
+  const pendingSave = useRef<{ generation: number } | null>(null);
   const archive = useRef<HostArchive | null>(null), store = useRef<Promise<RunStore> | null>(null), proposals = useRef<ProposalBook | null>(null);
   const replayClient = useRef<SimulationClient | null>(null), replayGeneration = useRef(0), replayAt = useRef(0), replayPending = useRef(false);
   const sessionRef = useRef<'welcome' | 'practice' | 'mission'>('welcome'), selected = useRef<string | null>(null);
@@ -74,6 +75,7 @@ export default function App() {
   }
   async function begin(next: typeof sessionRef.current, previous?: SavedRunRecord, runImmediately = true) {
     if (transitioning.current) return;
+    pendingSave.current = null;
     transitioning.current = true; const token = ++generation.current; simulation.current?.pause(); closeReplay(); setBusy(true); setPaused(true); setError('');
     try {
       await cancelCoworkers(); if (token !== generation.current) return;
@@ -112,7 +114,7 @@ export default function App() {
       append({ id: crypto.randomUUID(), actorId: originActor, at: receipt.observedAt, kind: 'order', text: receipt.status === 'rejected' ? `That order could not start: ${words(receipt.reason)}.` : receipt.status === 'applied' && intent.action === 'cancel_task' ? 'Current task stopped.' : `${labelAction(intent)} accepted. ${person(originActor)!.name} will report back.`, unread: false, summary: `${labelAction(intent)} ${receipt.status === 'rejected' ? 'could not start' : 'accepted'}.`, sections: [{ id: 'receipt', label: 'Order receipt', text: JSON.stringify(receipt, null, 2) }] }, receipt.evidenceIds);
       return receipt;
     } catch { if (token === generation.current) setError('Could not confirm the order. Check the current assignment before retrying.'); return null; }
-    finally { if (token === generation.current) { commandPending.current = false; setBusy(false); flushDeferredMenuCapture(); } }
+    finally { if (token === generation.current) { commandPending.current = false; setBusy(false); flushPendingSave(); flushDeferredMenuCapture(); } }
   }
   async function executeProposal(id: string) {
     if (transitioning.current || commandPending.current || hostPending.current || replayActive || !known.current || ended(known.current)) return;
@@ -141,24 +143,31 @@ export default function App() {
       const text = answer ? [...facts, answer.inference, answer.uncertainty].filter(Boolean).join('\n') || 'I’ve included the available readings in History.' : fallbackCopy(result.reply.kind === 'fallback' ? result.reply.reason : 'unavailable');
       append({ id: crypto.randomUUID(), actorId: originActor, at: known.current?.simTime ?? current.simTime, kind: answer ? 'live' : 'fallback', text, summary: text.length <= 260 ? text : `${person(originActor)!.name} sent a detailed reply.`, unread: true, exchangeId: result.start.requestId, proposals: allowed.map(authorization => ({ id: authorization.id, label: labelAction(authorization.intent), assignedName: person(authorization.intent.args.technicianId ?? (['pause_batch', 'resume_batch', 'set_batch_ceiling', 'verify_recovery'].includes(authorization.intent.action) ? 'sam' : originActor))?.name ?? person(originActor)!.name, status: 'ready' })), sections: [{ id: 'reply', label: 'Facts and reply', text: radioReport(result) }, { id: 'citations', label: 'Evidence', text: radioCitations(result) }, { id: 'receipts', label: 'Tool receipts', text: radioReceipts(result) }, { id: 'provenance', label: 'Provenance', text: radioProvenance(result) }] }, answer?.facts.flatMap(fact => 'observationId' in fact ? [fact.observationId] : []) ?? []);
     } catch { if (token === generation.current) append({ id: crypto.randomUUID(), actorId: originActor, at: known.current?.simTime ?? current.simTime, kind: 'fallback', text: 'I couldn’t finish that reply. Suggested orders still work.', unread: true }); }
-    finally { if (jobs.current.get(originActor)?.promise === job) jobs.current.delete(originActor); if (token === generation.current) { updateThreads(previous => updateConversation(previous, originActor, thread => ({ ...thread, busy: false }))); syncClock(); flushDeferredMenuCapture(); } }
+    finally { if (jobs.current.get(originActor)?.promise === job) jobs.current.delete(originActor); if (token === generation.current) { updateThreads(previous => updateConversation(previous, originActor, thread => ({ ...thread, busy: false }))); syncClock(); flushPendingSave(); flushDeferredMenuCapture(); } }
   }
   useEffect(() => { if (!menuOpen && menuOpener.current?.isConnected) menuOpener.current.focus(); }, [menuOpen]);
   function flushDeferredMenuCapture() {
     const pending = deferredMenuCapture.current;
     if (!pending) return;
     if (!menuOpenRef.current || pending.generation !== generation.current || pending.sourceGeneration !== sourceGeneration.current || sessionRef.current !== 'mission') { deferredMenuCapture.current = null; return; }
-    if (jobs.current.size || commandPending.current || transitioning.current || hostPending.current) return;
+    if (jobs.current.size || commandPending.current || transitioning.current || hostPending.current || pendingSave.current) return;
     deferredMenuCapture.current = null; void capture(false);
   }
-  function toggleMenu() { const open = !menuOpenRef.current; if (open) menuOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; menuOpenRef.current = open; setMenuOpen(open); if (open) { manualPaused.current = true; pauseLive(); void refreshSaves(); if (!replayActive && sessionRef.current === 'mission' && !hostPending.current) { if (jobs.current.size || commandPending.current) deferredMenuCapture.current = { generation: generation.current, sourceGeneration: sourceGeneration.current }; else void capture(false); } } else deferredMenuCapture.current = null; }
+  function toggleMenu() { const open = !menuOpenRef.current; if (open) menuOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; menuOpenRef.current = open; setMenuOpen(open); if (open) { manualPaused.current = true; pauseLive(); void refreshSaves(); if (!replayActive && sessionRef.current === 'mission' && !hostPending.current && !pendingSave.current) { if (jobs.current.size || commandPending.current) deferredMenuCapture.current = { generation: generation.current, sourceGeneration: sourceGeneration.current }; else void capture(false); } } else deferredMenuCapture.current = null; }
+  function flushPendingSave() {
+    const pending = pendingSave.current;
+    if (!pending) return;
+    if (pending.generation !== generation.current || sessionRef.current !== 'mission') { pendingSave.current = null; return; }
+    if (jobs.current.size || commandPending.current || transitioning.current || hostPending.current) return;
+    pendingSave.current = null; deferredMenuCapture.current = null; void capture(true);
+  }
   // Existing save/replay lifecycle follows below; normal UI receives scoped views only.
   async function capture(save: boolean) {
     const client = simulation.current, recorder = archive.current, token = generation.current;
     if (!client || !recorder || sessionRef.current !== 'mission' || replayActive || commandPending.current || transitioning.current || hostPending.current) return;
+    if (save && jobs.current.size) { pendingSave.current = { generation: token }; setNotice('Waiting for the reply before saving. You can still restart.'); return; }
     const request = ++sourceGeneration.current; hostPending.current = true;
     pauseLive();
-    if (save && jobs.current.size) setNotice('Waiting for the reply before saving. You can still restart.');
     try {
       await cancelCoworkers(false); if (token !== generation.current || request !== sourceGeneration.current) return;
       setBusy(true);
@@ -170,6 +179,7 @@ export default function App() {
     finally { if (token === generation.current && request === sourceGeneration.current) { hostPending.current = false; setBusy(false); } }
   }
   async function activateReplay(record: SavedRunRecord) {
+    if (pendingSave.current) { setNotice('Wait for the save to finish before opening a saved game.'); return; }
     pauseLive(); closeReplay(); const token = ++replayGeneration.current, sessionToken = generation.current; hostPending.current = true; setBusy(true); setError(''); await cancelCoworkers();
     try {
       await cancelCoworkers();
@@ -185,6 +195,7 @@ export default function App() {
     finally { if (token === replayGeneration.current && sessionToken === generation.current) { hostPending.current = false; setBusy(false); } }
   }
   async function reviewSaved(id: string, resume: boolean) {
+    if (pendingSave.current) { setNotice('Wait for the save to finish before opening a saved game.'); return; }
     const token = generation.current, request = ++sourceGeneration.current;
     hostPending.current = true; setBusy(true); setError('');
     try {
@@ -216,6 +227,7 @@ export default function App() {
     return () => clearInterval(timer);
   }, [replayPlaying, replayActive, source, speed]);
   async function compare(sequence: number, earlierAt: number) {
+    if (pendingSave.current) { setNotice('Wait for the save to finish before comparing this run.'); return; }
     if (!source || busy || hostPending.current || jobs.current.size) return; const token = generation.current, request = sourceGeneration.current; hostPending.current = true; setBusy(true); setError('');
     try {
       let client = replayClient.current;
