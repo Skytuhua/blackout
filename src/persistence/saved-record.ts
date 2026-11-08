@@ -132,7 +132,7 @@ export function validateSavedRun(input: unknown): SavedRunRecord {
         receipts.add(call.receiptId); if (call.responseId !== null) responseIds.add(call.responseId);
       }
       if (toolResult) {
-        if (start.interactionMode === 'advisory' && toolResult.receipt) fail('Advisory chat cannot execute a tool command.');
+        if (start.interactionMode && toolResult.receipt) fail('Advisory chat cannot execute a tool command.');
         if (reply?.kind !== 'tool_request' || !identity(toolResult) || toolResult.interactionId !== reply.interactionId || toolResult.callId !== reply.intent.callId) fail('Tool result has no corresponding request.');
         if (reply.intent.tool === 'inspect_asset' && toolResult.status === 'completed' || reply.intent.tool !== 'inspect_asset' && toolResult.receipt !== null) fail('Tool result status or receipt is incompatible with the tool.');
         knownObservations(toolResult.observations, start.actorId, interaction.end.atSimTime);
