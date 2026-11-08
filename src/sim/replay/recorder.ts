@@ -16,7 +16,7 @@ export function reissue(engine: SimulationEngine, command: RecordedCommand, task
   const view = engine.observe(command.actorId);
   const intent = structuredClone(command.intent);
   intent.atSimTime = Math.min(intent.atSimTime, at);
-  if (intent.args.taskId) {
+  if (intent.action === 'cancel_task' && intent.args.taskId) {
     const mapped = taskIds.get(intent.args.taskId);
     if (!mapped) return { status: 'rejected' as const, reason: 'UNMAPPED_TASK_REFERENCE', taskId: null };
     intent.args.taskId = mapped;

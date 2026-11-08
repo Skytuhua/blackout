@@ -6,6 +6,28 @@ import { request } from '../sim/mission-policy';
 import { recordedRun } from './fixtures';
 
 describe('frozen engine saved records', () => {
+  it('preserves an ignored non-cancel taskId instead of requiring a task mapping', () => {
+    const engine = initialize(hotRestart, 'unused-task-argument'); engine.step(10);
+    expect(engine.applyCommand(request(engine, 'pause_batch', 'site', { taskId: 'unused' })).status).toBe('accepted');
+    engine.step(10); const record = engine.exportRecord();
+    expect(replay.validateRunRecord(record).runId).toBe(record.runId);
+    expect(replay.verifyReplay(record, 'unused-task-replay').matches).toBe(true);
+    const cap = record.commands.find(c => c.intent.action === 'pause_batch')!;
+    expect(replay.compareEarlierCap(record, { commandSequence: cap.sequence, earlierAt: 0, branchRunId: 'unused-task-comparison' }).status).toBe('complete');
+  });
+  it('keeps ignored task and technician arguments literal even when they equal a real task ID', () => {
+    const engine = initialize(hotRestart, 'literal-task-argument');
+    expect(engine.applyCommand(request(engine, 'inspect', 'cooling-1', { technicianId: 'jules' })).status).toBe('rejected');
+    const inspection = engine.applyCommand(request(engine, 'inspect', 'cooling-1', { technicianId: 'alex' }));
+    engine.step(1); const args = { taskId: inspection.taskId!, technicianId: inspection.taskId! };
+    expect(engine.applyCommand(request(engine, 'pause_batch', 'site', args)).status).toBe('accepted');
+    engine.step(5); const record = engine.exportRecord();
+    const result = replay.verifyReplay(record, 'literal-task-replay');
+    expect(result.record.commands.find(c => c.intent.action === 'pause_batch')!.intent.args).toEqual(args);
+    expect(result.matches).toBe(true);
+    const cap = record.commands.find(c => c.intent.action === 'pause_batch')!;
+    expect(replay.compareEarlierCap(record, { commandSequence: cap.sequence, earlierAt: 0, branchRunId: 'literal-task-comparison' }).status).toBe('complete');
+  });
   it('accepts engine records whose optional command arguments were explicitly undefined', () => {
     const engine = initialize(hotRestart, 'optional-args');
     engine.applyCommand(request(engine, 'pause_batch', 'site', { technicianId: undefined, ceiling: undefined }));

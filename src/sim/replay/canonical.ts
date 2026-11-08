@@ -31,7 +31,17 @@ export function canonicalCheckpoint(checkpoint: Checkpoint): string {
   function normalize(value: unknown): unknown {
     if (typeof value === 'string') return tasks.get(value) ?? eventIds.get(value) ?? (value.startsWith('report-') && tasks.has(value.slice(7)) ? `report-${tasks.get(value.slice(7))}` : value);
     if (Array.isArray(value)) return value.map(normalize);
-    if (value !== null && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, normalize(v)]));
+    if (value !== null && typeof value === 'object') {
+      const object = value as Record<string, unknown>;
+      const normalized = Object.fromEntries(Object.entries(object).map(([k, v]) => [k, normalize(v)]));
+      if (typeof object.action === 'string' && object.args && typeof object.args === 'object') {
+        // Only cancellation has a semantic task reference; other accepted arguments stay literal.
+        const args = { ...object.args } as Record<string, unknown>;
+        if (object.action === 'cancel_task' && typeof args.taskId === 'string') args.taskId = normalize(args.taskId);
+        normalized.args = args;
+      }
+      return normalized;
+    }
     return value;
   }
   const { commands, idempotency: _idempotency, nextSequence: _sequence, ...authoritative } = state;

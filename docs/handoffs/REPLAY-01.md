@@ -9,7 +9,7 @@ Ready for coordinator review and integration. This is a replay/persistence libra
 - Read repository instructions, master-plan replay/snapshot/contracts/Task 6/gates, `docs/reviews/CORE-01.md` and `docs/handoffs/SIM-02.md` before edits. Applied requested Ponytail, Superpowers TDD and verification instructions.
 - Exclusive transferred paths only: `src/sim/replay/**`, `src/persistence/**`, `tests/replay/**`, this handoff. No nested agents. Parent owns fresh independent review; this implementer does not approve its own patch.
 - Frozen shared contract 1, engine `sim-02-v1`, content `hot-restart-v1`, procedure `procedures-v1`, seed 20261107. No shared schema or physics edits and no parallel interfaces replacing shared contracts.
-- Checkout lacked dependencies. User expressly approved the ignored `node_modules` junction, verified target `C:/Users/user/Documents/Blackout/node_modules`. Reused pinned dependencies; no installs, dependency edits, package/lock edits or target removal. The junction remains for coordinator checks.
+- Checkout lacked dependencies. The coordinator authorized the ignored `node_modules` junction under the existing verification scope, with verified target `C:/Users/user/Documents/Blackout/node_modules`. Reused pinned dependencies; no installs, dependency edits, package/lock edits or target removal. The junction remains for coordinator checks.
 
 Apply these commits in order:
 

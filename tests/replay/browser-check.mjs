@@ -2,7 +2,7 @@
 import { chromium } from '@playwright/test';
 import { build } from 'esbuild';
 import { createServer } from 'node:http';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -20,8 +20,9 @@ const origin = `http://127.0.0.1:${server.address().port}`;
 const profile = await mkdtemp(join(tmpdir(), 'blackout-replay-01-'));
 let context;
 const errors = [];
+const headless = process.env.REPLAY_BROWSER_HEADLESS === '1';
 async function open() {
-  context = await chromium.launchPersistentContext(profile, { headless: false });
+  context = await chromium.launchPersistentContext(profile, { headless });
   const page = context.pages()[0];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(origin); await page.waitForFunction(() => Boolean(window.replayProof));
@@ -36,8 +37,10 @@ try {
   const resumed = await page.evaluate(expected => window.replayProof.reloadAndResume(expected), saved);
   const boundaries = await page.evaluate(() => window.replayProof.corruptBoundaries());
   assert.deepEqual(errors, []);
-  const evidence = { mode: 'headed Chromium, fresh temporary persistent profile', browser: context.browser().version(), origin, saved, resumed, boundaries, pageErrors: errors, providerCalls: 0 };
-  await writeFile(join(here, 'browser-evidence.json'), `${JSON.stringify(evidence, null, 2)}\n`);
+  const evidence = { mode: `${headless ? 'headless' : 'headed'} Chromium, fresh temporary persistent profile`, browser: context.browser().version(), origin, saved, resumed, boundaries, pageErrors: errors, providerCalls: 0 };
+  const output = resolve('.local/replay-01/browser-evidence.json');
+  await mkdir(dirname(output), { recursive: true });
+  await writeFile(output, `${JSON.stringify(evidence, null, 2)}\n`);
   console.log(JSON.stringify(evidence, null, 2));
 } finally {
   if (context) await context.close();
