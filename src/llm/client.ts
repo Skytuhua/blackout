@@ -19,11 +19,14 @@ export function cancelInteraction(input: Identity) {
   void fetch('/api/llm/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ runId: input.runId, requestId: input.requestId, actorId: input.actorId }), keepalive: true }).catch(() => {});
 }
 async function turn(input: GatewayInput, context: GatewayStart, lifecycle: Lifecycle, signal?: AbortSignal, onWire?: GatewayWireObserver): Promise<GatewayResponse> {
+  let receivedCall: ProviderCall | undefined;
+  const retain = (reply: GatewayResponse) => { if (receivedCall) providerCalls.set(reply, receivedCall); return reply; };
+  const fail = (reason: string) => retain(fallback(input, reason));
   if (signal && signal !== lifecycle.signal) lifecycle.signal = lifecycle.signal ? AbortSignal.any([lifecycle.signal, signal]) : signal;
   const effectiveSignal = lifecycle.signal;
   const cancel = () => cancelInteraction(input);
-  if (effectiveSignal?.aborted) { lifecycle.closed = true; return fallback(input, 'canceled'); }
-  if (expired(lifecycle)) return fallback(input, 'canceled_or_expired');
+  if (effectiveSignal?.aborted) { lifecycle.closed = true; return fail('canceled'); }
+  if (expired(lifecycle)) return fail('canceled_or_expired');
   effectiveSignal?.addEventListener('abort', cancel, { once: true });
   let toolPending = false;
   try {
@@ -36,33 +39,34 @@ async function turn(input: GatewayInput, context: GatewayStart, lifecycle: Lifec
     const body = JSON.stringify(wire);
     onWire?.(JSON.parse(body) as GatewayInput);
     const response = await fetch('/api/llm/turn', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal: effectiveSignal });
-    const remaining = response.headers.get('X-Blackout-Deadline-Ms');
-    if (remaining !== null) {
-      if (!/^\d{1,5}$/.test(remaining) || Number(remaining) > 20000) return fallback(input, 'invalid_deadline');
-      // Starting at send time deliberately subtracts the whole HTTP round trip.
-      lifecycle.deadline = Math.min(lifecycle.deadline, sentAt + Number(remaining));
-    }
-    if (!response.ok) return fallback(input, 'gateway_unavailable');
-    const reply = GatewayResponseSchema.parse(await response.json());
-    if (expired(lifecycle)) return fallback(input, 'canceled_or_expired');
-    if (effectiveSignal?.aborted) return fallback(input, 'canceled');
-    if (reply.runId !== input.runId || reply.requestId !== input.requestId || reply.actorId !== input.actorId) return fallback(input, 'stale_response');
-    if (reply.kind === 'final' && !validateResponse(reply.response, { ...context, view: { ...wire.view, observations: [...seen.values()] } })) return fallback(input, 'invalid_evidence');
-    if (reply.kind === 'tool_request' && (reply.intent.runId !== input.runId || reply.intent.actorId !== input.actorId || reply.intent.requestId !== input.requestId || reply.intent.interactionId !== reply.interactionId)) return fallback(input, 'invalid_tool_identity');
-    if (reply.kind === 'tool_request') {
-      if (lifecycle.closed) return fallback(input, 'canceled_or_expired');
-      bindLifecycle(reply.intent, lifecycle); toolPending = true;
-    }
-    const output = reply.kind === 'fallback' ? { ...reply, facts: [] } : reply;
     const metadata = response.headers.get('X-Blackout-Call');
     if (metadata && metadata.length <= 1200) {
       try {
         const parsed = ProviderCallSchema.safeParse(JSON.parse(metadata));
-        if (parsed.success && parsed.data.runId === input.runId && parsed.data.requestId === input.requestId && parsed.data.actorId === input.actorId) providerCalls.set(output, parsed.data);
-      } catch { /* Optional transport metadata cannot change the game response. */ }
+        if (parsed.success && parsed.data.runId === input.runId && parsed.data.requestId === input.requestId && parsed.data.actorId === input.actorId) receivedCall = parsed.data;
+      } catch { /* Invalid optional metadata never changes game content. */ }
     }
-    return output;
-  } catch { return fallback(input, effectiveSignal?.aborted ? 'canceled' : 'gateway_unavailable'); }
+
+    const remaining = response.headers.get('X-Blackout-Deadline-Ms');
+    if (remaining !== null) {
+      if (!/^\d{1,5}$/.test(remaining) || Number(remaining) > 20000) return fail('invalid_deadline');
+      // Starting at send time deliberately subtracts the whole HTTP round trip.
+      lifecycle.deadline = Math.min(lifecycle.deadline, sentAt + Number(remaining));
+    }
+    if (!response.ok) return fail('gateway_unavailable');
+    const reply = GatewayResponseSchema.parse(await response.json());
+    if (expired(lifecycle)) return fail('canceled_or_expired');
+    if (effectiveSignal?.aborted) return fail('canceled');
+    if (reply.runId !== input.runId || reply.requestId !== input.requestId || reply.actorId !== input.actorId) return fail('stale_response');
+    if (reply.kind === 'final' && !validateResponse(reply.response, { ...context, view: { ...wire.view, observations: [...seen.values()] } })) return fail('invalid_evidence');
+    if (reply.kind === 'tool_request' && (reply.intent.runId !== input.runId || reply.intent.actorId !== input.actorId || reply.intent.requestId !== input.requestId || reply.intent.interactionId !== reply.interactionId)) return fail('invalid_tool_identity');
+    if (reply.kind === 'tool_request') {
+      if (lifecycle.closed) return fail('canceled_or_expired');
+      bindLifecycle(reply.intent, lifecycle); toolPending = true;
+    }
+    const output = reply.kind === 'fallback' ? { ...reply, facts: [] } : reply;
+    return retain(output);
+  } catch { return fail(effectiveSignal?.aborted ? 'canceled' : 'gateway_unavailable'); }
   finally { if (!toolPending) lifecycle.closed = true; effectiveSignal?.removeEventListener('abort', cancel); }
 }
 export async function startInteraction(input: GatewayStart, signal?: AbortSignal, onWire?: GatewayWireObserver): Promise<GatewayResponse> {

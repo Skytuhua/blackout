@@ -1,0 +1,54 @@
+{
+  "scope": "Actual production React interface, Chromium Web Worker and local official OpenAI gateway",
+  "syntheticTrainingMessages": true,
+  "providerAttempts": 4,
+  "completedCalls": [
+    {
+      "provider": "openai",
+      "model": "gpt-5.6-luna",
+      "inputTokens": 1690,
+      "outputTokens": 55,
+      "durationMs": 3620,
+      "status": "completed"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-5.6-luna",
+      "inputTokens": 1947,
+      "outputTokens": 118,
+      "durationMs": 1894,
+      "status": "completed"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-5.6-luna",
+      "inputTokens": 2017,
+      "outputTokens": 347,
+      "durationMs": 7212,
+      "status": "completed"
+    }
+  ],
+  "firstInteraction": {
+    "inspectionAcceptedAt": 10,
+    "workCompletedAt": 47,
+    "reportDeliveredAt": 49,
+    "toolRequest": true,
+    "liveQueuedReply": true
+  },
+  "followup": {
+    "firstAttempt": "call_timeout; labeled fallback",
+    "boundedRetryCalls": 1,
+    "reply": {
+      "kind": "final",
+      "reason": null,
+      "facts": 10
+    },
+    "result": "passed"
+  },
+  "pageErrors": [],
+  "limitations": [
+    "Not a representative latency sample",
+    "No training effectiveness or user visual acceptance claim",
+    "Unknown token usage for the timed-out provider attempt remains unknown"
+  ]
+}

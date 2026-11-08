@@ -92,6 +92,7 @@ export function InformationPanel({ props, feedback = false }: { props: DesktopGa
   return <div className="blackout-fill">{props.panel === 'objectives' && <SectionChoice value={tab} choices={['Objectives', 'Feedback']} onChange={setTab} label="Mission section" />}
     <PagedText text={props.panel === 'help' ? instructions : tab === 'Feedback' ? `NOTICE\n${props.notice || 'No notice.'}\n\nERROR\n${props.error || 'No error.'}` : missionText(props.view)} label={props.panel === 'help' ? 'Instructions' : 'Mission information'} />
     {props.session === 'practice' && <button onClick={props.onStartMission}>Start timed incident</button>}
+    {props.panel === 'help' && props.session === 'mission' && !terminal(props.view) && <button onClick={props.onRetry}>Restart mission</button>}
     {terminal(props.view) && <button onClick={props.onRetry}>Retry mission</button>}
   </div>;
 }

@@ -2,15 +2,15 @@
 
 A 2D pixel-art incident-command game for the NMC² challenge, **Keep the World Running**.
 
-The player directs a data-center team through a cooling failure. Power, heat, workload, technician travel, and delayed observations determine the outcome. OpenAI coworkers use their own permitted evidence and ordinary inspection tasks. The remaining delivery work adds an engine-computed replay, debrief and one alternative response.
+The player directs a data-center team through a cooling failure. Power, heat, workload, technician travel, and delayed observations determine the outcome. OpenAI coworkers use scoped evidence and ordinary inspection tasks. Recorded runs include a computed debrief and an earlier-workload alternative.
 
 ## Status
 
-Playable offline Hot Restart: the production React/Phaser interface uses the deterministic simulation worker, qualified dispatch, travel/work, delayed reports, workload mitigation and recovery verification. Browser controls complete recovery at t331 and an idle run fails at t505. Playback stops at the exact terminal tick; retry creates a fresh run.
+The desktop rebuild has a fixed, non-scrolling game window, 111-frame pixel atlas, commander movement, technician orders, animation and guided healthy practice. Real browser controls complete Hot Restart at t336; an idle run fails at t505. Interactive play stops at the exact terminal tick. Practice starts a separate mission at time zero.
 
-Coworker requests now use the bounded local gateway, with factual selectors rendered from records and inference/uncertainty labeled separately. Inspections go through the real worker; repairs and workload proposals await player confirmation. A live OpenAI cycle accepted inspection at t10, completed work at t47 and delivered its report at t49 before a grounded follow-up. Default scripted mode and provider outages leave the complete mission usable.
+Coworkers use the bounded local gateway. Facts, inference, uncertainty, tool receipts and provenance have paged views. Repairs and workload proposals await confirmation against the exchange's original versions. Provider outages leave direct orders usable. Earlier live capability evidence is retained in [AI-02](docs/reviews/AI-02.md); desktop runtime checks are recorded separately.
 
-Replay, persistence, comparison, the final timing sample and release rehearsal remain unfinished application work. The replay/storage library is undergoing independent review.
+Native IndexedDB saves preserve original transcripts and incompatible bytes for export. Compatible saves resume paused; replay projects scoped views in a separate worker, and comparisons retain equal horizons or label their supported prefix. Actual laptop rehearsal, user visual acceptance and training effectiveness remain separate acceptance steps. Mobile is deferred.
 
 The delivery target is a local laptop-browser demonstration for judges. [Public source repository](https://github.com/Skytuhua/blackout). No public game hosting is required for the initial release.
 
@@ -33,13 +33,13 @@ npm run build
 npm run demo
 ```
 
-Open `http://127.0.0.1:4173`, read the briefing and start the mission. Pause or step time to review evidence before dispatch. Use the equipment list with a keyboard, select a qualified technician, and wait for task completion and the delayed report before choosing a repair. Workload controls preserve deferred batch work.
+Open `http://127.0.0.1:4173` and choose Start practice or Skip practice. Focus the facility and use WASD/arrows to walk, E to view nearby equipment, or select equipment on the map. Select Facilities/Electrical and click floor to request travel; Command → Movement provides a keyboard equivalent. Equipment → Work offers inspection and repair orders. Pause and 1x/2x/4x control time. Radio, Replay and More open paged panels; Replay → Runs contains save/export/resume actions. Help includes instructions and Restart mission. Wait for completed work and its delayed report before choosing a repair.
 
 `npm run dev` starts client and local service together. `npm run verify` checks types, unit tests, the production build and Chromium mission tests (first install: `npx playwright install chromium`). `npm run test:sim`, `npm run test:contracts` and `npm run test:llm` run focused suites.
 
 ## Stack
 
-TypeScript, React, Phaser, Vite, a deterministic simulation Web Worker, a small local Node service, OpenAI Responses API, Vitest and Playwright. IndexedDB persistence is planned. Dependencies are pinned in the lockfile.
+TypeScript, React, Phaser, Vite, a deterministic simulation Web Worker, a small local Node service, OpenAI Responses API, IndexedDB, Vitest and Playwright. Dependencies are pinned in the lockfile.
 
 The production command serves client and API from one stable loopback origin, fails if its port is occupied, and defaults to scripted mode. Health checks never make paid provider calls.
 

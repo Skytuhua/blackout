@@ -75,9 +75,9 @@ it('scope preserves source freshness and selected evidence without mutating engi
   expect(scopeKnowledge(input.view, ['cooling-1'], [sample.id]).observations).toContainEqual(sample);
 });
 
-it.each([[75, false], [331, false], [75, true]] as const)('real mission t%s completes bounded calls with newer sensor readings: %s', async (at, advanceSensors) => {
+it.each([[75, false], [336, false], [75, true]] as const)('real mission t%s completes bounded calls with newer sensor readings: %s', async (at, advanceSensors) => {
   const engine = initialize(hotRestart, `real-context-${at}`);
-  if (at === 331) {
+  if (at === 336) {
     // Exercise the real terminal history without coupling gateway limits to the old floor plan's ETAs.
     successfulPolicy(engine);
     expect(engine.observe('player').mission.status).toBe('success');

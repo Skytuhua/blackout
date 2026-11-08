@@ -29,3 +29,6 @@ First visual review follows shell+fourmasters. Then integrate controls/practice/
 
 ## Acceptance
 No scroll at1280x720,1366x768,1920x1080 through all panels,longrecords,longIDs,pastedmessage,zoom. Entire facility and essential controls visible. Responsive collision-aware commander creates no evidence/provider calls. Real technician travel/work/report/cancel/reset. Practice no deadline and clean mission transition. New map mission success/failure/retry; deterministic saves/replay; model success/outage/reset/proposals. Interactive terminal stops first endingtick; preserve equal-horizon replay comparison semantics. Run standard verify and viewport browser checks. User visual acceptance and first-time walkthrough remain separate from automated proof. Dedicated persistent demo at stable4173 after tests finish.
+
+## Integration contract3: recorder worker operations
+Coordinator reviewed additive internal replay_to(record,at) and compare(record,change) requests with bounded integer cursor and comparison reply. Normal UI receives scoped views or ledgers only, never records/checkpoints. DesktopGameProps unchanged. Engine/checkpoint wire1 and savedhost2 retained. Contract3 fixture: tests/fixtures/worker-contract-v3.json. DESKTOP-RECORD completed its compatibility lease; coordinator nowowns persistence and replayrecorder again.

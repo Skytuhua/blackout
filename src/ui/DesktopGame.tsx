@@ -17,11 +17,13 @@ function DesktopSurface(props: DesktopGameProps) {
   const [focus, setFocus] = useState(false), [dockPage, setDockPage] = useState(0), [menu, setMenu] = useState(false);
   const [recipient, setRecipient] = useState(''), [drafts, setDrafts] = useState<Record<string, string>>({});
   const [feedback, setFeedback] = useState(false);
+  const [fullscreen, setFullscreen] = useState(Boolean(document.fullscreenElement)), [fullscreenError, setFullscreenError] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const asset = view.knownTopology.assets.find(a => a.id === props.selectedAssetId);
   const panelTitle = props.panel === 'equipment' && asset && asset.label.length <= 24 ? asset.label : props.panel ? props.panel[0].toUpperCase() + props.panel.slice(1) : '';
   const show = (panel: DesktopPanel) => { setMenu(false); setFeedback(false); props.onPanelChange(panel); };
   useEffect(() => { if (props.panel) heading.current?.focus({ preventScroll: true }); }, [props.panel]);
+  useEffect(() => { const changed = () => setFullscreen(Boolean(document.fullscreenElement)); document.addEventListener('fullscreenchange', changed); return () => document.removeEventListener('fullscreenchange', changed); }, []);
   const summaryAge = view.simTime - view.summary.observedAt;
   const cooling = view.knownTopology.assets.filter(a => a.kind === 'cooling').map(a => indicatorState(view.observations.filter(o => o.assetId === a.id), view.simTime));
   const coolingStatus = cooling.includes('attention') ? 'Cooling stopped' : cooling.length > 0 && cooling.every(s => s === 'active') ? 'Cooling ready' : 'Cooling unknown';
@@ -34,6 +36,7 @@ function DesktopSurface(props: DesktopGameProps) {
         <h1>BLACKOUT</h1><span className="blackout-mission-name">{props.session === 'practice' ? 'Practice' : 'Hot Restart'}</span>
         <button className="blackout-status-cell" onClick={() => show('objectives')}><i className={`blackout-led${serviceStatus === 'Service stable' ? '' : ' blackout-led-warn'}`} />{serviceStatus}</button>
         <button className="blackout-status-cell blackout-cooling-status" onClick={() => show('equipment')}><i className={`blackout-led${coolingStatus === 'Cooling ready' ? '' : coolingStatus === 'Cooling stopped' ? ' blackout-led-warn' : ' blackout-led-unknown'}`} />{coolingStatus}</button>
+        <button className="blackout-status-cell blackout-temperature" aria-label="Observed inlet temperature" title={`Observed ${timeLabel(view.summary.observedAt)}`} onClick={() => show('objectives')}>{view.summary.hottestTemperatureC === null || summaryAge < 0 ? 'Temp unknown' : `${view.summary.hottestTemperatureC.toFixed(1)} °C${summaryAge > 10 ? ' stale' : ''}`}</button>
         <button className="blackout-status-cell blackout-crew-status" onClick={() => show('command')}><i className="blackout-led" />{availableCrew} crew available</button>
         <div className="blackout-playback"><button aria-label={props.paused ? 'Resume simulation' : 'Pause simulation'} onClick={props.onPause} disabled={terminal(view) || props.session === 'welcome'}>{props.paused ? <Play size={18} /> : <Pause size={18} />}</button>{([1, 2, 4] as const).map(speed => <button key={speed} aria-pressed={props.speed === speed} onClick={() => props.onSpeed(speed)}>{speed}x</button>)}</div>
         <time>{timeLabel(view.simTime)}</time>
@@ -52,7 +55,7 @@ function DesktopSurface(props: DesktopGameProps) {
         <div className="blackout-crew">{view.crew.map(crew => { const task = view.tasks.find(t => t.id === crew.taskId); return <button key={crew.id} aria-pressed={props.selectedCrewId === crew.id} onClick={() => { props.onSelectCrew(props.selectedCrewId === crew.id ? null : crew.id); if (crew.role !== 'remote') props.onTutorialEvent('crew_selected'); }}><DesktopPortrait role={crew.role} /><span><strong>{crew.role === 'remote' ? 'IT' : crew.role === 'facilities' ? 'Facilities' : 'Electrical'}</strong><small>{task ? task.status : crew.role === 'remote' ? 'Online' : 'Ready'}</small></span></button>; })}</div>
         <nav aria-label="Game panels">{(['command', 'radio', 'replay'] as const).map(panel => <button key={panel} aria-pressed={props.panel === panel} onClick={() => show(panel)}>{panel[0].toUpperCase() + panel.slice(1)}</button>)}<button aria-expanded={menu} onClick={() => setMenu(!menu)}>More</button></nav>
       </footer>
-      {menu && <nav className="blackout-secondary-menu" aria-label="More game panels">{(['equipment', 'objectives', 'help'] as const).map(panel => <button key={panel} onClick={() => show(panel)}>{panel[0].toUpperCase() + panel.slice(1)}</button>)}<button onClick={() => setMenu(false)}>Close menu</button></nav>}
+      {menu && <nav className="blackout-secondary-menu" aria-label="More game panels">{(['equipment', 'objectives', 'help'] as const).map(panel => <button key={panel} onClick={() => show(panel)}>{panel[0].toUpperCase() + panel.slice(1)}</button>)}<button disabled={!document.fullscreenEnabled || fullscreenError} onClick={() => { const request = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); void request.then(() => setMenu(false)).catch(() => setFullscreenError(true)); }}>{fullscreenError ? 'Use F11 for fullscreen' : fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}</button><button onClick={() => setMenu(false)}>Close menu</button></nav>}
     </div>
     {props.session === 'welcome' && <DesktopWelcome props={props} />}
     {terminal(view) && props.panel !== 'replay' && <div className="blackout-result" role="status"><strong>Mission {view.mission.status}</strong><button onClick={() => show('objectives')}>Review result</button><button onClick={() => show('replay')}>After action</button><button onClick={props.onRetry}>Retry</button></div>}

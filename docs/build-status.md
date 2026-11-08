@@ -1,5 +1,9 @@
 # Blackout build status
 
+## Desktop revision checkpoint
+
+Desktop host integration passes223 tests,11 production Chromium checks,native IndexedDB and nine desktop UI browser groups. See [host handoff](handoffs/DESKTOP-HOST.md) and [independent review](reviews/DESKTOP-RELEASE-CANDIDATE.md). The user has requested a further WASD/proximity/onboarding revision; desktop acceptance and final PR merge remain pending. Earlier milestone entries below are historical evidence.
+
 Updated: 7 November 2026.
 
 The real playable host is merged at PR8 (`70f5ab0`) with successful hosted checks: offline recovery t331, idle failure t505, exact terminal stopping and fresh retry. The actual production worker/OpenAI cycle is merged at PR9 (`203bcb4`): accepted t10, completed t47, report t49, grounded live follow-up. Public repository: https://github.com/Skytuhua/blackout. The replay/storage library is reviewed and locally verified; application integration, debrief/comparison, complete transcript capture, timing sample and release rehearsal remain unfinished.

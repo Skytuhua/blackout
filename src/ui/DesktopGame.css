@@ -100,3 +100,5 @@
 @media (max-height:599px) { .blackout-editor-window { min-height:34px; }.blackout-editor-window textarea,.blackout-editor-measure { padding:4px; }.blackout-draft { gap:3px; } }
 @media (max-height:599px) { .blackout-panel-heading { min-height:36px; padding:3px 8px; }.blackout-panel-content,.blackout-focus .blackout-panel-content { padding-top:4px; padding-bottom:4px; } }
 @media (prefers-reduced-motion:reduce) { .blackout-desktop *, .blackout-desktop *::before, .blackout-desktop *::after { animation:none!important; transition:none!important; } }
+@media(max-width:1365px){.blackout-crew-status{display:none!important}}
+@media(max-width:760px){.blackout-temperature{display:none!important}}

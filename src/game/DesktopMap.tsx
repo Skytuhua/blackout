@@ -19,7 +19,7 @@ export function DesktopMap(props: DesktopGameProps) {
     let disposed = false, game: import('phaser').Game | undefined;
     const media = matchMedia('(prefers-reduced-motion: reduce)');
     const state = () => ({ ...latest.current, reducedMotion: media.matches });
-    const resize = () => { const size = fitWorld(container.clientWidth, container.clientHeight); element.style.width = `${size.width}px`; element.style.height = `${size.height}px`; element.dataset.scale = String(size.scale); };
+    const resize = () => { const size = fitWorld(container.clientWidth, container.clientHeight); element.style.width = `${size.width}px`; element.style.height = `${size.height}px`; element.dataset.scale = String(size.scale); game?.scale.refresh(); };
     const observer = new ResizeObserver(resize); observer.observe(container); resize();
     const clear = () => scene.current?.clearKeys();
     const visibility = () => { if (document.hidden) clear(); };
