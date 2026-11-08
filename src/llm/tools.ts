@@ -3,6 +3,7 @@ import { ToolIntentSchema, KnowledgeViewSchema, CommandReceiptSchema } from '../
 import type { SimulationClient } from '../workers/SimulationClient';
 import { validAction, validStart } from './validation';
 import { lifecycleFor, expired } from './lifecycle';
+import { latestObservations } from './context';
 export type ScopedContext = { start: GatewayStart; simulation?: Pick<SimulationClient, 'observe' | 'command'>; signal?: AbortSignal };
 const completed = new WeakMap<ScopedContext, Map<string, { fingerprint: string; result: Promise<PublicToolResult> }>>();
 export async function executeToolIntent(intent: ToolIntent, context: ScopedContext): Promise<PublicToolResult> {
@@ -26,7 +27,7 @@ export async function executeToolIntent(intent: ToolIntent, context: ScopedConte
       return procedure ? { ...reject('procedure'), status: 'completed', procedureText: procedure.text } : reject('procedure_not_permitted');
     }
     if (!(intent.tool === 'propose_action' && intent.action && validAction(intent.action, context.start)) && !view.knownTopology.assets.some(a => a.id === intent.targetId)) return reject('unknown_target');
-    if (intent.tool === 'read_observations') return { ...reject('observations'), status: 'completed', observations: view.observations.filter(o => o.assetId === intent.targetId) };
+    if (intent.tool === 'read_observations') return { ...reject('observations'), status: 'completed', observations: latestObservations(view.observations.filter(o => o.assetId === intent.targetId)) };
     if (!intent.action || intent.action.targetId !== intent.targetId || !validAction(intent.action, context.start)) return reject('action_not_permitted');
     if (context.start.view.observedEntityVersions[intent.targetId] === undefined || view.observedEntityVersions[intent.targetId] !== context.start.view.observedEntityVersions[intent.targetId]) return reject('stale_action');
     if (!validAction({ ...intent.action, atSimTime: view.simTime }, current)) return reject('action_not_permitted');
@@ -36,7 +37,7 @@ export async function executeToolIntent(intent: ToolIntent, context: ScopedConte
     const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify([intent.runId, intent.requestId, intent.actorId, intent.interactionId, intent.callId])));
     const idempotencyKey = 'llm:' + Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
     if (closed()) return reject('canceled_or_expired');
-    const receipt = CommandReceiptSchema.parse(await context.simulation.command({ schemaVersion: 1, ...{ runId: intent.runId, requestId: intent.requestId, actorId: intent.actorId }, intent: { ...intent.action, atSimTime: view.simTime }, expectedEntityVersions: { [intent.targetId]: context.start.view.observedEntityVersions[intent.targetId] }, idempotencyKey }));
+    const receipt = CommandReceiptSchema.parse(await context.simulation.command({ schemaVersion: 1, ...{ runId: intent.runId, requestId: intent.requestId, actorId: intent.actorId }, intent: { ...intent.action, atSimTime: view.simTime }, expectedEntityVersions: context.start.view.observedEntityVersions, idempotencyKey }));
     if (receipt.runId !== intent.runId || receipt.actorId !== intent.actorId || receipt.requestId !== intent.requestId || closed()) return reject('stale_run');
     return { ...reject('inspection_receipt'), status: receipt.status === 'rejected' ? 'rejected' : 'accepted', receipt };
   })().catch(() => reject('worker_unavailable'));

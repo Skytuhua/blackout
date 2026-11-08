@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import type { GatewayInput, GatewayResponse, GatewayStart, ToolIntent, PublicToolResult } from '../../src/shared/contracts';
+import type { GatewayInput, GatewayResponse, GatewayStart, ToolIntent, PublicToolResult, Observation } from '../../src/shared/contracts';
 import { GatewayInputSchema } from '../../src/shared/schemas';
 import { validStart, validAction, validateResponse } from '../../src/llm/validation';
 import { Budget } from './budget';
 import { initialHistory, parameters, decode, appendOutput, appendToolResult, appendFreshView, officialTransport, type History, type Transport } from './adapter';
 type Options = { mode?: string; keyConfigured?: boolean; transport?: Transport; budget?: Budget; callTimeoutMs?: number; interactionTimeoutMs?: number; debriefTimeoutMs?: number };
 type Diagnostic = { runId: string; requestId: string; model: string; inputTokens: number | null; outputTokens: number | null; durationMs: number; status: string };
-type Interaction = { start: GatewayStart; history: History; calls: number; controller: AbortController; deadline: number; pending?: ToolIntent; fingerprint: string; reply?: GatewayResponse; busy: boolean; expires: ReturnType<typeof setTimeout> };
+type Interaction = { start: GatewayStart; history: History; evidence: Map<string, Observation>; calls: number; controller: AbortController; deadline: number; pending?: ToolIntent; fingerprint: string; reply?: GatewayResponse; busy: boolean; expires: ReturnType<typeof setTimeout> };
 const sameIdentity = (a: { runId: string; requestId: string; actorId: string }, b: typeof a) => a.runId === b.runId && a.requestId === b.requestId && a.actorId === b.actorId;
 export class Gateway {
   private interactions = new Map<string, Interaction>();
@@ -70,7 +70,7 @@ export class Gateway {
       const id = randomUUID(), controller = new AbortController();
       const duration = input.role === 'debrief' ? this.options.debriefTimeoutMs ?? 20000 : this.options.interactionTimeoutMs ?? 18000;
       const expires = setTimeout(() => controller.abort('interaction_timeout'), duration); expires.unref();
-      state = { start: input, history: initialHistory(input), calls: 0, controller, deadline: Date.now() + duration, fingerprint, busy: false, expires };
+      state = { start: input, history: initialHistory(input), evidence: new Map(input.view.observations.map(o => [o.id, o])), calls: 0, controller, deadline: Date.now() + duration, fingerprint, busy: false, expires };
       this.interactions.set(id, state);
     } else {
       const found = this.interactions.get(input.interactionId);
@@ -82,6 +82,7 @@ export class Gateway {
       if (this.providerBusy) return this.fallback(input, 'provider_busy');
       state.history = appendToolResult(state.history, input.expectedCallId, input.result);
       state.start = { ...state.start, view: input.view }; state.pending = undefined; state.fingerprint = fingerprint;
+      for (const observation of input.view.observations) state.evidence.set(observation.id, observation);
       state.history = appendFreshView(state.history, state.start);
     }
     const interactionId = [...this.interactions.entries()].find(([, s]) => s === state)![0];
@@ -121,7 +122,7 @@ export class Gateway {
           if ((value.tool === 'inspect_asset' || value.tool === 'propose_action') && (!value.action || value.action.targetId !== value.targetId || !validAction(value.action, state.start))) throw new Error('invalid_action');
           state.pending = value; state.reply = { kind: 'tool_request', runId: input.runId, requestId: input.requestId, actorId: input.actorId, interactionId, intent: value };
         } else {
-          if (!validateResponse(value, state.start)) throw new Error('invalid_evidence');
+          if (!validateResponse(value, { ...state.start, view: { ...state.start.view, observations: [...state.evidence.values()] } })) throw new Error('invalid_evidence');
           state.reply = { kind: 'final', runId: input.runId, requestId: input.requestId, actorId: input.actorId, response: value }; clearTimeout(state.expires);
         }
       } finally { clearTimeout(timeout); state.controller.signal.removeEventListener('abort', close); callController.signal.removeEventListener('abort', onAbort); }

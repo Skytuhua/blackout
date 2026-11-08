@@ -1,8 +1,10 @@
-import type { GatewayStart, GatewayContinue, GatewayInput, GatewayResponse } from '../shared/contracts';
+import type { GatewayStart, GatewayContinue, GatewayInput, GatewayResponse, Observation } from '../shared/contracts';
 import { GatewayStartSchema, GatewayContinueSchema, GatewayResponseSchema } from '../shared/schemas';
 import { validStart, validateResponse } from './validation';
 import { bindLifecycle, lifecycleFor, expired, type Lifecycle } from './lifecycle';
+import { scopeKnowledge } from './context';
 const contexts = new Map<string, { start: GatewayStart; lifecycle: Lifecycle }>();
+const evidence = new WeakMap<Lifecycle, Map<string, Observation>>();
 const key = (input: GatewayInput) => JSON.stringify([input.runId, input.requestId, input.actorId]);
 const fallback = (input: GatewayInput, reason: string): GatewayResponse => ({ kind: 'fallback', runId: input.runId, requestId: input.requestId, actorId: input.actorId, mode: 'scripted', reason, message: 'Scripted fallback: use permitted observations and procedures.', facts: [] });
 async function turn(input: GatewayInput, context: GatewayStart, lifecycle: Lifecycle, signal?: AbortSignal): Promise<GatewayResponse> {
@@ -15,7 +17,12 @@ async function turn(input: GatewayInput, context: GatewayStart, lifecycle: Lifec
   let toolPending = false;
   try {
     const sentAt = performance.now();
-    const response = await fetch('/api/llm/turn', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input), signal: effectiveSignal });
+    const retainIds = input.kind === 'continue' ? [...input.result.observations.map(o => o.id), ...input.result.receipt?.evidenceIds ?? []] : [];
+    const wire = { ...input, view: scopeKnowledge(input.view, undefined, retainIds) };
+    let seen = evidence.get(lifecycle);
+    if (!seen) { seen = new Map(); evidence.set(lifecycle, seen); }
+    for (const observation of wire.view.observations) seen.set(observation.id, observation);
+    const response = await fetch('/api/llm/turn', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(wire), signal: effectiveSignal });
     const remaining = response.headers.get('X-Blackout-Deadline-Ms');
     if (remaining !== null) {
       if (!/^\d{1,5}$/.test(remaining) || Number(remaining) > 20000) return fallback(input, 'invalid_deadline');
@@ -27,7 +34,7 @@ async function turn(input: GatewayInput, context: GatewayStart, lifecycle: Lifec
     if (lifecycle.signal?.aborted || performance.now() >= lifecycle.deadline) return fallback(input, 'canceled_or_expired');
     if (effectiveSignal?.aborted) return fallback(input, 'canceled');
     if (reply.runId !== input.runId || reply.requestId !== input.requestId || reply.actorId !== input.actorId) return fallback(input, 'stale_response');
-    if (reply.kind === 'final' && !validateResponse(reply.response, context)) return fallback(input, 'invalid_evidence');
+    if (reply.kind === 'final' && !validateResponse(reply.response, { ...context, view: { ...wire.view, observations: [...seen.values()] } })) return fallback(input, 'invalid_evidence');
     if (reply.kind === 'tool_request' && (reply.intent.runId !== input.runId || reply.intent.actorId !== input.actorId || reply.intent.requestId !== input.requestId || reply.intent.interactionId !== reply.interactionId)) return fallback(input, 'invalid_tool_identity');
     if (reply.kind === 'tool_request') {
       if (lifecycle.closed) return fallback(input, 'canceled_or_expired');

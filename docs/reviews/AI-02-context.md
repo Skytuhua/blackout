@@ -1,0 +1,13 @@
+# Bounded real-mission context review
+
+Real SIM-02 evidence at t75 exposed a 132,716-byte gateway envelope and 78,093 planned input tokens. Four coordinator assertions failed for HTTP size, provider budget, duplicate snapshots and unbounded target sensor history. The correction keeps full simulation/UI/recorder history, sends a detached latest-per-asset/field/source gateway projection, and uses compact provider rows. Host callers explicitly scope the selected target and site with `scopeKnowledge`; unrestricted all-asset context may still produce labeled `input_limit` fallback.
+
+An independent explorer also reproduced a real-engine inspection rejection: target-only expected versions omitted the selected technician. The adapter now forwards the original public version vector; the engine still checks only its relevant resources and worker. Real engine coverage requires ordinary travel, work and delayed reporting before inspection evidence appears.
+
+Independent correctness review found one HIGH regression: sensor advancement could remove an earlier tool reading from final grounding even though the provider retained that exact tool result. A coordinator rejection case reproduced this at t75/t80/t85. Client and server now retain previously supplied permitted observations for validation throughout the bounded interaction, while each provider continuation contains one fresh snapshot. The regression passes without increasing payload or token limits.
+
+Independent security review found no reportable vulnerability in this scoped change; it exercised synthetic tests and typecheck without provider calls or credentials. Native reviewers supplied no T3 task/thread identifiers, so task-status-backed archival was unavailable; their delivered results were retained.
+
+Tests cover real t75 and successful t331 histories through loopback HTTP, client, mocked three-call provider transport and real engine tools; exact provider call IDs, stale evidence selectors, independent-source freshness, detached projections and overflow before budget reservation are checked. These are integration tests with a mocked provider, not a browser mission or live model acceptance. Production worker/host wiring remains the next gate.
+
+Final coordinator verification: 43 LLM tests and 129 full unit/contract tests passed, together with typecheck, production build and the foundation Chromium round trip. A combined run initially hit the 5-second test timeout while duplicating the adaptive mission policy under concurrent load; the context fixture now reuses the recorded accepted command schedule, leaving policy decision coverage in simulation tests. The final standard `npm run verify` passed.
