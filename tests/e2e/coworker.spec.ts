@@ -380,3 +380,16 @@ test('failed queued save clears waiting message and keeps fresh review evidence'
     expect(await readPages(page, 'Original wire transcript')).toContain(requestId);
   } finally { release(); }
 });
+
+
+test('successful save retry clears an earlier storage error', async ({ page }) => {
+  await page.addInitScript(() => { const original = IDBObjectStore.prototype.put; IDBObjectStore.prototype.put = function(...args) { if ((window as any).__denySave && this.name === 'runs') throw new DOMException('Injected storage failure', 'QuotaExceededError'); return original.apply(this, args); }; });
+  await begin(page); const dialog = await menu(page);
+  await page.evaluate(() => { (window as any).__denySave = true; });
+  await dialog.getByRole('button', { name: 'Save game', exact: true }).click();
+  await expect(dialog.getByRole('alert')).toContainText('Could not save or review');
+  await page.evaluate(() => { (window as any).__denySave = false; });
+  await dialog.getByRole('button', { name: 'Save game', exact: true }).click();
+  await expect(dialog).toContainText('Mission saved locally');
+  await expect(dialog.getByRole('alert')).toHaveCount(0);
+});

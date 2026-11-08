@@ -168,6 +168,7 @@ export default function App() {
     if (save && jobs.current.size) { pendingSave.current = { generation: token }; setNotice('Waiting for the reply before saving. You can still restart.'); return; }
     const request = ++sourceGeneration.current; hostPending.current = true;
     pauseLive();
+    setError(previous => previous.startsWith('Could not save or review this run:') ? '' : previous);
     if (save) setNotice('');
     try {
       await cancelCoworkers(false); if (token !== generation.current || request !== sourceGeneration.current) return;
