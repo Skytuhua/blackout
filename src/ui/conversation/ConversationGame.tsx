@@ -120,7 +120,7 @@ export function ConversationGame(props: ConversationGameProps) {
         </>}
       </> : <p>Select a coworker.</p>}
     </aside>
-    {props.menuOpen && <section className="conv-menu" aria-label="Menu"><button onClick={props.onMenuToggle}>Back to game</button>{props.menuContent}</section>}
+    {props.menuOpen && props.menuContent}
     {props.session === 'welcome' && <section className="conv-welcome" aria-label="Welcome to Blackout"><h2>Keep the facility running.</h2><p>Direct Alex, Jules and Sam through an incident. Choose suggested orders or ask your team a question.</p><button className="conv-primary" onClick={props.onStartGuided}>Start guided game</button><button onClick={props.onStartPractice}>Practice</button></section>}
   </main>;
 }

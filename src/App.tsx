@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { ConversationGame } from './ui/conversation/ConversationGame';
 import { DesktopReplayView } from './ui/debrief/DesktopReplayView';
-import { PagedText } from './ui/DesktopPaging';
+import { ConversationMenu } from './ui/conversation-menu';
+import { savedConversations } from './ui/conversation/recorded-history';
 import { radioCitations, radioProvenance, radioReceipts, radioReport, observationText } from './ui/desktop-copy';
 import { SimulationClient } from './workers/SimulationClient';
 import { hotRestart, practiceScenario } from './content/scenarios/hot-restart';
@@ -22,20 +23,6 @@ const person = (actorId: string) => conversationPeople.find(actor => actor.actor
 const labelAction = (intent: ActionIntent) => intent.action === 'inspect' ? 'Check cooling controls' : intent.action === 'repair_cooling' ? 'Repair the controls' : intent.action === 'pause_batch' ? 'Pause background jobs' : intent.action === 'set_batch_ceiling' || intent.action === 'resume_batch' ? 'Resume background jobs' : intent.action === 'verify_recovery' ? 'Check recovery' : words(intent.action);
 type RadioJob = { controller: AbortController; promise: Promise<CoworkerResult> };
 
-function savedConversations(source?: SavedRunRecord) {
-  let threads = createConversations();
-  for (const message of source?.dialogue ?? []) {
-    const actorId = message.conversationActorId ?? (person(message.speaker) ? message.speaker : null);
-    if (!actorId) continue;
-    threads = appendConversationEntry(threads, { id: message.id, actorId, at: message.at, kind: message.conversationKind ?? (message.id.startsWith('report-') ? 'report' : message.mode === 'live' ? 'live' : 'system'), text: message.text, summary: message.text.length > 260 ? `${person(actorId)?.name} sent a saved message.` : message.text, unread: false, ...(message.id.startsWith('report-') ? { reportId: message.id } : {}) });
-  }
-  for (const interaction of source?.interactions ?? []) {
-    const input = interaction.turns[0].input; if (input.kind !== 'start') continue;
-    const id = `question:${input.requestId}`;
-    if (!threads.find(thread => thread.actorId === input.actorId)?.entries.some(entry => entry.id === id)) threads = appendConversationEntry(threads, { id, actorId: input.actorId, at: interaction.turns[0].atSimTime, kind: 'player', text: input.message, unread: false });
-  }
-  return threads;
-}
 
 export default function App() {
   const simulation = useRef<SimulationClient | null>(null), unsubscribe = useRef<(() => void) | null>(null), known = useRef<KnowledgeView | null>(null);
@@ -45,10 +32,11 @@ export default function App() {
   const replayClient = useRef<SimulationClient | null>(null), replayGeneration = useRef(0), replayAt = useRef(0), replayPending = useRef(false);
   const sessionRef = useRef<'welcome' | 'practice' | 'mission'>('welcome'), selected = useRef<string | null>(null);
   const threadState = useRef<ConversationThread[]>(createConversations()), selectedActor = useRef('alex'), manualPaused = useRef(true), guideEnabled = useRef(true), menuOpenRef = useRef(false);
+  const menuOpener = useRef<HTMLElement | null>(null);
   const [view, setView] = useState<KnowledgeView | null>(null), [session, setSession] = useState<typeof sessionRef.current>('welcome');
   const [paused, setPaused] = useState(true), [speed, setSpeed] = useState<1 | 2 | 4>(1), [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(''), [error, setError] = useState(''), [assetId, setAssetId] = useState<string | null>(null), [actorId, setActorId] = useState('alex');
-  const [threads, setThreads] = useState<ConversationThread[]>(threadState.current), [reader, setReader] = useState<ConversationGameProps['reader']>(null), [menuOpen, setMenuOpen] = useState(false), [menuTab, setMenuTab] = useState('replay'), [guidanceEnabled, setGuidanceEnabled] = useState(true);
+  const [threads, setThreads] = useState<ConversationThread[]>(threadState.current), [reader, setReader] = useState<ConversationGameProps['reader']>(null), [menuOpen, setMenuOpen] = useState(false), [guidanceEnabled, setGuidanceEnabled] = useState(true);
   const [saved, setSaved] = useState<SavedRunSummary[]>([]), [source, setSource] = useState<SavedRunRecord | null>(null), [ledger, setLedger] = useState<OutcomeLedger | null>(null), [comparison, setComparison] = useState<ComparisonResult | null>(null);
   const [replayView, setReplayView] = useState<KnowledgeView | null>(null), [replayActive, setReplayActive] = useState(false), [replayPlaying, setReplayPlaying] = useState(false), [cursor, setCursor] = useState(0);
 
@@ -150,7 +138,8 @@ export default function App() {
     } catch { if (token === generation.current) append({ id: crypto.randomUUID(), actorId: originActor, at: known.current?.simTime ?? current.simTime, kind: 'fallback', text: 'I couldn’t finish that reply. Suggested orders still work.', unread: true }); }
     finally { if (jobs.current.get(originActor)?.promise === job) jobs.current.delete(originActor); if (token === generation.current) { updateThreads(previous => updateConversation(previous, originActor, thread => ({ ...thread, busy: false }))); syncClock(); } }
   }
-  function toggleMenu() { const open = !menuOpenRef.current; menuOpenRef.current = open; setMenuOpen(open); if (open) { manualPaused.current = true; pauseLive(); void refreshSaves(); if (!replayActive && sessionRef.current === 'mission') void capture(false); } }
+  useEffect(() => { if (!menuOpen && menuOpener.current?.isConnected) menuOpener.current.focus(); }, [menuOpen]);
+  function toggleMenu() { const open = !menuOpenRef.current; if (open) menuOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; menuOpenRef.current = open; setMenuOpen(open); if (open) { manualPaused.current = true; pauseLive(); void refreshSaves(); if (!replayActive && sessionRef.current === 'mission') void capture(false); } }
   // Existing save/replay lifecycle follows below; normal UI receives scoped views only.
   async function capture(save: boolean) {
     const client = simulation.current, recorder = archive.current, token = generation.current;
@@ -225,21 +214,30 @@ export default function App() {
   const shown = replayActive ? replayView : view;
   if (!shown) return <main className="host-loading"><h1>BLACKOUT</h1><p role={error ? 'alert' : 'status'}>{error || 'Opening your shift…'}</p>{error && <button onClick={() => { transitioning.current = false; void begin('welcome'); }}>Retry</button>}</main>;
   const options = conversationOrders(shown);
-  const displayedThreads = withConversationAssignments(replayActive && source ? savedConversations(source) : threads, shown).map(thread => ({ ...thread, suggestedOrders: options.filter(order => order.actorId === thread.actorId).map(({ intent: _intent, ...order }) => order) }));
+  const displayedThreads = withConversationAssignments(replayActive && source ? savedConversations(source, shown) : threads, shown).map(thread => ({ ...thread, suggestedOrders: options.filter(order => order.actorId === thread.actorId).map(({ intent: _intent, ...order }) => order) }));
   const coolingStopped = shown.observations.some(observation => observation.field === 'running' && observation.value === false && shown.simTime - observation.observedAt <= 10);
-  const replayContent = <DesktopReplayView saved={saved} ledger={ledger} comparison={comparison} cursor={cursor} playing={replayPlaying} busy={busy} active={replayActive} canSave={session === 'mission'} notice={notice} error={error}
+  const replayContent = <DesktopReplayView compactMenu saved={saved} ledger={ledger} comparison={comparison} cursor={cursor} playing={replayPlaying} busy={busy} active={replayActive} canSave={session === 'mission'} notice={notice} error={error}
     caps={source?.commands.filter(command => ['accepted', 'applied'].includes(command.receipt.status) && ['pause_batch', 'set_batch_ceiling'].includes(command.intent.action)).map(command => ({ sequence: command.sequence, at: command.at, label: words(command.intent.action) })) ?? []}
     dialogue={source?.dialogue ?? []} transcript={source ? JSON.stringify(source.interactions, null, 2) : ''}
     onSave={() => void capture(true)} onRefresh={() => void refreshSaves()} onReview={id => void reviewSaved(id, false)} onResume={id => void reviewSaved(id, true)} onExport={id => void exportSaved(id)}
     onReplay={() => { if (source) void activateReplay(source); }} onReturn={() => { closeReplay(); setMenuOpen(false); menuOpenRef.current = false; }} onSeek={at => void seek(at)} onToggle={() => setReplayPlaying(value => !value)} onCompare={(sequence, at) => void compare(sequence, at)} />;
-  const menuContent = <div className="conv-host-menu"><select aria-label="Menu section" value={menuTab} onChange={event => setMenuTab(event.target.value)}><option value="replay">Saves and after action</option><option value="help">How to play</option><option value="settings">Game options</option></select>{menuTab === 'replay' ? replayContent : menuTab === 'help' ? <PagedText label="Instructions" text="Choose Alex for cooling, Jules for power, or Sam for background jobs.\n\nSuggested orders start real work. A message asks the live assistant; any work it proposes needs your click.\n\nWatch the assignment: walking, checking or working, then a report. Busy crew finish their task unless you choose Stop.\n\nOlder and Newer show whole messages. Open a report for its readings and sources. Expand a long draft to read every part.\n\nThe map selects equipment only. The crew travel automatically. Pause stops the game.\n\nMenu keeps saves, replay, evidence and options. The facility is fictional." /> : <><label><input type="checkbox" checked={guidanceEnabled} onChange={event => { guideEnabled.current = event.target.checked; setGuidanceEnabled(event.target.checked); syncClock(); }} /> Guidance</label><label>Game speed<select aria-label="Game speed" value={speed} onChange={event => { const next = Number(event.target.value) as 1 | 2 | 4; setSpeed(next); simulation.current?.setSpeed(next); }}><option value="1">1x</option><option value="2">2x</option><option value="4">4x</option></select></label><button onClick={() => void begin('mission', undefined, false)}>Restart game</button><button onClick={() => void begin('practice')}>Start practice</button><PagedText text={error || notice || 'Options do not change the difficulty or equipment rules.'} /></>}</div>;
+  const readEntries = (id: string, ids: string[]) => { if (!replayActive) updateThreads(previous => markConversationRead(previous, id, ids)); };
+  const openEntry = (id: string, entryId: string) => { if (!displayedThreads.find(thread => thread.actorId === id)?.entries.some(entry => entry.id === entryId)) return; setReader({ actorId: id, entryId }); readEntries(id, [entryId]); };
+  const setGuidance = (enabled: boolean) => { guideEnabled.current = enabled; setGuidanceEnabled(enabled); syncClock(); };
+  const setGameSpeed = (next: 1 | 2 | 4) => { setSpeed(next); simulation.current?.setSpeed(next); };
+  const menuContent = <ConversationMenu key={shown.runId} conversations={displayedThreads} selectedActorId={actorId} reader={reader} savedRuns={saved} busy={busy}
+    notice={notice} error={error} guidanceEnabled={guidanceEnabled} speed={speed} afterActionContent={replayContent}
+    onClose={() => { setReader(null); toggleMenu(); }} onSave={() => { if (session !== 'mission' || replayActive) setNotice('Return to the live mission to save.'); else void capture(true); }} onRefreshSaves={() => void refreshSaves()}
+    onResumeSave={id => void reviewSaved(id, true)} onReplaySave={id => void reviewSaved(id, false)} onExportSave={id => void exportSaved(id)}
+    onOpenEntry={openEntry} onCloseEntry={() => setReader(null)} onReadEntries={readEntries} onExecuteProposal={id => void executeProposal(id)}
+    onGuidanceChange={setGuidance} onSpeed={setGameSpeed} onRestart={() => void begin('mission', undefined, false)} onStartPractice={() => void begin('practice')} />;
   return <ConversationGame view={shown} session={session} selectedActorId={actorId} selectedAssetId={assetId} conversations={displayedThreads} paused={replayActive ? !replayPlaying : paused} speed={speed} busy={busy || replayActive}
     objective={replayActive ? 'Recorded run — use Menu to return to the game.' : ended(shown) ? `Mission ${shown.mission.status}` : session === 'practice' ? 'Practice: choose Alex and request a cooling check.' : coolingStopped ? 'Keep cooling and critical service running.' : 'Direct your team and watch for updates.'}
     alerts={[...(coolingStopped ? [{ id: 'cooling-stopped', level: 'warning' as const, text: 'Cooling has stopped. Ask Alex to check the controls.' }] : []), ...(error ? [{ id: 'host-error', level: 'info' as const, text: error }] : [])]}
     guidance={session !== 'welcome' && guidanceEnabled && !replayActive ? { enabled: guidanceEnabled, paused: false, text: 'Choose a character. Orders start work; messages ask the assistant.', canContinue: false } : null}
     reader={reader} menuOpen={menuOpen} menuContent={menuContent} onSelectActor={chooseActor} onSelectAsset={chooseAsset}
     onDraftChange={(id, draft) => { if (!replayActive) updateThreads(previous => setConversationDraft(previous, id, draft)); }} onSend={id => void askCoworker(id)}
-    onReadEntries={(id, ids) => { if (!replayActive) updateThreads(previous => markConversationRead(previous, id, ids)); }} onOpenEntry={(id, entryId) => { if (!displayedThreads.find(thread => thread.actorId === id)?.entries.some(entry => entry.id === entryId)) return; chooseActor(id); setReader({ actorId: id, entryId }); if (!replayActive) updateThreads(previous => markConversationRead(previous, id, [entryId])); }} onCloseEntry={() => setReader(null)}
+    onReadEntries={readEntries} onOpenEntry={openEntry} onCloseEntry={() => setReader(null)}
     onExecuteProposal={id => void executeProposal(id)} onSuggestedOrder={id => { const current = known.current; if (!current) return; const order = conversationOrders(current).find(order => order.id === id && order.enabled); if (order) void applyOrder(order.actorId, order.intent); }}
     onStopTask={(id, taskId) => { const current = known.current; if (!current || current.crew.find(crew => crew.id === id)?.taskId !== taskId) return; const task = current.tasks.find(task => task.id === taskId); if (task) void applyOrder(id, { action: 'cancel_task', targetId: task.targetId, atSimTime: current.simTime, args: { taskId } }); }}
     onWait={() => syncClock()} onPause={() => { if (transitioning.current || hostPending.current || commandPending.current) return; if (replayActive) setReplayPlaying(value => !value); else { manualPaused.current = !paused; syncClock(); } }} onSpeed={next => { setSpeed(next); simulation.current?.setSpeed(next); }}
