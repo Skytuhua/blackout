@@ -1,10 +1,11 @@
-import type { GatewayInput, GatewayResponse, GatewayStart, KnowledgeView, ProposalAuthorization, PublicToolResult, RecordedInteraction, ToolIntent } from '../shared/contracts';
+import type { ActionIntent, GatewayInput, GatewayResponse, GatewayStart, KnowledgeView, ProposalAuthorization, PublicToolResult, RecordedInteraction, ToolIntent } from '../shared/contracts';
 import type { SimulationClient } from '../workers/SimulationClient';
 import { procedures } from '../content/procedures';
 import { scopeKnowledge } from './context';
 import { cancelInteraction, continueInteraction, startInteraction, providerCallFor, type GatewayWireObserver } from './client';
 import { executeToolIntent, type ScopedContext } from './tools';
 import type { ProviderCall } from './diagnostics';
+import { validAction } from './validation';
 
 export type CoworkerResult = { start: GatewayStart; targetId: string | null; view: KnowledgeView; reply: Exclude<GatewayResponse, { kind: 'tool_request' }>; tools: PublicToolResult[]; intents: ToolIntent[]; calls: ProviderCall[]; durationMs: number; recording: RecordedInteraction | null; authorizations: ProposalAuthorization[] };
 export type CoworkerRequest = { simulation: Pick<SimulationClient, 'observe' | 'command'>; runId: string; actorId: string; targetId: string | null; message: string; signal: AbortSignal; interactionMode?: 'advisory'; getSimTime?: () => number; onTool?: (intent: ToolIntent, result: PublicToolResult) => Promise<void> };
@@ -19,6 +20,18 @@ export async function runCoworker(input: CoworkerRequest): Promise<CoworkerResul
   const tools: PublicToolResult[] = [], intents: ToolIntent[] = [];
   const calls: ProviderCall[] = [];
   const turns: RecordedInteraction['turns'] = [];
+  const authorizations: ProposalAuthorization[] = [];
+  const proposals = new Set<string>();
+  let originatingWire: GatewayInput | undefined;
+  const retainProposal = (intent: ActionIntent, wire: GatewayInput | undefined) => {
+    if (start.interactionMode !== 'advisory' || !wire || !validAction(intent, { ...start, view: wire.view }) || wire.view.observedEntityVersions[intent.targetId] === undefined) return;
+    // Repeating an operation in a later turn must not refresh its authority or
+    // create another executable token. Distinct task/worker/ceiling args remain distinct.
+    const key = JSON.stringify([intent.action, intent.targetId, Object.entries(intent.args).sort(([a], [b]) => a.localeCompare(b))]);
+    if (proposals.has(key)) return;
+    proposals.add(key);
+    authorizations.push(structuredClone({ id: `${start.requestId}:proposal:${authorizations.length + 1}`, runId: wire.runId, actorId: wire.actorId, requestId: wire.requestId, intent, expectedEntityVersions: wire.view.observedEntityVersions }));
+  };
   const targets = new Set(input.targetId ? [input.targetId] : []);
   const evidenceIds = new Set<string>();
   const fallback = (reason: string): CoworkerResult['reply'] => ({ kind: 'fallback', runId: start.runId, requestId: start.requestId, actorId: start.actorId, mode: 'scripted', reason, message: 'Use permitted observations and procedures.', facts: [] });
@@ -26,7 +39,7 @@ export async function runCoworker(input: CoworkerRequest): Promise<CoworkerResul
     const durationMs = Math.round(performance.now() - began);
     const atSimTime = Math.max(view.simTime, input.getSimTime?.() ?? 0, ...turns.map(t => t.atSimTime), ...tools.map(t => t.receipt?.observedAt ?? 0));
     const recording: RecordedInteraction | null = turns.length ? structuredClone({ turns, end: { atSimTime, reason: input.signal.aborted ? 'canceled' : reply.kind === 'final' ? 'final' : 'fallback', reply, durationMs } }) : null;
-    return { start: context.start, targetId: input.targetId, view, reply, tools, intents, calls, durationMs, recording, authorizations: [] };
+    return { start: context.start, targetId: input.targetId, view, reply, tools, intents, calls, durationMs, recording, authorizations: input.signal.aborted || reply.kind === 'fallback' && reply.reason === 'stale_run' ? [] : structuredClone(authorizations) };
   };
   const receive = async (send: (onWire: GatewayWireObserver) => Promise<GatewayResponse>) => {
     const capture: { turn?: RecordedInteraction['turns'][number] } = {};
@@ -35,6 +48,7 @@ export async function runCoworker(input: CoworkerRequest): Promise<CoworkerResul
       turns.push(capture.turn);
     });
     if (capture.turn) { capture.turn.reply = structuredClone(reply); capture.turn.call = providerCallFor(reply) ?? null; }
+    originatingWire = capture.turn?.input;
     return reply;
   };
   const cancel = () => cancelInteraction(start);
@@ -46,13 +60,18 @@ export async function runCoworker(input: CoworkerRequest): Promise<CoworkerResul
     for (let round = 0; round < 3; round++) {
       const call = providerCallFor(reply); if (call && !calls.some(known => known.receiptId === call.receiptId)) calls.push(call);
       if (input.signal.aborted) return finish(fallback('canceled'));
-      if (reply.kind !== 'tool_request') { complete = true; return finish(reply); }
+      if (reply.kind !== 'tool_request') {
+        if (reply.kind === 'final') for (const proposal of reply.response.proposals) retainProposal(proposal, originatingWire);
+        complete = true; return finish(reply);
+      }
       if (round === 2) return finish(fallback('interaction_quota'));
       const intent = reply.intent;
+      const proposalWire = originatingWire;
       intents.push(intent);
       const result = await executeToolIntent(intent, context); tools.push(result);
       turns.at(-1)!.toolResult = structuredClone(result);
       if (input.signal.aborted) return finish(fallback('canceled'));
+      if (intent.tool === 'propose_action' && intent.action && result.status === 'completed' && result.reason === 'player_confirmation_required') retainProposal(intent.action, proposalWire);
       await input.onTool?.(intent, result);
       if (input.signal.aborted) return finish(fallback('canceled'));
       for (const id of [...result.observations.map(o => o.id), ...result.receipt?.evidenceIds ?? []]) evidenceIds.add(id);

@@ -25,6 +25,8 @@ it('records exact start and continuation inputs with their received tool acknowl
   expect(result.recording?.turns.map(turn => turn.input)).toEqual(wire);
   expect(result.recording?.turns[0].toolResult?.receipt?.status).toBe('accepted');
   expect(result.recording?.end.reason).toBe('final');
+  expect(result.authorizations).toEqual([]);
+  expect(Object.hasOwn(wire[0], 'interactionMode')).toBe(false);
   const saved = validateSavedRun({ ...engine.exportRecord(), schemaVersion: 2, lineage: [], interactions: [result.recording] });
   expect(saved.interactions[0]).toEqual(result.recording);
 });

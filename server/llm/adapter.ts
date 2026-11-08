@@ -19,7 +19,7 @@ function toolsFor(start: GatewayStart) {
   return [
     ...tool('read_observations', 'Read latest permitted observations for a known equipment ID. No action is dispatched.', start.view.knownTopology.assets.map(a => a.id), z.null()),
     ...tool('read_procedure', 'Read a declared procedure by procedure ID, never an equipment ID. No action is dispatched.', start.procedures.map(p => p.id), z.null()),
-    ...advisory ? [] : tool('inspect_asset', 'Dispatch one qualified inspection of equipment. Returns acceptance and ETA immediately; travel/work/report are still pending.', [...new Set(start.view.affordances.filter(a => a.action === 'inspect' && a.enabled).map(a => a.targetId))], action.extend({ action: z.enum(['inspect']) })),
+    ...(advisory ? [] : tool('inspect_asset', 'Dispatch one qualified inspection of equipment. Returns acceptance and ETA immediately; travel/work/report are still pending.', [...new Set(start.view.affordances.filter(a => a.action === 'inspect' && a.enabled).map(a => a.targetId))], action.extend({ action: z.enum(['inspect']) }))),
     ...tool('propose_action', 'Propose an allowed action for player confirmation. This tool never executes the proposal.', [...new Set(start.view.affordances.filter(a => (advisory || a.action !== 'inspect') && a.enabled).map(a => a.targetId))], action),
   ];
 }

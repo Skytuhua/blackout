@@ -53,3 +53,20 @@ it('offers read-only tools and confirmation proposals including inspection in ad
   expect(params.instructions).not.toContain('Inspections dispatch ordinary tasks');
   expect(parameters(start, initialHistory(start), 1).tools!.some(tool => tool.type === 'function' && tool.name === 'inspect_asset')).toBe(true);
 });
+
+it.each([undefined, 'advisory'] as const)('constructs strict provider schemas at startup with mode %s', interactionMode => {
+  const input = { ...start, ...(interactionMode ? { interactionMode } : {}) };
+  const params = parameters(input, initialHistory(input), 1);
+  const strictObjects = (value: any) => {
+    if (!value || typeof value !== 'object') return;
+    if (value.type === 'object') {
+      expect(value.additionalProperties).toBe(false);
+      expect(value.required.slice().sort()).toEqual(Object.keys(value.properties).sort());
+    }
+    for (const child of Object.values(value)) if (Array.isArray(child)) child.forEach(strictObjects); else strictObjects(child);
+  };
+  strictObjects((params.text!.format as any).schema);
+  for (const tool of params.tools!) if (tool.type === 'function') { expect(tool.strict).toBe(true); strictObjects(tool.parameters); }
+  expect(params.parallel_tool_calls).toBe(false);
+  expect(params.store).toBe(false);
+});
