@@ -3,6 +3,7 @@ import type { ConversationGameProps } from '../shared/contracts';
 import type { DesktopScene, DesktopSceneState } from './DesktopScene';
 import { fitWorld, routePosition } from './desktop-world';
 import { DesktopPortrait } from './DesktopPortrait';
+import { NearbyEquipment } from './NearbyEquipment';
 
 const sceneKey = Symbol.for('blackout.conversation.scene');
 const sceneHost = (element: HTMLElement) => element as unknown as Record<symbol, DesktopScene | undefined>;
@@ -33,6 +34,7 @@ export function ConversationMap(props: ConversationGameProps) {
   useEffect(() => { scene.current?.setView({ view: props.view, selectedAssetId: props.selectedAssetId, selectedCrewId: props.selectedActorId, paused: props.paused, speed: props.speed, session: props.session, reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches, displayOnly: true }); }, [props]);
   const asset = props.view.knownTopology.assets.find(item => item.id === props.selectedAssetId);
   return <section className="conv-map" aria-label="Facility world">
+    <NearbyEquipment {...props} />
     <div className="conv-stage" ref={stage}><div ref={host} className="conv-canvas" data-art={art} role="img" aria-label="Facility equipment. Select known equipment for conversation context. Crew travel follows accepted tasks.">
       {props.view.crew.filter(crew => crew.role !== 'remote').map(crew => { const pose = routePosition(crew, props.view.tasks.find(task => task.id === crew.taskId), props.view.simTime, props.view.knownTopology); const thread = props.conversations.find(item => item.actorId === crew.id); return <span key={crew.id} className="conv-map-name" style={{ left: `${(pose.x + .5) / props.view.knownTopology.width * 100}%`, top: `${pose.y / props.view.knownTopology.height * 100}%` }} aria-hidden="true">{thread?.name ?? crew.name}</span>; })}
     </div></div>
