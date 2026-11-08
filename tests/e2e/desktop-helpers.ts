@@ -87,7 +87,7 @@ export async function readReport(page: Page, actor: Actor, taskId: string, secti
   const report = page.locator('.conv-history-window > article[data-entry-id="report-' + taskId + '"]');
   await expect(report).toBeVisible();
   await report.getByRole('button', { name: 'Read report', exact: true }).click();
-  await page.getByRole('combobox', { name: 'Section', exact: true }).selectOption({ label: section });
+  await page.getByRole('combobox', { name: 'Section', exact: true }).selectOption({ label: section === 'Full message' ? 'Delivery notice' : section });
   const text = await readPages(page, 'Message text');
   await page.getByLabel(names[actor] + ' message reader', { exact: true }).getByRole('button', { name: 'Back', exact: true }).click();
   return text;
