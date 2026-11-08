@@ -201,6 +201,35 @@ test('menu refreshes after a pending worker command finishes', async ({ page }) 
   await expect(dialog).toContainText('ORIGINAL RUN');
 });
 
+test('comparison waits for a pending reply and uses the refreshed record', async ({ page }) => {
+  test.setTimeout(60000);
+  const wire = fixtures(); let captured: GatewayInput | undefined; let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/api/llm/turn', async route => {
+    captured = route.request().postDataJSON() as GatewayInput; await gate;
+    await route.fulfill({ json: wire.final(captured) });
+  });
+  try {
+    await begin(page); await advanceTo(page, 2); await suggested(page, 'sam', 'Pause background jobs'); await advanceTo(page, 5);
+    const initial = await menu(page, 'Replay and results');
+    await initial.getByRole('combobox', { name: 'After action section' }).selectOption('outcome');
+    await expect(initial).toContainText('T+0:05'); await closeMenu(page); await advanceTo(page, 10);
+    await equipment(page, 'cooling-1'); await radio(page, 'What is known?'); await expect.poll(() => !!captured).toBe(true);
+    const dialog = await menu(page, 'Replay and results');
+    await dialog.getByRole('combobox', { name: 'After action section' }).selectOption('compare');
+    await dialog.getByRole('spinbutton', { name: 'Earlier simulation second' }).fill('0');
+    const compare = dialog.getByRole('button', { name: 'Run comparison' });
+    await expect(compare).toBeDisabled();
+    await expect(dialog).toContainText('Wait for the reply before reviewing this run.');
+    release();
+    await dialog.getByRole('combobox', { name: 'After action section' }).selectOption('outcome');
+    await expect(dialog).toContainText('T+0:10');
+    await dialog.getByRole('combobox', { name: 'After action section' }).selectOption('compare');
+    await expect(compare).toBeEnabled(); await compare.click();
+    await expect(dialog.getByLabel('Comparison metrics', { exact: true })).toContainText('COMPUTED ALTERNATIVE');
+  } finally { release(); }
+});
+
 test('timestamp facts are formatted as metadata rather than equipment readings', async ({ page }) => {
   const wire = fixtures(); let observationId = '';
   await page.route('**/api/llm/turn', async route => {
