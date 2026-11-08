@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Blackout isolated audio audition</title>
+  <body>
+    <h1>Isolated audio audition</h1>
+    <p>Fixture only. Uses the native Web Audio controller and versioned assets. A request can be silent if assets or browser audio are unavailable. This page does not run a mission.</p>
+    <button id="unlock">Enable audio with this gesture</button>
+    <label><input id="muted" type="checkbox"> Muted</label>
+    <label>Volume <input id="volume" type="range" min="0" max="1" step="0.01" value="0.35"></label>
+    <p id="status" role="status" aria-live="polite">Audio has not been enabled.</p>
+    <div id="cues"></div>
+    <button id="stop">Stop loops and reset fixture</button>
+    <button id="destroy">Dispose controller</button>
+    <script type="module" src="./audition.ts"></script>
+  </body>
+</html>
