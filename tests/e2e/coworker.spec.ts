@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { ActionIntent, GatewayInput, GatewayResponse } from '../../src/shared/contracts';
-import { advanceTo, begin, closeMenu, equipment, latestEntry, latestReceipt, menu, radio, readPages, readReport, replySection, suggested } from './desktop-helpers';
+import { advanceTo, begin, closeMenu, equipment, latestEntry, latestReceipt, menu, radio, readPages, readReport, replySection, selectActor, suggested } from './desktop-helpers';
 
 // Request mode, never player prose, selects the documented wire/authorization semantics.
 // A continuation inherits the originating start mode; v2 remains proposal-only.
@@ -189,7 +189,7 @@ test('menu refreshes after a pending worker command finishes', async ({ page }) 
   });
   await begin(page);
   await page.evaluate(() => { (window as any).__holdReceipt = true; });
-  await page.getByRole('tab', { name: /^Sam ·/ }).click();
+  await page.getByRole('tab', { name: /^Sam ?/ }).click();
   const order = page.getByRole('button', { name: 'Pause background jobs', exact: true });
   while (!(await order.count())) await page.getByRole('button', { name: 'Next suggested order', exact: true }).click();
   await order.click();
@@ -312,5 +312,38 @@ test('saving waits for a pending reply and retains its original transcript', asy
     await dialog.getByRole('button', { name: 'Replay and results', exact: true }).click();
     await dialog.getByRole('combobox', { name: 'After action section' }).selectOption('provenance');
     expect(await readPages(page, 'Original wire transcript')).toContain(captured!.requestId);
+  } finally { release(); }
+});
+
+test('pending save keeps live orders and conversations usable', async ({ page }) => {
+  const arrived: string[] = []; let release!: () => void; const gate = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/api/llm/turn', async route => { const input = route.request().postDataJSON() as GatewayInput; arrived.push(input.actorId); await gate; await route.abort().catch(() => {}); });
+  try {
+    await begin(page); await radio(page, 'What is known?'); await expect.poll(() => arrived).toContain('alex');
+    const dialog = await menu(page); await dialog.getByRole('button', { name: 'Save game', exact: true }).click();
+    await expect(dialog).toContainText('Waiting for the reply before saving.'); await closeMenu(page);
+    await selectActor(page, 'sam');
+    const order = page.getByRole('button', { name: 'Check recovery', exact: true });
+    while (!(await order.count())) await page.getByRole('button', { name: 'Next suggested order', exact: true }).click();
+    await order.click(); await expect(page.locator('.conv-history-window > article.conv-entry-order')).toHaveCount(1);
+    await radio(page, 'Is this working?', 'sam'); await expect.poll(() => arrived).toContain('sam');
+  } finally { release(); }
+});
+
+test('pending save cannot be silently displaced by replaying an older save', async ({ page }) => {
+  let arrived = false; let release!: () => void; const gate = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/api/llm/turn', async route => { arrived = true; await gate; await route.abort().catch(() => {}); });
+  try {
+    await begin(page); let dialog = await menu(page); await dialog.getByRole('button', { name: 'Save game', exact: true }).click();
+    await expect(dialog).toContainText('Mission saved locally'); await closeMenu(page); await advanceTo(page, 3);
+    await radio(page, 'What is known?'); await expect.poll(() => arrived).toBe(true);
+    dialog = await menu(page); await dialog.getByRole('button', { name: 'Save game', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Saved games', exact: true }).click();
+    await dialog.getByRole('combobox', { name: 'Saved game' }).selectOption({ index: 1 });
+    await dialog.getByRole('button', { name: 'Replay save', exact: true }).click();
+    await expect(dialog).toContainText('Wait for the save to finish before opening a saved game.');
+    release(); await expect(dialog).toContainText('Mission saved locally');
+    const times = await page.evaluate(() => new Promise<number[]>((resolve, reject) => { const open = indexedDB.open('blackout-local-runs'); open.onerror = () => reject(open.error); open.onsuccess = () => { const db = open.result; const request = db.transaction('runs').objectStore('runs').getAll(); request.onsuccess = () => { resolve(request.result.map((text: string) => JSON.parse(text).finalCheckpoint.simTime)); db.close(); }; request.onerror = () => reject(request.error); }; }));
+    expect(times).toContain(3);
   } finally { release(); }
 });
