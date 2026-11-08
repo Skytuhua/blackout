@@ -143,7 +143,7 @@ export default function App() {
     finally { if (jobs.current.get(originActor)?.promise === job) jobs.current.delete(originActor); if (token === generation.current) { updateThreads(previous => updateConversation(previous, originActor, thread => ({ ...thread, busy: false }))); syncClock(); } }
   }
   useEffect(() => { if (!menuOpen && menuOpener.current?.isConnected) menuOpener.current.focus(); }, [menuOpen]);
-  function toggleMenu() { const open = !menuOpenRef.current; if (open) menuOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; menuOpenRef.current = open; setMenuOpen(open); if (open) { manualPaused.current = true; pauseLive(); void refreshSaves(); if (!replayActive && sessionRef.current === 'mission') void capture(false); } }
+  function toggleMenu() { const open = !menuOpenRef.current; if (open) menuOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; menuOpenRef.current = open; setMenuOpen(open); if (open) { manualPaused.current = true; pauseLive(); void refreshSaves(); if (!replayActive && sessionRef.current === 'mission' && jobs.current.size === 0) void capture(false); } }
   // Existing save/replay lifecycle follows below; normal UI receives scoped views only.
   async function capture(save: boolean) {
     const client = simulation.current, recorder = archive.current, token = generation.current;
