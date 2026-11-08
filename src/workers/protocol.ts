@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ActionRequestSchema, CheckpointSchema, CommandReceiptSchema, KnowledgeViewSchema, RunRecordSchema, ScenarioSpecSchema } from '../shared/schemas';
+import { ActionRequestSchema, CheckpointSchema, CommandReceiptSchema, ComparisonResultSchema, KnowledgeViewSchema, RunRecordSchema, ScenarioSpecSchema } from '../shared/schemas';
 const identity = { correlationId: z.string().min(1), runId: z.string().min(1) };
 export const WorkerRequestSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('initialize'), ...identity, spec: ScenarioSpecSchema }),
@@ -9,6 +9,8 @@ export const WorkerRequestSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('snapshot'), ...identity }),
   z.strictObject({ kind: z.literal('restore'), ...identity, checkpoint: CheckpointSchema, newRunId: z.string().min(1) }),
   z.strictObject({ kind: z.literal('record'), ...identity }),
+  z.strictObject({ kind: z.literal('replay_to'), ...identity, record: RunRecordSchema, at: z.number().int().min(0).max(600) }),
+  z.strictObject({ kind: z.literal('compare'), ...identity, record: RunRecordSchema, change: z.strictObject({ commandSequence: z.number().int().nonnegative(), earlierAt: z.number().int().min(0).max(599), branchRunId: z.string().min(1) }) }),
 ]);
 export const WorkerReplySchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('initialized'), ...identity, view: KnowledgeViewSchema }),
@@ -18,6 +20,7 @@ export const WorkerReplySchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('checkpoint'), ...identity, checkpoint: CheckpointSchema }),
   z.strictObject({ kind: z.literal('restored'), ...identity, view: KnowledgeViewSchema }),
   z.strictObject({ kind: z.literal('record'), ...identity, record: RunRecordSchema }),
+  z.strictObject({ kind: z.literal('comparison'), ...identity, comparison: ComparisonResultSchema }),
   z.strictObject({ kind: z.literal('error'), ...identity, code: z.enum(['invalid_request', 'stale_run', 'not_initialized', 'not_implemented', 'engine_error']), message: z.string().max(400) }),
 ]);
 export type WorkerRequest = z.infer<typeof WorkerRequestSchema>;

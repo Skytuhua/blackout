@@ -3,6 +3,8 @@ import type { GatewayInput, GatewayResponse, GatewayStart, ToolIntent, PublicToo
 import { GatewayInputSchema } from '../../src/shared/schemas';
 import { validStart, validAction, validateResponse } from '../../src/llm/validation';
 import { Budget } from './budget';
+import { conciseCoworkerResponse, projectCoworkerContext } from '../../src/llm/conversation-policy';
+import { usesConversationPolicy, usesNaturalConversation } from '../../src/llm/conversation-mode';
 import type { ProviderCall } from '../../src/llm/diagnostics';
 import { initialHistory, parameters, decode, appendOutput, appendToolResult, appendFreshView, officialTransport, type History, type Transport } from './adapter';
 type Options = { mode?: string; keyConfigured?: boolean; transport?: Transport; budget?: Budget; callTimeoutMs?: number; interactionTimeoutMs?: number; debriefTimeoutMs?: number };
@@ -55,7 +57,8 @@ export class Gateway {
   async turn(raw: GatewayInput, signal?: AbortSignal): Promise<GatewayResponse> {
     const parsed = GatewayInputSchema.safeParse(raw);
     if (!parsed.success) return this.fallback(raw, 'invalid_payload');
-    const input = parsed.data;
+    const rawInput = parsed.data;
+    const input = rawInput.kind === 'start' && usesConversationPolicy(rawInput) ? projectCoworkerContext(rawInput) : rawInput;
     if (signal?.aborted) return this.fallback(input, 'canceled');
     if ((this.options.mode ?? process.env.LLM_MODE ?? 'scripted') !== 'live') return this.fallback(input, 'scripted');
     if (!(this.options.keyConfigured ?? Boolean(process.env.OPENAI_API_KEY))) return this.fallback(input, 'missing_key');
@@ -82,8 +85,9 @@ export class Gateway {
       if (state.fingerprint === fingerprint && state.reply) return state.reply;
       if (state.busy || !this.validResult(input.result, state, input) || input.view.runId !== input.runId || input.view.actorId !== input.actorId) return this.fallback(input, 'invalid_tool_result');
       if (this.providerBusy) return this.fallback(input, 'provider_busy');
-      state.history = appendToolResult(state.history, input.expectedCallId, input.result);
-      state.start = { ...state.start, view: input.view }; state.pending = undefined; state.fingerprint = fingerprint;
+      state.history = appendToolResult(state.history, input.expectedCallId, input.result, state.start.interactionMode === 'conversation' && state.start.promptVersion === 'coworker-v4');
+      const fresh = { ...state.start, view: input.view };
+      state.start = usesConversationPolicy(fresh) ? { ...projectCoworkerContext(fresh), procedures: state.start.procedures } : fresh; state.pending = undefined; state.fingerprint = fingerprint;
       for (const observation of input.view.observations) state.evidence.set(observation.id, observation);
       state.history = appendFreshView(state.history, state.start);
     }
@@ -96,7 +100,7 @@ export class Gateway {
       const params = parameters(state.start, state.history, state.calls + 1);
       // Plan at two UTF-8 bytes per token, including every schema and history item.
       if (Math.ceil(Buffer.byteLength(JSON.stringify(params), 'utf8') / 2) > 6000) throw new Error('input_limit');
-      const reservation = this.budget.reserve(6000, state.start.role === 'debrief' ? 800 : 400, input.runId);
+      const reservation = this.budget.reserve(6000, state.start.role === 'debrief' ? 800 : 400, input.runId, params.model);
       state.calls++; this.providerBusy = true;
       const callController = new AbortController();
       const timeout = setTimeout(() => callController.abort('call_timeout'), state.start.role === 'debrief' ? this.options.debriefTimeoutMs ?? 20000 : this.options.callTimeoutMs ?? 8000);
@@ -120,6 +124,8 @@ export class Gateway {
         state.history = appendOutput(state.history, response);
         const value = decode(response, state.start, interactionId);
         if ('tool' in value) {
+          if (!!state.start.interactionMode && value.tool === 'inspect_asset') throw new Error('advisory_execution_forbidden');
+          if (usesNaturalConversation(state.start) && value.tool === 'propose_action') throw new Error('advisory_execution_forbidden');
           if (state.calls >= 3 || state.start.role === 'debrief') throw new Error('interaction_quota');
           if (state.history.filter(i => 'type' in i && i.type === 'function_call' && i.call_id === value.callId).length !== 1) throw new Error('duplicate_call');
           if (value.tool === 'read_procedure' ? !state.start.procedures.some(p => p.id === value.targetId) : !(value.tool === 'propose_action' && value.action && validAction(value.action, state.start)) && !state.start.view.knownTopology.assets.some(a => a.id === value.targetId)) throw new Error('invalid_target');
@@ -127,12 +133,13 @@ export class Gateway {
           state.pending = value; state.reply = { kind: 'tool_request', runId: input.runId, requestId: input.requestId, actorId: input.actorId, interactionId, intent: value };
         } else {
           if (!validateResponse(value, { ...state.start, view: { ...state.start.view, observations: [...state.evidence.values()] } })) throw new Error('invalid_evidence');
+          if (usesConversationPolicy(state.start) && !conciseCoworkerResponse({ ...state.start, view: { ...state.start.view, observations: [...state.evidence.values()] } }, value)) throw new Error('unsafe_narrative');
           state.reply = { kind: 'final', runId: input.runId, requestId: input.requestId, actorId: input.actorId, response: value }; clearTimeout(state.expires);
         }
       } finally { clearTimeout(timeout); state.controller.signal.removeEventListener('abort', close); callController.signal.removeEventListener('abort', onAbort); }
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
-      const allowed = ['budget_exhausted', 'budget_unavailable', 'mission_quota', 'interaction_quota', 'input_limit', 'canceled', 'call_timeout', 'interaction_timeout', 'refusal', 'incomplete_response', 'invalid_evidence', 'invalid_target', 'invalid_action', 'duplicate_call'];
+      const allowed = ['budget_exhausted', 'budget_unavailable', 'mission_quota', 'interaction_quota', 'input_limit', 'canceled', 'call_timeout', 'interaction_timeout', 'refusal', 'incomplete_response', 'invalid_evidence', 'invalid_target', 'invalid_action', 'duplicate_call', 'advisory_execution_forbidden', 'invalid_reasoning_effort', 'invalid_model_pricing', 'model_pricing_unconfigured', 'unsafe_narrative', 'unsupported_conversation_context'];
       const status = (error as { status?: number }).status;
       state.reply = this.fallback(input, status === 429 ? 'provider_quota' : allowed.includes(message) ? message : 'malformed_or_unavailable');
       clearTimeout(state.expires);

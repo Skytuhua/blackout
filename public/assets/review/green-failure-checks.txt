@@ -1,0 +1,24 @@
+PASS complete atlas baseline
+PASS rejected /off-palette/
+PASS rejected /binary alpha/
+PASS rejected /outside named frame/
+PASS rejected /111 contracted names/
+PASS rejected /anchor/
+PASS rejected /animation clock/
+PASS rejected /editable-source pixel|frame gap overlap/
+PASS rejected /editable-source pixel/
+PASS rejected /source hash/
+PASS rejected /retained original generation/
+PASS rejected modified original generated raster
+PASS all 60 crew frames have fixed feet baseline and distinct paired animation
+PASS all three crew identities have four distinct directional silhouettes
+PASS four unique fan and three unique mechanical generator frames
+PASS rack chassis has neutral indicator sockets
+PASS restored baseline after corruption probes
+{
+  "checks": 17,
+  "atlas": 111,
+  "paidCalls": 0,
+  "runtimeIntegration": "not exercised",
+  "visualAcceptance": "not asserted"
+}

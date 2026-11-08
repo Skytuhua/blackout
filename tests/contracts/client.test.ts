@@ -66,8 +66,10 @@ it('stops the playback timer on a terminal view and cannot resume that run', asy
   try {
     const initialized = client.initialize(hotRestart, 'clock');
     worker.reply(0, { kind: 'initialized', view: { ...alarmFixture, runId: 'clock' } }); await initialized;
-    client.setSpeed(4); client.resume(); await vi.advanceTimersByTimeAsync(1000);
-    expect(worker.messages[1]).toMatchObject({ kind: 'advance', ticks: 4 });
+    client.setSpeed(4); client.resume(); await vi.advanceTimersByTimeAsync(249);
+    expect(worker.messages).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(worker.messages[1]).toMatchObject({ kind: 'advance', ticks: 1 });
     worker.reply(1, { kind: 'advanced', view: { ...alarmFixture, runId: 'clock', simTime: 505, mission: { ...alarmFixture.mission, status: 'failure' } } });
     await vi.advanceTimersByTimeAsync(5000); client.resume(); await vi.advanceTimersByTimeAsync(5000);
     expect(worker.messages).toHaveLength(2);

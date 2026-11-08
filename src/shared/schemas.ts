@@ -5,9 +5,12 @@ const number = z.number().finite();
 const seconds = number.nonnegative();
 const version = z.literal(1);
 const object = z.strictObject;
+export const INTEGRATION_CONTRACT_VERSION = 5;
+// Additive conversation contract; legacy desktop/record formats keep their identities.
+export const NATURAL_CONVERSATION_CONTRACT_VERSION = 6;
 export const PointSchema = object({ x: number, y: number });
 export const RoleSchema = z.enum(['player', 'facilities', 'electrical', 'remote', 'debrief']);
-export const ActionSchema = z.enum(['inspect', 'independent_reading', 'repair_cooling', 'restart_cooling', 'pause_batch', 'resume_batch', 'set_batch_ceiling', 'verify_recovery', 'cancel_task', 'reset_ups']);
+export const ActionSchema = z.enum(['inspect', 'independent_reading', 'repair_cooling', 'restart_cooling', 'pause_batch', 'resume_batch', 'set_batch_ceiling', 'verify_recovery', 'cancel_task', 'reset_ups', 'move_crew']);
 export const AssetSchema = object({ id, label: z.string(), kind: z.enum(['rack', 'cooling', 'ups', 'controller', 'generator', 'distribution']), x: number, y: number, width: number.positive(), height: number.positive(), serviceTile: PointSchema, dependencies: z.array(id) });
 export const CrewSchema = object({ id, name: z.string(), role: z.enum(['facilities', 'electrical', 'remote']), x: number, y: number, speed: number.positive(), taskId: id.nullable() });
 export const TopologySchema = object({ width: number.int().positive(), height: number.int().positive(), tileMeters: number.positive(), walkable: z.array(PointSchema), assets: z.array(AssetSchema) });
@@ -18,16 +21,23 @@ export const ProfileSchema = object({
 });
 export const ExternalEventSchema = object({ id, at: seconds.int(), kind: z.enum(['utility_loss', 'utility_restore', 'generator_ready', 'transfer_complete', 'cooling_control_fault', 'workload_pulse_start', 'workload_pulse_end']), value: number.nullable() });
 export const ScenarioSpecSchema = object({
-  schemaVersion: version, id, contentVersion: id, procedureVersion: id, title: z.string(), description: z.string(), seed: number.int().nonnegative(), topology: TopologySchema, crew: z.array(CrewSchema), profile: ProfileSchema,
+  schemaVersion: version, id, contentVersion: id, procedureVersion: id, mode: z.enum(['practice', 'mission']).optional(), title: z.string(), description: z.string(), seed: number.int().nonnegative(), topology: TopologySchema, crew: z.array(CrewSchema), profile: ProfileSchema,
   workload: object({ critical: number.nonnegative(), interactive: number.nonnegative(), batch: number.nonnegative(), catchupCeiling: number.nonnegative() }),
   externalEvents: z.array(ExternalEventSchema), mission: object({ windowSeconds: seconds.positive().int(), criticalLossSeconds: seconds.positive().int(), stabilityHoldSeconds: seconds.positive().int(), verificationMaxAgeSeconds: seconds.positive().int(), recoveryRestartSeconds: seconds, repairSeconds: seconds, inspectSeconds: seconds, remoteSeconds: seconds, verifySeconds: seconds }),
 });
 export const ObservationSchema = object({ id, assetId: id, source: id, field: id, value: z.union([number, z.string().max(2000), z.boolean(), z.null()]), units: z.string().max(60), observedAt: seconds, receivedAt: seconds, quality: z.enum(['reported', 'independent', 'estimated', 'unknown']) });
-export const ActionIntentSchema = object({ action: ActionSchema, targetId: id, atSimTime: seconds, args: object({ technicianId: id.optional(), ceiling: number.min(0).max(100).optional(), taskId: id.optional() }) });
+const destination = object({ x: number.int().nonnegative(), y: number.int().nonnegative() });
+const actionArgs = object({ technicianId: id.optional(), ceiling: number.min(0).max(100).optional(), taskId: id.optional(), destination: destination.optional() });
+const actionIdentity = { targetId: id, atSimTime: seconds };
+export const OperationalActionIntentSchema = object({ ...actionIdentity, action: ActionSchema.exclude(['move_crew']), args: actionArgs });
+export const ActionIntentSchema = z.discriminatedUnion('action', [
+  OperationalActionIntentSchema,
+  object({ ...actionIdentity, action: z.literal('move_crew'), args: actionArgs.extend({ destination }) }),
+]);
 export const ActionRequestSchema = object({ schemaVersion: version, runId: id, requestId: id, actorId: id, intent: ActionIntentSchema, expectedEntityVersions: z.record(id, number.int().nonnegative()), idempotencyKey: id });
 export const CommandReceiptSchema = object({ schemaVersion: version, runId: id, requestId: id, actorId: id, status: z.enum(['queued', 'accepted', 'rejected', 'applied']), reason: id, taskId: id.nullable(), eta: seconds.nullable(), evidenceIds: z.array(id), observedAt: seconds });
 export const TaskSchema = object({ id, actorId: id, targetId: id, action: ActionSchema, status: z.enum(['queued', 'traveling', 'inspecting', 'working', 'blocked', 'completed', 'canceled']), startedAt: seconds, arrivalAt: seconds, completesAt: seconds, progress: number.min(0).max(1), path: z.array(PointSchema), reason: z.string().nullable() });
-export const PublicMessageSchema = object({ id, at: seconds, speaker: id, text: z.string().max(3000), evidenceIds: z.array(id), mode: z.enum(['live', 'scripted', 'recorded', 'system']) });
+export const PublicMessageSchema = object({ id, at: seconds, speaker: id, text: z.string().max(3000), evidenceIds: z.array(id), mode: z.enum(['live', 'scripted', 'recorded', 'system']), conversationActorId: id.optional(), conversationKind: z.enum(['player', 'order', 'system', 'live', 'fallback', 'report']).optional() });
 export const AffordanceSchema = object({ action: ActionSchema, targetId: id, enabled: z.boolean(), reason: z.string().nullable(), technicianIds: z.array(id), travelSeconds: seconds.nullable(), workSeconds: seconds });
 export const KnowledgeViewSchema = object({
   schemaVersion: version, runId: id, actorId: id, simTime: seconds, viewHash: id, knownTopology: TopologySchema, observations: z.array(ObservationSchema), tasks: z.array(TaskSchema), crew: z.array(CrewSchema), messages: z.array(PublicMessageSchema), allowedProcedureIds: z.array(id), observedEntityVersions: z.record(id, number.int().nonnegative()), affordances: z.array(AffordanceSchema),
@@ -45,7 +55,7 @@ export const FactSelectorSchema = z.union([
   object({ observationId: id, field: z.enum(['value', 'source', 'observedAt', 'receivedAt', 'units', 'assetId']) }),
   object({ ledgerRunId: id, field: z.enum(['horizon', 'criticalDemand', 'criticalDelivered', 'interactiveDemand', 'interactiveDelivered', 'batchArrivals', 'batchCompleted', 'batchBacklog', 'batchDelayUnitSeconds', 'peakTemperatureC']) }),
 ]);
-export const AgentResponseSchema = object({ runId: id, requestId: id, actorId: id, speaker: id, mode: z.enum(['live', 'scripted', 'recorded']), facts: z.array(FactSelectorSchema).max(12), inference: z.string().max(1200), uncertainty: z.string().max(600), proposals: z.array(ActionIntentSchema).max(3) });
+export const AgentResponseSchema = object({ runId: id, requestId: id, actorId: id, speaker: id, mode: z.enum(['live', 'scripted', 'recorded']), facts: z.array(FactSelectorSchema).max(12), inference: z.string().max(1200), uncertainty: z.string().max(600), proposals: z.array(ActionIntentSchema).max(3), requestKind: z.enum(['question', 'order', 'unclear']).optional() });
 export const ToolIntentSchema = object({ runId: id, requestId: id, actorId: id, interactionId: id, callId: id, tool: z.enum(['inspect_asset', 'read_observations', 'read_procedure', 'propose_action']), targetId: id, action: ActionIntentSchema.nullable() });
 export const PublicToolResultSchema = object({ runId: id, requestId: id, actorId: id, interactionId: id, callId: id, status: z.enum(['accepted', 'rejected', 'completed']), reason: id, receipt: CommandReceiptSchema.nullable(), observations: z.array(ObservationSchema), procedureText: z.string().max(4000).nullable() });
 const gatewayIdentity = { runId: id, requestId: id, actorId: id };
@@ -65,7 +75,7 @@ export const ComparisonResultSchema = z.discriminatedUnion('status', [
   if (ledgers.some(ledger => ledger.horizon !== result.supportedHorizon)) context.addIssue({ code: 'custom', message: 'Comparison evidence must use the supported equal horizon.' });
 });
 
-export const GatewayStartSchema = object({ kind: z.literal('start'), ...gatewayIdentity, role: RoleSchema, message: z.string().max(1600), view: KnowledgeViewSchema, procedures: z.array(object({ id, text: z.string().max(3000) })).max(4), promptVersion: id, debriefContext: object({ ledger: OutcomeLedgerSchema, comparison: ComparisonResultSchema.nullable() }).optional() });
+export const GatewayStartSchema = object({ kind: z.literal('start'), ...gatewayIdentity, role: RoleSchema, message: z.string().max(1600), view: KnowledgeViewSchema, procedures: z.array(object({ id, text: z.string().max(3000) })).max(4), promptVersion: id, interactionMode: z.enum(['advisory', 'conversation']).optional(), debriefContext: object({ ledger: OutcomeLedgerSchema, comparison: ComparisonResultSchema.nullable() }).optional() });
 export const GatewayContinueSchema = object({ kind: z.literal('continue'), ...gatewayIdentity, interactionId: id, expectedCallId: id, view: KnowledgeViewSchema, result: PublicToolResultSchema });
 export const GatewayInputSchema = z.discriminatedUnion('kind', [GatewayStartSchema, GatewayContinueSchema]);
 

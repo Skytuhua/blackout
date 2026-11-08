@@ -11,7 +11,7 @@ it('uses the installed SDK without retries and sends explicit Responses settings
     expect(String(url)).toBe('https://api.openai.com/v1/responses');
     const body = JSON.parse(String(init.body));
     expect(body.store).toBe(false); expect(body.parallel_tool_calls).toBe(false);
-    expect(body.reasoning.effort).toBe('none'); expect(body.max_output_tokens).toBe(400);
+    expect(body.model).toBe('gpt-6.1-terra'); expect(body.reasoning.effort).toBe('low'); expect(body.max_output_tokens).toBe(400);
     expect(body.text.format.strict).toBe(true);
     for (const tool of body.tools) { expect(tool.strict).toBe(true); expect(tool.parameters.additionalProperties).toBe(false); }
     return new Response(JSON.stringify({ error: { message: 'Synthetic quota exhausted', type: 'insufficient_quota', code: 'insufficient_quota' } }), { status: 429, headers: { 'Content-Type': 'application/json' } });
@@ -38,4 +38,35 @@ it('distinguishes procedure targets and read-only arguments from equipment inspe
   const properties = (tool.parameters as any).properties;
   expect(properties.targetId.enum).toEqual(['hot-restart-v1']);
   expect(properties.action.type).toBe('null');
+});
+
+it('offers read-only tools and confirmation proposals including inspection in advisory mode', () => {
+  const input = { ...start, interactionMode: 'advisory' as const };
+  const params = parameters(input, initialHistory(input), 1);
+  const names = params.tools!.map(tool => tool.type === 'function' && tool.name);
+  expect(names).not.toContain('inspect_asset');
+  expect(names).toContain('read_observations');
+  const proposal = params.tools!.find(tool => tool.type === 'function' && tool.name === 'propose_action');
+  expect(proposal && proposal.type === 'function' && (proposal.parameters as any).properties.targetId.enum).toEqual(['cooling-1']);
+  expect(params.instructions).toContain('Answer questions');
+  expect(params.instructions).toContain('clarification');
+  expect(params.instructions).not.toContain('Inspections dispatch ordinary tasks');
+  expect(parameters(start, initialHistory(start), 1).tools!.some(tool => tool.type === 'function' && tool.name === 'inspect_asset')).toBe(true);
+});
+
+it.each([undefined, 'advisory'] as const)('constructs strict provider schemas at startup with mode %s', interactionMode => {
+  const input = { ...start, ...(interactionMode ? { interactionMode } : {}) };
+  const params = parameters(input, initialHistory(input), 1);
+  const strictObjects = (value: any) => {
+    if (!value || typeof value !== 'object') return;
+    if (value.type === 'object') {
+      expect(value.additionalProperties).toBe(false);
+      expect(value.required.slice().sort()).toEqual(Object.keys(value.properties).sort());
+    }
+    for (const child of Object.values(value)) if (Array.isArray(child)) child.forEach(strictObjects); else strictObjects(child);
+  };
+  strictObjects((params.text!.format as any).schema);
+  for (const tool of params.tools!) if (tool.type === 'function') { expect(tool.strict).toBe(true); strictObjects(tool.parameters); }
+  expect(params.parallel_tool_calls).toBe(false);
+  expect(params.store).toBe(false);
 });

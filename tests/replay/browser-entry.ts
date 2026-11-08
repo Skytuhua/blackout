@@ -76,7 +76,31 @@ const api = {
     const record = initialize(hotRestart, 'bad').exportRecord();
     try {
       await rawPut('bad', '{'); await rejected(() => store.loadRun('bad'), 'CORRUPT');
-      await rejected(() => store.listRuns(), 'CORRUPT');
+      await store.saveRun(initialize(hotRestart, 'compatible-sibling').exportRecord());
+      const oldBytes = ` \n${JSON.stringify({ ...record, runId: 'older-sibling', engineVersion: 'sim-01-v1' }, null, 2)}\n `;
+      await rawPut('older-sibling', oldBytes);
+      await rawPut('content-sibling', JSON.stringify({ ...record, runId: 'content-sibling', scenario: { ...record.scenario, contentVersion: 'hot-restart-v1' } }));
+      await rawPut('identity-sibling', JSON.stringify(record));
+      await rawPut('bad-metadata', JSON.stringify({ schemaVersion: 99, scenario: { id: { unsafe: 'object' } }, finalCheckpoint: { simTime: 1e100 } }));
+      await rawPut('non-json-sibling', { scenario: { id: ['unsafe'] }, finalCheckpoint: { simTime: -1 } });
+      const listed = await store.listRuns();
+      assert(listed.length === 7, 'Every compatible/incompatible/corrupt sibling is listed independently');
+      assert(listed.find(row => row.runId === 'compatible-sibling')?.unavailableReason === undefined, 'Current entry remains available');
+      for (const id of ['bad', 'older-sibling', 'content-sibling', 'identity-sibling', 'bad-metadata', 'non-json-sibling']) {
+        const summary = listed.find(row => row.runId === id);
+        assert(summary && typeof summary.unavailableReason === 'string' && summary.unavailableReason.length > 0, `Unavailable save is labeled: ${id}`);
+        assert(typeof summary?.scenarioId === 'string' && summary.scenarioId.length <= 120 && typeof summary.simTime === 'number' && Number.isSafeInteger(summary.simTime) && summary.simTime >= 0, 'Display metadata is bounded primitive data');
+      }
+      await rejected(() => store.loadRun('older-sibling'), 'VERSION_MISMATCH');
+      await rejected(() => store.loadRun('content-sibling'), 'IDENTITY_MISMATCH');
+      await rejected(() => store.loadRun('identity-sibling'), 'IDENTITY_MISMATCH');
+      assert(await store.exportRun('older-sibling') === oldBytes, 'Old version exports exact stored bytes including whitespace');
+      assert(await store.exportRun('bad') === '{', 'Malformed JSON remains exactly exportable');
+      assert(await store.exportRun('missing') === null, 'Missing export is explicit null');
+      await rejected(() => store.exportRun('non-json-sibling'), 'CORRUPT');
+      assert((await store.loadRun('compatible-sibling'))?.runId === 'compatible-sibling', 'Valid sibling loads despite incompatible/corrupt entries');
+      assert(await store.exportRun('older-sibling') === oldBytes && await store.exportRun('bad') === '{', 'Listing/loading never migrate or delete bytes');
+      for (const id of ['compatible-sibling', 'older-sibling', 'content-sibling', 'identity-sibling', 'bad-metadata', 'non-json-sibling']) await store.removeRun(id);
       await rawPut('bad', JSON.stringify({ ...record, engineVersion: 'future' }));
       await rejected(() => store.loadRun('bad'), 'VERSION_MISMATCH');
       await rawPut('bad', record); await rejected(() => store.loadRun('bad'), 'CORRUPT');
@@ -97,7 +121,7 @@ const api = {
       request.onerror = () => reject(request.error);
     });
     await rejected(() => openRunStore('replay-01-future-db'), 'VERSION_MISMATCH');
-    return { corrupt: 'rejected', versionMismatch: 'rejected', badSavePreservedData: true, closedStore: 'explicit failure' };
+    return { corrupt: 'rejected', versionMismatch: 'rejected', badSavePreservedData: true, mixedSiblingsListed: 7, exactRawExport: true, closedStore: 'explicit failure' };
   },
 };
 declare global { interface Window { replayProof: typeof api } }

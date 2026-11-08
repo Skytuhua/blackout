@@ -3,9 +3,10 @@ import { readFile } from 'node:fs/promises';
 import { extname, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { Gateway } from './llm/gateway';
+import { modelConfiguration } from './llm/config';
 import { GatewayInputSchema, GatewayStartSchema } from '../src/shared/schemas';
 const identitySchema = GatewayStartSchema.pick({ runId: true, requestId: true, actorId: true });
-const mime: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.woff2': 'font/woff2', '.svg': 'image/svg+xml' };
+const mime: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.woff2': 'font/woff2', '.svg': 'image/svg+xml', '.wav': 'audio/wav' };
 export function createDemoServer(gateway = new Gateway()) {
   const root = resolve('dist');
   let windowStart = Date.now(), requests = 0;
@@ -15,7 +16,11 @@ export function createDemoServer(gateway = new Gateway()) {
     if (req.headers.host !== '127.0.0.1:4173' || (req.headers.origin && !['http://127.0.0.1:4173', 'http://127.0.0.1:5173'].includes(req.headers.origin))) { res.writeHead(403).end('Local origin required.'); return; }
     let pathname: string;
     try { pathname = decodeURIComponent(new URL(req.url ?? '/', 'http://127.0.0.1:4173').pathname); } catch { res.writeHead(400).end('Invalid URL.'); return; }
-    if (pathname === '/api/health' && req.method === 'GET') { json(200, { mode: process.env.LLM_MODE === 'live' ? 'live' : 'scripted', model: process.env.OPENAI_MODEL ?? 'gpt-5.6-luna', stage: 'gateway' }); return; }
+    if (pathname === '/api/health' && req.method === 'GET') {
+      try { json(200, { mode: process.env.LLM_MODE === 'live' ? 'live' : 'scripted', ...modelConfiguration(), stage: 'gateway' }); }
+      catch { json(503, { error: 'Invalid model configuration.' }); }
+      return;
+    }
     if (pathname.startsWith('/api/')) {
       if (!['/api/llm/turn', '/api/llm/cancel', '/api/llm/reset'].includes(pathname)) { json(404, { error: 'Unknown route.' }); return; }
       if (req.method !== 'POST') { res.writeHead(405).end(); return; }

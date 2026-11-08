@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { alarmFixture } from '../../src/shared/fixtures';
 import { makeAction, readingStatus } from '../../src/ui/presentation';
+import { freshRunning } from '../../src/ui/presentation';
 
 describe('operational evidence and dispatch', () => {
   it('labels missing and old evidence without implying it is current', () => {
@@ -14,6 +15,15 @@ describe('operational evidence and dispatch', () => {
     expect(makeAction(affordance, 75, 'unavailable')).toBeNull();
     expect(makeAction({ ...affordance, enabled: false }, 75, 'alex')).toBeNull();
   });
+});
+
+it('animates equipment only from a fresh explicit running observation', () => {
+  const observation = { ...alarmFixture.observations[1], value: true };
+  expect(freshRunning([{ ...observation, field: 'inspection_complete' }], 75)).toBe(false);
+  expect(freshRunning([{ ...observation, field: 'prerequisite_ready' }], 75)).toBe(false);
+  expect(freshRunning([{ ...observation, field: 'running' }], 75)).toBe(true);
+  expect(freshRunning([{ ...observation, field: 'running', observedAt: 60 }], 75)).toBe(false);
+  expect(freshRunning([{ ...observation, field: 'running', receivedAt: 76 }], 75)).toBe(false);
 });
 
 it('does not light equipment indicators without a current observed state', async () => {

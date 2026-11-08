@@ -39,6 +39,26 @@ it('round trips exact scoped turns, ordinary tool receipts, final selectors and 
   expect(saved.interactions[0].turns[0].input.view.observations[0].value).not.toBe('changed');
 });
 
+it('rejects advisory transcripts claiming a silently accepted inspection while preserving legacy receipts', () => {
+  const { saved } = fixture();
+  expect(() => serializeRun(saved)).not.toThrow();
+  const first = saved.interactions[0].turns[0].input;
+  if (first.kind !== 'start') throw new Error('Start required');
+  first.interactionMode = 'advisory';
+  expect(() => serializeRun(saved)).toThrow(/HISTORY/);
+});
+
+it('preserves a rejected advisory attempt that never issued a command', () => {
+  const { saved } = fixture();
+  const engine = initialize(hotRestart, saved.runId); engine.step(10);
+  const changed = { ...engine.exportRecord(), schemaVersion: 2 as const, lineage: [], interactions: structuredClone(saved.interactions) };
+  const interaction = changed.interactions[0], turn = interaction.turns[0];
+  if (turn.input.kind !== 'start' || !turn.toolResult) throw new Error('Start/tool fixture required');
+  turn.input.interactionMode = 'advisory'; turn.toolResult = { ...turn.toolResult, status: 'rejected', reason: 'player_confirmation_required', receipt: null };
+  interaction.turns.splice(1); interaction.end = { atSimTime: 10, reason: 'canceled' as any, reply: null as any, durationMs: 5 };
+  expect(() => serializeRun(changed)).not.toThrow();
+});
+
 it('retains an accepted command when the interaction ends canceled before continuation', () => {
   const { saved } = fixture();
   saved.interactions[0].turns.splice(1);

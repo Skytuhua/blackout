@@ -1,8 +1,22 @@
 # Blackout build status
 
-Updated: 7 November 2026.
+## Current demo checkpoint
 
-The real playable host is merged at PR8 (`70f5ab0`) with successful hosted checks: offline recovery t331, idle failure t505, exact terminal stopping and fresh retry. The actual production worker/OpenAI cycle is merged at PR9 (`203bcb4`): accepted t10, completed t47, report t49, grounded live follow-up. Public repository: https://github.com/Skytuhua/blackout. The replay/storage library is reviewed and locally verified; application integration, debrief/comparison, complete transcript capture, timing sample and release rehearsal remain unfinished.
+Updated: 8 November 2026. Source content at `f044f266efd83fae468ccce8cdbb83f689b7d82f` is identical to merged demo branch `89c97d7fcc33d3898a8037aec370fec30309c15a`.
+
+The desktop demo uses character conversations and suggested orders, automatic crew travel, a single pannable and zoomable facility map, header speed controls, sound effects, delivered report findings, and Menu-based history, save/resume, replay, and comparison. The original facility is simulated; surrounding rooms are scenery. Live coworkers are configured for `gpt-6.1-terra` with low reasoning effort, while the default launch remains scripted and direct orders work offline.
+
+Observed verification reported by the integration coordinator:
+
+- Typecheck and production build passed; the final full unit run passed **473 tests**.
+- The latest report/chat correction passed **5 production-browser cases on the running 4173 site**, covering delivered findings, ordinary conversation and validated orders, and saved replay report evidence.
+- The prior map checkpoint passed **15 production-browser cases on 4173**, covering the shared room artwork, pan/zoom, minimum-zoom panning, selection, and desktop/compact layouts. These are separate runs, not a new full-suite total.
+- Two approved live diagnostic calls reproduced the missing-report-context and display-length rejection paths. The captured live answer passes the corrected validator without another provider call. Earlier live movement evidence accepted Sam's walking order.
+- Independent reviews closed the report-scope, equipment-subject, and continuation-budget findings. PRs [37](https://github.com/Skytuhua/blackout/pull/37) and [38](https://github.com/Skytuhua/blackout/pull/38) passed hosted verification and were merged into the demo feature branch.
+
+A first-time-player walkthrough, physical sound check, and final demo-laptop rehearsal remain unverified. The public repository is the source submission; the runnable demo is local at `http://127.0.0.1:4173/`.
+
+The task queue and evidence below are retained historical records. They describe earlier milestones and should not be read as the current interface or release status.
 
 ## Task queue
 

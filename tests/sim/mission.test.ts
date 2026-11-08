@@ -95,20 +95,21 @@ describe('headless Hot Restart mission', () => {
 
   it('keeps fractional crew positions on travel cancellation and estimates the next real path', () => {
     const engine = fresh();
+    const spawn = hotRestart.crew.find(c => c.id === 'alex')!;
     const receipt = inspect(engine, 'rack-3');
     const original = engine.observe('player').tasks[0];
     expect(original.arrivalAt).toBeGreaterThan(1);
     expect(original.path.every(p => hotRestart.topology.walkable.some(tile => tile.x === p.x && tile.y === p.y))).toBe(true);
     engine.step(1);
     const position = engine.observe('player').crew.find(c => c.id === 'alex')!;
-    expect(Math.abs(position.x - 3) + Math.abs(position.y - 9)).toBeCloseTo(1.25);
+    expect(Math.abs(position.x - spawn.x) + Math.abs(position.y - spawn.y)).toBeCloseTo(spawn.speed / hotRestart.topology.tileMeters);
     engine.applyCommand(request(engine, 'cancel_task', 'rack-3', { taskId: receipt.taskId! }));
     expect(engine.observe('player').crew.find(c => c.id === 'alex')).toMatchObject({ x: position.x, y: position.y, taskId: null });
     const next = inspect(engine, 'controller');
     const travel = engine.observe('player').tasks.find(t => t.id === next.taskId)!;
     expect(travel.path[0]).toEqual({ x: position.x, y: position.y });
     engine.step(travel.arrivalAt - 1);
-    expect(engine.observe('player').crew.find(c => c.id === 'alex')).toMatchObject({ x: 3, y: 10 });
+    expect(engine.observe('player').crew.find(c => c.id === 'alex')).toMatchObject(hotRestart.topology.assets.find(a => a.id === 'controller')!.serviceTile);
     expect(engine.observe('player').tasks.find(t => t.id === next.taskId)?.progress).toBe(0);
   });
 

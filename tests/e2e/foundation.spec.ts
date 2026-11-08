@@ -1,21 +1,18 @@
 import { expect, test } from '@playwright/test';
-test('production mission uses real paused dispatch and a fresh retry run', async ({ page }) => {
-  await page.goto('/');
+import { begin, elapsed, menu, suggested } from './desktop-helpers';
+
+test('production mission accepts a real paused order with automatic travel and opens instructions', async ({ page }) => {
+  await page.route('**/api/llm/turn', route => route.abort());
+  await begin(page);
   await expect(page.getByRole('heading', { name: 'BLACKOUT', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Start mission', exact: true })).toBeEnabled();
-  await page.getByRole('button', { name: 'Start mission', exact: true }).click();
-  await page.getByRole('button', { name: 'Pause simulation', exact: true }).click();
-  await expect(page.locator('canvas')).toBeVisible();
-  await page.getByRole('button', { name: 'Cooling control controller', exact: true }).click();
-  const action = page.locator('.bo-action').filter({ has: page.getByRole('button', { name: 'Dispatch inspect', exact: true }) });
-  await action.getByRole('combobox', { name: 'Technician', exact: true }).selectOption('alex');
-  await action.getByRole('button', { name: 'Dispatch inspect', exact: true }).click();
-  await expect(page.getByRole('status').filter({ hasText: 'Inspection accepted' })).toBeVisible();
-  await expect(page.locator('.bo-crew')).toContainText('traveling');
-  await expect(page.getByText('Simulation 0:00', { exact: false }).first()).toBeVisible();
-  await page.getByRole('button', { name: 'Retry mission', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Start mission', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Start mission', exact: true }).click();
-  await page.getByRole('button', { name: 'Pause simulation', exact: true }).click();
-  await expect(page.locator('.bo-crew')).toContainText('No active assignment');
+  const receipt = await suggested(page, 'alex', 'Check cooling controls');
+  expect(receipt.taskId).toMatch(/^task-/); expect(receipt.eta).toBeGreaterThan(30);
+  await expect(page.locator('.conv-assignment')).toContainText('Walking');
+  await expect(page.getByRole('progressbar', { name: 'Alex task progress', exact: true })).toHaveAttribute('aria-valuenow', '0');
+  expect(await elapsed(page)).toBe(0);
+  const help = await menu(page, 'How to play');
+  await expect(help.getByRole('combobox', { name: 'Help topic', exact: true })).toBeVisible();
+  await expect(help).toContainText('Characters travel and work automatically.');
+  await help.getByRole('combobox', { name: 'Help topic', exact: true }).selectOption({ label: 'Read the evidence' });
+  await expect(help).toContainText('what the team observed and when');
 });

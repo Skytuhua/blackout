@@ -1,0 +1,16 @@
+﻿{
+  "stage": "masters",
+  "frames": 9,
+  "width": 512,
+  "height": 512,
+  "rgba": true,
+  "binaryAlpha": true,
+  "paletteColors": 16,
+  "opaquePixels": 3406,
+  "sourcePixelMatch": true,
+  "paddingPx": 2,
+  "custodyFiles": 2,
+  "hashedDeliverables": 10,
+  "visualAcceptance": "not asserted",
+  "runtimeIntegration": "not exercised by asset validation"
+}

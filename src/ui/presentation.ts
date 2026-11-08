@@ -1,4 +1,5 @@
 import type { ActionIntent, KnowledgeView, Observation, FactSelector } from '../shared/contracts';
+export { naturalReplyText as formatConversationReply } from '../llm/natural-conversation';
 
 export function formatObservationFact(observation: Observation, field: Extract<FactSelector, { observationId: string }>['field']): string {
   const metadata = field === 'observedAt' ? 'observed at' : field === 'receivedAt' ? 'received at' : field === 'assetId' ? 'asset' : field;
@@ -13,11 +14,12 @@ export function parseCeiling(value: string): number | undefined {
 
 // Ten seconds is the mission's verification window, not a claim about sensor accuracy.
 export function readingStatus(observation: Observation | null, simTime: number): 'unknown' | 'stale' | 'fresh' {
-  if (!observation || observation.value === null || observation.quality === 'unknown' || observation.observedAt > simTime) return 'unknown';
+  if (!observation || observation.value === null || observation.quality === 'unknown' || observation.observedAt > simTime || observation.receivedAt > simTime) return 'unknown';
   return simTime - observation.observedAt > 10 ? 'stale' : 'fresh';
 }
 
 export function makeAction(affordance: KnowledgeView['affordances'][number], simTime: number, technicianId: string, extra: { ceiling?: number; taskId?: string } = {}): ActionIntent | null {
+  if (affordance.action === 'move_crew') return null; // Movement needs an explicit map destination.
   if (!affordance.enabled || (affordance.technicianIds.length > 0 && !affordance.technicianIds.includes(technicianId))) return null;
   if (affordance.action === 'set_batch_ceiling' && (extra.ceiling === undefined || !Number.isFinite(extra.ceiling) || extra.ceiling < 0 || extra.ceiling > 100)) return null;
   if (affordance.action === 'cancel_task' && !extra.taskId) return null;
@@ -30,4 +32,9 @@ export function indicatorState(observations: Observation[], simTime: number): 'u
   if (state.value === true || ['running', 'online', 'ready', 'available'].includes(String(state.value))) return 'active';
   if (state.value === false || ['not_ready', 'offline', 'stopped', 'off', 'booting', 'throttled', 'thermal_tripped', 'tripped', 'unavailable'].includes(String(state.value))) return 'attention';
   return 'unknown';
+}
+
+export function freshRunning(observations: Observation[], simTime: number): boolean {
+  const state = observations.filter(o => o.field === 'running' || o.field === 'state').sort((a, b) => b.observedAt - a.observedAt)[0];
+  return !!state && readingStatus(state, simTime) === 'fresh' && (state.field === 'running' && state.value === true || state.field === 'state' && state.value === 'running');
 }

@@ -1,0 +1,98 @@
+.debrief {
+  --db-bg: #07111b; --db-panel: #102332; --db-text: #dceaf2; --db-muted: #92a8b7;
+  --db-line: #34505f; --db-cyan: #45d5e8; --db-amber: #f4b860; --db-purple: #ca70ea; --db-danger: #f06b79;
+  color: var(--db-text); background: var(--db-bg); color-scheme: dark;
+  font-family: 'IBM Plex Sans', sans-serif; font-size: 16px; line-height: 1.6;
+  max-width: 1280px; min-width: 0; margin: auto; padding: 28px;
+  font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
+}
+.debrief, .debrief * { box-sizing: border-box; }
+.debrief h1, .debrief h2, .debrief h3 { font-family: 'Barlow Condensed', sans-serif; font-weight: 600; line-height: 1.15; text-wrap: balance; }
+.debrief h1 { font-size: 36px; margin: 0 0 8px; }
+.debrief h2 { font-size: 28px; margin: 0 0 16px; }
+.debrief h3 { font-size: 23px; margin: 24px 0 12px; }
+.debrief p { max-width: 78ch; margin: 10px 0; }
+.debrief small, .debrief-note, .debrief-header p { color: var(--db-muted); font-size: 14px; }
+.debrief-header { display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 24px; padding-bottom: 24px; }
+.debrief nav, .debrief-playback { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.debrief-section { border-top: 1px solid var(--db-line); padding: 28px 0; min-width: 0; }
+.debrief-horizon { color: var(--db-cyan); }
+.debrief-horizon span { color: var(--db-muted); }
+.debrief-totals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 32px; margin: 24px 0; }
+.debrief-totals dt { font-size: 14px; color: var(--db-muted); }
+.debrief-totals dd { margin: 2px 0 0; }
+.debrief button, .debrief input, .debrief select, .debrief summary { min-height: 44px; font: inherit; }
+.debrief button, .debrief input, .debrief select { color: var(--db-text); background: var(--db-panel); border: 1px solid #547180; border-radius: 3px; padding: 9px 12px; min-width: 0; max-width: 100%; }
+.debrief button { cursor: pointer; touch-action: manipulation; }
+.debrief button:hover:not(:disabled), .debrief summary:hover { background: #193747; }
+.debrief button:active:not(:disabled) { border-color: var(--db-cyan); }
+.debrief :disabled { color: var(--db-muted); opacity: .65; cursor: not-allowed; }
+.debrief :is(button, input, select, summary, [tabindex]):focus-visible { outline: 3px solid var(--db-cyan); outline-offset: 3px; }
+.debrief ::selection { color: var(--db-bg); background: var(--db-cyan); }
+.debrief * { scrollbar-color: #547180 var(--db-panel); }
+.debrief input { caret-color: var(--db-cyan); accent-color: var(--db-cyan); }
+.debrief label { display: grid; gap: 8px; min-width: 0; }
+.debrief-playback { margin: 20px 0; }
+.debrief-playback label { flex: 1 1 280px; display: block; }
+.debrief-playback input { width: 100%; display: block; padding-inline: 0; }
+.debrief details { margin-top: 20px; }
+.debrief summary { cursor: pointer; padding: 10px 4px; color: var(--db-cyan); }
+.debrief-timeline, .debrief-dialogue { padding: 0; list-style: none; margin: 12px 0; }
+.debrief-timeline { max-height: 420px; overflow-y: auto; }
+.debrief-timeline li { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 16px; padding: 12px 4px; border-bottom: 1px solid var(--db-line); align-items: start; }
+.debrief-timeline button { width: 100%; }
+.debrief-timeline p { margin: 0; }
+.debrief fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.debrief legend { color: var(--db-muted); padding: 0 0 12px; }
+.debrief-cap-fields { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; gap: 16px; align-items: end; }
+.debrief-cap-fields label { font-size: 14px; }
+.debrief-comparison { margin-top: 28px; }
+.debrief-warning { color: var(--db-amber); }
+.debrief [role=alert] { color: var(--db-danger); }
+.debrief [role=status] { color: var(--db-cyan); }
+.debrief-table-scroll { overflow: auto; max-width: 100%; margin: 20px 0 0; }
+.debrief table { border-collapse: collapse; width: 100%; font-size: 14px; }
+.debrief caption { text-align: left; color: var(--db-muted); padding: 0 0 12px; }
+.debrief th, .debrief td { text-align: right; padding: 12px; border-bottom: 1px solid var(--db-line); }
+.debrief th:first-child { text-align: left; }
+.debrief th { font-weight: 500; }
+.debrief thead th { background: var(--db-panel); color: var(--db-cyan); }
+.debrief tbody td { white-space: nowrap; }
+.debrief-legend { display: flex; gap: 8px 24px; flex-wrap: wrap; font-size: 14px; }
+.debrief-legend span:first-child { color: var(--db-cyan); }
+.debrief-legend span:nth-child(2) { color: var(--db-amber); }
+.debrief-charts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; margin-top: 24px; }
+.debrief figure { margin: 0; min-width: 0; }
+.debrief figcaption { font-weight: 500; }
+.debrief svg { display: block; width: 100%; height: auto; overflow: visible; margin-top: 12px; }
+.debrief svg text { fill: var(--db-muted); font: 12px 'IBM Plex Sans', sans-serif; }
+.debrief-gridline { stroke: var(--db-line); }
+.debrief-marker { stroke: var(--db-muted); stroke-dasharray: 1 4; opacity: .6; }
+.debrief svg polyline { fill: none; stroke-width: 2; stroke-linejoin: round; }
+.debrief-series-base { stroke: var(--db-cyan); fill: var(--db-cyan); }
+.debrief-series-alt { stroke: var(--db-amber); fill: var(--db-amber); stroke-dasharray: 6 4; }
+.debrief-dialogue { display: grid; gap: 20px; max-width: 78ch; }
+.debrief-dialogue li { padding-bottom: 16px; border-bottom: 1px solid var(--db-line); }
+.debrief-dialogue li > div { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 20px; }
+.debrief-dialogue span { color: var(--db-muted); font-size: 14px; }
+.debrief-dialogue p { white-space: pre-wrap; }
+.debrief-explanation h3 { color: var(--db-purple); }
+.debrief-explanation ul { padding-left: 24px; }
+@media (max-width: 900px) {
+  .debrief-charts { grid-template-columns: minmax(0, 1fr); max-width: 620px; }
+  .debrief-cap-fields { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .debrief-cap-fields > button { grid-column: 1 / -1; justify-self: start; }
+}
+@media (max-width: 520px) {
+  .debrief { padding: 20px 16px; }
+  .debrief h1 { font-size: 32px; }
+  .debrief-totals, .debrief-cap-fields { grid-template-columns: minmax(0, 1fr); }
+  .debrief nav { width: 100%; }
+  .debrief nav button { flex: 1 1 140px; }
+  .debrief-timeline li { grid-template-columns: 78px minmax(0, 1fr); gap: 12px; }
+  .debrief th, .debrief td { padding: 10px 6px; }
+  .debrief-section { padding: 24px 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .debrief *, .debrief *::before, .debrief *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}

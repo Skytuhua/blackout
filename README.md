@@ -1,31 +1,14 @@
 # Blackout
 
-A 2D pixel-art incident-command game for the NMC² challenge, **Keep the World Running**.
+A pixel-art incident-command game about keeping a data center running through a cooling failure.
 
-The player directs a data-center team through a cooling failure. Power, heat, workload, technician travel, and delayed observations determine the outcome. OpenAI coworkers use their own permitted evidence and ordinary inspection tasks. The remaining delivery work adds an engine-computed replay, debrief and one alternative response.
+Direct Alex, Jules, and Sam through conversation and suggested orders. The deterministic simulation controls power, heat, workload, travel, work completion, reports, and the mission outcome. OpenAI coworkers explain the evidence available to their character and can propose supported orders for validation.
 
-## Status
+[Source repository](https://github.com/Skytuhua/blackout) | [Build status and evidence](docs/build-status.md)
 
-Playable offline Hot Restart: the production React/Phaser interface uses the deterministic simulation worker, qualified dispatch, travel/work, delayed reports, workload mitigation and recovery verification. Browser controls complete recovery at t331 and an idle run fails at t505. Playback stops at the exact terminal tick; retry creates a fresh run.
+## Run locally
 
-Coworker requests now use the bounded local gateway, with factual selectors rendered from records and inference/uncertainty labeled separately. Inspections go through the real worker; repairs and workload proposals await player confirmation. A live OpenAI cycle accepted inspection at t10, completed work at t47 and delivered its report at t49 before a grounded follow-up. Default scripted mode and provider outages leave the complete mission usable.
-
-Replay, persistence, comparison, the final timing sample and release rehearsal remain unfinished application work. The replay/storage library is undergoing independent review.
-
-The delivery target is a local laptop-browser demonstration for judges. [Public source repository](https://github.com/Skytuhua/blackout). No public game hosting is required for the initial release.
-
-## Start here
-
-- [Master plan](docs/blackout-master-plan.md): product, simulation, visual direction, architecture, implementation tasks, and acceptance gates.
-- [Agent instructions](AGENTS.md): ownership, isolated worktrees, integration, review, and handoffs.
-- [Build status](docs/build-status.md): task dependencies and current evidence.
-- [Task packet template](docs/task-packet-template.md): the complete brief given to each development worker.
-- [Initial agent packets](docs/agent-task-packets.md): foundation, simulation, game/interface, OpenAI, and reviewer briefs.
-- [Asset provenance](docs/asset-provenance.md): how shipped assets and template code will be attributed.
-
-## Run the mission
-
-Requires Node.js 24 and npm. All runtime fonts are local.
+Requires Node.js 24 and npm. From the repository directory:
 
 ```sh
 npm ci
@@ -33,24 +16,54 @@ npm run build
 npm run demo
 ```
 
-Open `http://127.0.0.1:4173`, read the briefing and start the mission. Pause or step time to review evidence before dispatch. Use the equipment list with a keyboard, select a qualified technician, and wait for task completion and the delayed report before choosing a repair. Workload controls preserve deferred batch work.
+Open **http://127.0.0.1:4173/** and choose **Start guided game** or **Practice**. The production server uses this fixed local origin; stop an existing instance before launching another one.
 
-`npm run dev` starts client and local service together. `npm run verify` checks types, unit tests, the production build and Chromium mission tests (first install: `npx playwright install chromium`). `npm run test:sim`, `npm run test:contracts` and `npm run test:llm` run focused suites.
+The default is offline/scripted mode and needs no API key. Suggested orders remain usable when the model is unavailable. Fonts, pixel art, and sound assets are served locally.
 
-## Stack
+## Play
 
-TypeScript, React, Phaser, Vite, a deterministic simulation Web Worker, a small local Node service, OpenAI Responses API, Vitest and Playwright. IndexedDB persistence is planned. Dependencies are pinned in the lockfile.
+- Select **Alex (Cooling)**, **Jules (Power)**, or **Sam (IT)** in the conversation sidebar. Each character keeps its own conversation and draft.
+- Choose a suggested order to start a validated task, or type a question or supported work request. **Enter** sends; **Shift+Enter** inserts a newline. Characters travel automatically when accepted work requires it. Busy work requires an explicit stop request before replacement.
+- Watch the assignment and task progress, then read the delivered report. Travel, work completion, and report arrival are separate events.
+- Drag the map or focus it and use the arrow keys to pan. Use the mouse wheel or zoom buttons to zoom, and **Reset** to fit the map again. Selecting known equipment sets conversation context.
+- Use **Pause/Resume** and the header **Speed** selector for 1x, 2x, or 4x simulation time. **Menu > Sound** controls sound effects and volume.
+- **Menu** contains **History**, **Save game**, **Saved games**, and **Replay and results**. Compatible saves resume paused; replay and comparison use recorded simulation evidence. Saves belong to the browser profile and local origin. Use **Export original** to keep a copy outside browser storage.
 
-The production command serves client and API from one stable loopback origin, fails if its port is occupied, and defaults to scripted mode. Health checks never make paid provider calls.
+The current demo simulates the original facility; the additional rooms are scenery. It targets desktop play, and mobile is deferred.
 
-For live coworkers, provide `OPENAI_API_KEY` only in the local server environment and set `LLM_MODE=live`; optional local overrides load from `.env.local`. Never put a key in a `VITE_` variable. Routine tests use synthetic transports, while live acceptance checks are run separately with bounded calls.
+## Enable live coworkers
 
-## Development model
+Copy [.env.example](.env.example) to `.env.local`, add your own server-side key, and set:
 
-One human builder supervises one coordinating agent and up to three parallel workers. The initial workers own simulation, game/interface, and OpenAI integration respectively. The coordinator owns shared contracts, content, package configuration, integration, and release evidence. Workers deliver small commits against a pinned base and do not merge themselves.
+```dotenv
+OPENAI_API_KEY=your_key_here
+LLM_MODE=live
+OPENAI_MODEL=gpt-6.1-terra
+OPENAI_REASONING_EFFORT=low
+```
 
-## Model boundaries
+Then run `npm run demo`. Keep `.env.local` private and never put a key in a `VITE_` variable. The gateway validates character identity, permitted evidence, proposed actions, and current simulation state. It applies persisted usage limits and returns a labeled fallback on unavailable or invalid replies. The configured limits are documented in [.env.example](.env.example); local accounting is not a provider-side billing cap.
 
-Blackout uses fictional equipment profiles and reduced-order models. It is an educational prototype, not a calibrated facility predictor or operational certification system. Provider failure switches the dialogue to labeled authored responses; the simulation continues independently.
+## Verify
 
-Keep API keys in the local environment. Do not commit secrets, personal run logs, or credentials. Runtime inference budgets are separate from development-agent and image-generation costs.
+Install Chromium once for the browser tests:
+
+```sh
+npx playwright install chromium
+npm run verify
+```
+
+`verify` runs type checking, unit tests, the production build, and browser checks. Routine tests use mocked or disconnected model transports and do not require an API key. `npm run dev` starts the development client and local service together.
+
+The latest recorded checks include 473 unit tests and focused production-browser checks for map navigation, conversations, reports, saved runs, and replay. See the [current checkpoint](docs/build-status.md) for the exact scope; a human first-time-player walkthrough and physical sound check remain separate acceptance work.
+
+## Source, assets, and boundaries
+
+The stack is TypeScript, React, Phaser, Vite, a simulation Web Worker, a local Node service, OpenAI Responses API, IndexedDB, Vitest, and Playwright. Dependencies are pinned in `package-lock.json`.
+
+- [Asset and template provenance](docs/asset-provenance.md) records the pixel-art production method and source custody.
+- [Retro sound provenance](docs/assets/retro-audio-provenance.md) records the Freesound CC0 public previews, authors, transformations, and hashes used for the sound pack.
+- Font notices are included under [public/licenses/fonts](public/licenses/fonts).
+- [Master plan](docs/blackout-master-plan.md) preserves the original design baseline; [conversation plan](docs/conversation-game-plan.md) records the replacement interaction direction.
+
+Blackout uses fictional equipment profiles and reduced-order models for an educational demo. It has no live facility connection and is not a calibrated operational predictor. Credentials, local run data, and personal logs are excluded from the repository.

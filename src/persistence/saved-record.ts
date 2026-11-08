@@ -8,6 +8,8 @@ import { factValue, validAction, validStart, validateResponse } from '../llm/val
 import { acceptedCommands, advanceTo, reissue, verifyReplay } from '../sim/replay/recorder';
 import { restore } from '../sim/engine';
 import { buildOutcomeLedger } from '../sim/replay/ledger';
+import { usesConversationPolicy } from '../llm/conversation-mode';
+import { projectCoworkerContext } from '../llm/conversation-policy';
 
 const equal = (a: unknown, b: unknown) => canonicalJson(a) === canonicalJson(b);
 function fail(message: string): never { throw new ReplayDataError('HISTORY_MISMATCH', message); }
@@ -83,7 +85,10 @@ export function validateSavedRun(input: unknown): SavedRunRecord {
     requests.add(requestKey); previousRunIndex = runIndex;
     if (interaction.turns[0].atSimTime < (lastStarted.get(start.runId) ?? 0)) fail('Interactions are not in original start order.');
     lastStarted.set(start.runId, interaction.turns[0].atSimTime);
-    if (!start.procedures.every(p => procedures.some(known => equal(p, known))) || !equal(start.view.knownTopology, saved.scenario.topology)) fail('Unknown procedure or topology content.');
+    const canonicalProcedures = usesConversationPolicy(start)
+      ? equal(start.procedures, projectCoworkerContext({ ...start, procedures: procedures.filter(procedure => start.view.allowedProcedureIds.includes(procedure.id)) }).procedures)
+      : start.procedures.every(p => procedures.some(known => equal(p, known)));
+    if (!canonicalProcedures || !equal(start.view.knownTopology, saved.scenario.topology)) fail('Unknown procedure or topology content.');
     if (start.debriefContext) {
       validateSourceLedger(start.debriefContext.ledger, start.runId, horizon);
       const comparison = start.debriefContext.comparison;
@@ -127,6 +132,7 @@ export function validateSavedRun(input: unknown): SavedRunRecord {
         receipts.add(call.receiptId); if (call.responseId !== null) responseIds.add(call.responseId);
       }
       if (toolResult) {
+        if (start.interactionMode && toolResult.receipt) fail('Advisory chat cannot execute a tool command.');
         if (reply?.kind !== 'tool_request' || !identity(toolResult) || toolResult.interactionId !== reply.interactionId || toolResult.callId !== reply.intent.callId) fail('Tool result has no corresponding request.');
         if (reply.intent.tool === 'inspect_asset' && toolResult.status === 'completed' || reply.intent.tool !== 'inspect_asset' && toolResult.receipt !== null) fail('Tool result status or receipt is incompatible with the tool.');
         knownObservations(toolResult.observations, start.actorId, interaction.end.atSimTime);

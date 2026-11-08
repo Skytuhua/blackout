@@ -1,0 +1,17 @@
+# Natural conversation contract6
+
+The user explicitly replaced finite reply phrases and confirmation-only chat orders. New normal play sends `interactionMode: conversation` and `promptVersion: coworker-v3`. Legacy advisory/v2 and absent-mode transcripts retain their original behavior and bytes. The deterministic explanation experiment was not shipped.
+
+The provider writes short freeform `inference` and `uncertainty`, with no phrase enums. It classifies the current message as `question`, `order` or `unclear`. Questions, small talk and unclear requests have no action. A clear supported order may return one own-role action, even when unrelated to the current objective. There is no leading-verb or objective-relevance admission test in this mode. Unsupported capabilities and busy assignments receive a short explanation or clarification. A new order never silently replaces existing work; stopping is explicit.
+
+The new field `requestKind` is optional in the retained shared response format, but required by the v3 provider schema and final gate. Only v3 permits the conversation interaction marker. Legacy provider schemas omit the new field. Natural provider tools only read permitted observations/procedure excerpts. Injected inspection/action tools cannot execute commands; accepted work is represented in the final response.
+
+Host execution uses the exact final action and the original originating actor/run/request/version snapshot. Only a final order can consume one matching single-use ProposalAuthorization. The existing engine validates roles, task availability, equipment prerequisites, route, versions and idempotency. Changing tabs cannot redirect work. Cancellation/reset/late replies retain generation fences. Questions never acquire executable authorizations. Fallbacks cannot authorize natural-mode work.
+
+Scoped observations, delivered reports and role-limited actions remain the evidence boundary. Procedure projection supplies current role capabilities, not a future mission recipe. The final gate retains identity, selector, role, known-target, delivered/unknown/future evidence and legal-action checks. It also bounds visible length, rejects clocks and common unsupported diagnosis/completion/recipe patterns. These text checks are defensive heuristics, not complete semantic verification. Prompting and finite-pattern guards cannot prove perfect spoiler prevention or perfect intent classification. They do not grant state-writing authority.
+
+Normal bubbles show the model's prose verbatim. Numeric/string measurements use actual selectors and known labels; repeated identity/boolean metadata is kept in History rather than appended to every reply. Old selected readings get a visible report-age label. Exact original response, selectors, provider receipts, evidence and rejected raw replies remain archived. No original recording is rewritten to match new copy.
+
+Per-interaction provider calls remain subject to the existing budgets, timeouts and model configuration. No extra grading or verification-model call is introduced. Offline direct suggested orders and explicitly labeled preset fallback remain. New-mode provider generation is not claimed verified by a synthetic transport test.
+
+Root owns App/gateway/shared/archive integration. Existing speed-control UI lease remains separate. Facility map contract7 and new-engine work remain separate from this change. User capacity override permits at most five active workers, exclusive paths/worktrees and no nested fanout.
