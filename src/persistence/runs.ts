@@ -1,11 +1,12 @@
-import type { Checkpoint, RunRecord } from '../shared/contracts';
-import { ReplayDataError, validateCheckpoint, validateRunRecord } from '../sim/replay/validation';
+import type { Checkpoint, RunRecord, SavedRunRecord } from '../shared/contracts';
+import { ReplayDataError, validateCheckpoint } from '../sim/replay/validation';
+import { validateSavedRun } from './saved-record';
 
 function parse(text: string): unknown {
   try { return JSON.parse(text); } catch { throw new ReplayDataError('CORRUPT', 'Saved data is not valid JSON.'); }
 }
-export const serializeRun = (record: RunRecord): string => JSON.stringify(validateRunRecord(record));
-export const deserializeRun = (text: string): RunRecord => validateRunRecord(parse(text));
+export const serializeRun = (record: RunRecord | SavedRunRecord): string => JSON.stringify(validateSavedRun(record));
+export const deserializeRun = (text: string): SavedRunRecord => validateSavedRun(parse(text));
 export const serializeCheckpoint = (checkpoint: Checkpoint): string => JSON.stringify(validateCheckpoint(checkpoint));
 export const deserializeCheckpoint = (text: string): Checkpoint => validateCheckpoint(parse(text));
 
@@ -15,8 +16,8 @@ export class StorageError extends Error {
 
 export interface SavedRunSummary { runId: string; scenarioId: string; simTime: number }
 export interface RunStore {
-  saveRun(record: RunRecord): Promise<void>;
-  loadRun(runId: string): Promise<RunRecord | null>;
+  saveRun(record: RunRecord | SavedRunRecord): Promise<void>;
+  loadRun(runId: string): Promise<SavedRunRecord | null>;
   listRuns(): Promise<SavedRunSummary[]>;
   removeRun(runId: string): Promise<void>;
   saveCheckpoint(checkpoint: Checkpoint): Promise<void>;

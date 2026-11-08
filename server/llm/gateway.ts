@@ -108,7 +108,7 @@ export class Gateway {
       if (state.controller.signal.aborted) close();
       const startedAt = Date.now();
       const provider = Promise.resolve().then(() => { if (callController.signal.aborted) throw new Error('canceled'); return this.transport(params, callController.signal); }).then(response => {
-        receipt = { receiptId: randomUUID(), runId: input.runId, requestId: input.requestId, actorId: input.actorId, model: response.model.slice(0, 120), inputTokens: response.usage?.input_tokens ?? null, outputTokens: response.usage?.output_tokens ?? null, durationMs: Date.now() - startedAt, status: String(response.status).slice(0, 30) };
+        receipt = { receiptId: randomUUID(), provider: 'openai', responseId: typeof response.id === 'string' && response.id.length > 0 && response.id.length <= 120 ? response.id : null, runId: input.runId, requestId: input.requestId, actorId: input.actorId, model: response.model.slice(0, 120), inputTokens: response.usage?.input_tokens ?? null, outputTokens: response.usage?.output_tokens ?? null, durationMs: Date.now() - startedAt, status: String(response.status).slice(0, 30) };
         this.recent.push(receipt);
         if (this.recent.length > 64) this.recent.shift();
         if (response.usage) this.budget.reconcile(reservation, response.usage.input_tokens, response.usage.output_tokens);

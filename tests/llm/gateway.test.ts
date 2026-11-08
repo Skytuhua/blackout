@@ -91,8 +91,13 @@ it('enforces call deadlines and retains reservations when usage is unknown', asy
   expect(reply.kind === 'fallback' && reply.reason).toBe('call_timeout');
 });
 it('retains bounded metadata with returned model identity and no prompts', async () => {
-  const gateway = setup(async () => text(final));
+  const gateway = setup(async () => ({ ...text(final), id: 'resp_returned_by_provider' }));
   await gateway.turn(start);
-  expect(gateway.diagnostics).toEqual([expect.objectContaining({ model: 'test-model', inputTokens: 40, outputTokens: 13, runId: start.runId, requestId: 'req' })]);
+  expect(gateway.diagnostics).toEqual([expect.objectContaining({ provider: 'openai', responseId: 'resp_returned_by_provider', model: 'test-model', inputTokens: 40, outputTokens: 13, runId: start.runId, requestId: 'req' })]);
   expect(JSON.stringify(gateway.diagnostics)).not.toContain('Check cooling.');
+});
+it('keeps absent provider response identity and usage explicitly unknown', async () => {
+  const gateway = setup(async () => ({ ...text(final), usage: undefined }));
+  await gateway.turn(start);
+  expect(gateway.diagnostics[0]).toMatchObject({ provider: 'openai', responseId: null, inputTokens: null, outputTokens: null });
 });
