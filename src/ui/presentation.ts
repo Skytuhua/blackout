@@ -1,4 +1,5 @@
 import type { ActionIntent, KnowledgeView, Observation, FactSelector } from '../shared/contracts';
+export { naturalReplyText as formatConversationReply } from '../llm/natural-conversation';
 
 export function formatObservationFact(observation: Observation, field: Extract<FactSelector, { observationId: string }>['field']): string {
   const metadata = field === 'observedAt' ? 'observed at' : field === 'receivedAt' ? 'received at' : field === 'assetId' ? 'asset' : field;

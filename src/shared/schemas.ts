@@ -6,6 +6,8 @@ const seconds = number.nonnegative();
 const version = z.literal(1);
 const object = z.strictObject;
 export const INTEGRATION_CONTRACT_VERSION = 5;
+// Additive conversation contract; legacy desktop/record formats keep their identities.
+export const NATURAL_CONVERSATION_CONTRACT_VERSION = 6;
 export const PointSchema = object({ x: number, y: number });
 export const RoleSchema = z.enum(['player', 'facilities', 'electrical', 'remote', 'debrief']);
 export const ActionSchema = z.enum(['inspect', 'independent_reading', 'repair_cooling', 'restart_cooling', 'pause_batch', 'resume_batch', 'set_batch_ceiling', 'verify_recovery', 'cancel_task', 'reset_ups', 'move_crew']);
@@ -53,7 +55,7 @@ export const FactSelectorSchema = z.union([
   object({ observationId: id, field: z.enum(['value', 'source', 'observedAt', 'receivedAt', 'units', 'assetId']) }),
   object({ ledgerRunId: id, field: z.enum(['horizon', 'criticalDemand', 'criticalDelivered', 'interactiveDemand', 'interactiveDelivered', 'batchArrivals', 'batchCompleted', 'batchBacklog', 'batchDelayUnitSeconds', 'peakTemperatureC']) }),
 ]);
-export const AgentResponseSchema = object({ runId: id, requestId: id, actorId: id, speaker: id, mode: z.enum(['live', 'scripted', 'recorded']), facts: z.array(FactSelectorSchema).max(12), inference: z.string().max(1200), uncertainty: z.string().max(600), proposals: z.array(ActionIntentSchema).max(3) });
+export const AgentResponseSchema = object({ runId: id, requestId: id, actorId: id, speaker: id, mode: z.enum(['live', 'scripted', 'recorded']), facts: z.array(FactSelectorSchema).max(12), inference: z.string().max(1200), uncertainty: z.string().max(600), proposals: z.array(ActionIntentSchema).max(3), requestKind: z.enum(['question', 'order', 'unclear']).optional() });
 export const ToolIntentSchema = object({ runId: id, requestId: id, actorId: id, interactionId: id, callId: id, tool: z.enum(['inspect_asset', 'read_observations', 'read_procedure', 'propose_action']), targetId: id, action: ActionIntentSchema.nullable() });
 export const PublicToolResultSchema = object({ runId: id, requestId: id, actorId: id, interactionId: id, callId: id, status: z.enum(['accepted', 'rejected', 'completed']), reason: id, receipt: CommandReceiptSchema.nullable(), observations: z.array(ObservationSchema), procedureText: z.string().max(4000).nullable() });
 const gatewayIdentity = { runId: id, requestId: id, actorId: id };
@@ -73,7 +75,7 @@ export const ComparisonResultSchema = z.discriminatedUnion('status', [
   if (ledgers.some(ledger => ledger.horizon !== result.supportedHorizon)) context.addIssue({ code: 'custom', message: 'Comparison evidence must use the supported equal horizon.' });
 });
 
-export const GatewayStartSchema = object({ kind: z.literal('start'), ...gatewayIdentity, role: RoleSchema, message: z.string().max(1600), view: KnowledgeViewSchema, procedures: z.array(object({ id, text: z.string().max(3000) })).max(4), promptVersion: id, interactionMode: z.literal('advisory').optional(), debriefContext: object({ ledger: OutcomeLedgerSchema, comparison: ComparisonResultSchema.nullable() }).optional() });
+export const GatewayStartSchema = object({ kind: z.literal('start'), ...gatewayIdentity, role: RoleSchema, message: z.string().max(1600), view: KnowledgeViewSchema, procedures: z.array(object({ id, text: z.string().max(3000) })).max(4), promptVersion: id, interactionMode: z.enum(['advisory', 'conversation']).optional(), debriefContext: object({ ledger: OutcomeLedgerSchema, comparison: ComparisonResultSchema.nullable() }).optional() });
 export const GatewayContinueSchema = object({ kind: z.literal('continue'), ...gatewayIdentity, interactionId: id, expectedCallId: id, view: KnowledgeViewSchema, result: PublicToolResultSchema });
 export const GatewayInputSchema = z.discriminatedUnion('kind', [GatewayStartSchema, GatewayContinueSchema]);
 

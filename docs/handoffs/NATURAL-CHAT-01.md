@@ -1,0 +1,13 @@
+# NATURAL-CHAT-01
+
+Base: 9edaf6acd140bc98626a129ed463352891166125. Root branch: fix/alex-report-explanations. The original fixed-explanation test experiment was removed after the user's direct override; no deterministic explanation source, preview or PR shipped.
+
+Changes: additive conversation contract6/request classification; versioned v3 freeform provider schema and final gate; full eligible own-role work independent of selected map target/objective; direct final-order consumption through original ProposalAuthorization; natural bubble copy without repeated raw booleans/IDs; canonical v3 procedure validation while retaining v1/v2 records. See docs/natural-conversation-contract.md for exact authority and compatibility rules.
+
+Observed evidence before first candidate: natural dialogue regressions initially failed on the old phrase gate/schema and missing presenter (8 failures/12 passes). Corrected focused policy/integration tests passed 69; the natural suite including real-engine off-objective order, single-use authorization, native serialized archive and exact physical replay passed21. Full units passed361/50files. Typecheck passed after correcting a test's attempted access to opaque checkpoint JSON. Isolated production Vite and server bundle builds passed. Two isolated production Chromium cases passed: actual delivered report/resumed native save with full natural prose, and question followed by off-objective chat order with real worker travel. No paid calls, user-run reset or user transcript capture.
+
+The broader production browser regression is run separately and its actual result is reported with the candidate. Older normal-UI confirmation-only fixture expectations are updated for the explicit direct-order override; legacy advisory authorization coverage remains in unit/record tests. No complete guided win, human walkthrough, physical laptop timing, new facility engine, sound listening or live v3 provider result is implied.
+
+Raw interaction/source records remain exact. Normal conversation uses model text, not a deterministic phrase renderer. Natural language guards remain bounded heuristics; no perfect semantic anti-spoiler or intent-classification guarantee is claimed. A model can still misunderstand language; only validated actions can affect the simulation.
+
+Root must obtain an independent exact-head review, complete relevant checks, publish/link the focused PR, and update the actual preview only after the integration gate. Speed PR24 has its own reviewed merge/adoption path. Preserve all unrelated worktrees and docs/reviews/CONV-01-independent.md.

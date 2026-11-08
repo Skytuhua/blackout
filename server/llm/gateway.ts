@@ -4,7 +4,7 @@ import { GatewayInputSchema } from '../../src/shared/schemas';
 import { validStart, validAction, validateResponse } from '../../src/llm/validation';
 import { Budget } from './budget';
 import { conciseCoworkerResponse, projectCoworkerContext } from '../../src/llm/conversation-policy';
-import { usesConversationPolicy } from '../../src/llm/conversation-mode';
+import { usesConversationPolicy, usesNaturalConversation } from '../../src/llm/conversation-mode';
 import type { ProviderCall } from '../../src/llm/diagnostics';
 import { initialHistory, parameters, decode, appendOutput, appendToolResult, appendFreshView, officialTransport, type History, type Transport } from './adapter';
 type Options = { mode?: string; keyConfigured?: boolean; transport?: Transport; budget?: Budget; callTimeoutMs?: number; interactionTimeoutMs?: number; debriefTimeoutMs?: number };
@@ -124,7 +124,8 @@ export class Gateway {
         state.history = appendOutput(state.history, response);
         const value = decode(response, state.start, interactionId);
         if ('tool' in value) {
-          if (state.start.interactionMode === 'advisory' && value.tool === 'inspect_asset') throw new Error('advisory_execution_forbidden');
+          if (!!state.start.interactionMode && value.tool === 'inspect_asset') throw new Error('advisory_execution_forbidden');
+          if (usesNaturalConversation(state.start) && value.tool === 'propose_action') throw new Error('advisory_execution_forbidden');
           if (state.calls >= 3 || state.start.role === 'debrief') throw new Error('interaction_quota');
           if (state.history.filter(i => 'type' in i && i.type === 'function_call' && i.call_id === value.callId).length !== 1) throw new Error('duplicate_call');
           if (value.tool === 'read_procedure' ? !state.start.procedures.some(p => p.id === value.targetId) : !(value.tool === 'propose_action' && value.action && validAction(value.action, state.start)) && !state.start.view.knownTopology.assets.some(a => a.id === value.targetId)) throw new Error('invalid_target');

@@ -2,6 +2,7 @@ import type { AgentResponse, GatewayStart, ActionIntent, FactSelector } from '..
 import { AgentResponseSchema, GatewayStartSchema } from '../shared/schemas';
 export function validStart(start: GatewayStart): boolean {
   if (!GatewayStartSchema.safeParse(start).success || start.view.runId !== start.runId || start.view.actorId !== start.actorId) return false;
+  if (start.interactionMode === 'conversation' && start.promptVersion !== 'coworker-v3') return false;
   const role = start.actorId === 'player' ? 'player' : start.view.crew.find(c => c.id === start.actorId)?.role;
   if (start.role !== role && !(start.role === 'debrief' && start.actorId === 'player')) return false;
   return start.procedures.every(p => start.view.allowedProcedureIds.includes(p.id)) && (!start.debriefContext || (start.role === 'debrief' && start.debriefContext.ledger.runId === start.runId));
