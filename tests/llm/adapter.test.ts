@@ -19,3 +19,23 @@ it('uses the installed SDK without retries and sends explicit Responses settings
   await expect(officialTransport()(parameters(start, initialHistory(start), 1), new AbortController().signal)).rejects.toMatchObject({ status: 429 });
   expect(requests).toBe(1);
 });
+
+it('supplies the actor speaker explicitly and constrains final identity at the provider boundary', () => {
+  const actor = { ...start, actorId: 'alex', role: 'facilities' as const, view: { ...start.view, actorId: 'alex' } };
+  const history = initialHistory(actor);
+  const context = JSON.parse((history[0] as { content: string }).content);
+  expect(context.speaker).toBe('alex');
+  const params = parameters(actor, history, 1);
+  const properties = (params.text!.format as any).schema.properties;
+  for (const [field, value] of Object.entries({ runId: actor.runId, requestId: actor.requestId, actorId: 'alex', speaker: 'alex', mode: 'live' })) expect(properties[field].enum).toEqual([value]);
+});
+
+it('distinguishes procedure targets and read-only arguments from equipment inspection tools', () => {
+  const input = { ...start, procedures: [{ id: 'hot-restart-v1', text: 'Declared training procedure.' }] };
+  const params = parameters(input, initialHistory(input), 1);
+  const tool = params.tools!.find(tool => tool.type === 'function' && tool.name === 'read_procedure');
+  if (!tool || tool.type !== 'function') throw new Error('Procedure tool missing.');
+  const properties = (tool.parameters as any).properties;
+  expect(properties.targetId.enum).toEqual(['hot-restart-v1']);
+  expect(properties.action.type).toBe('null');
+});

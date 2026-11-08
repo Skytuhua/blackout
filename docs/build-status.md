@@ -2,7 +2,7 @@
 
 Updated: 7 November 2026.
 
-G0, physical simulation, mission engine, pixel fixture UI and bounded gateway are merged and reviewed. The real production worker/host now pass local offline mission controls: success t331 and idle failure t505, exact terminal stopping, paused dispatch and fresh retry. The playable-host PR is awaiting its final gate. Public repository: https://github.com/Skytuhua/blackout. Live worker/model cycle, replay and persistence remain unfinished.
+The real playable host is merged at PR8 (`70f5ab0`) with successful hosted checks: offline recovery t331, idle failure t505, exact terminal stopping and fresh retry. The actual production worker/OpenAI inspection cycle now passes locally (accepted t10, completed t47, report t49); its integration PR is next. Public repository: https://github.com/Skytuhua/blackout. Replay/storage library integration, debrief/comparison, complete transcript capture, timing sample and release rehearsal remain unfinished.
 
 ## Task queue
 
@@ -16,9 +16,9 @@ G0, physical simulation, mission engine, pixel fixture UI and bounded gateway ar
 | SIM-02: full mission behavior | Simulation worker | SIM-01 and CONTENT-01 | Merged PR6: 770fff3 | Crew/task timing, observations, protection, success/failure/timeout/reset traces. |
 | UI-01: runtime masters and fixture UI | Game/UI worker, coordinator corrections | CORE-00 | Merged PR2: be52b64 | Native/3× sprite review, selection/dispatch flow, accessible controls. |
 | AI-01: gateway and mock tool cycle | OpenAI worker | CORE-00 | Merged PR5: 49cb850 | Strict schemas, bounded transport, fallback, usage/race checks. |
-| UI-02: real mission and radio integration | Coordinator host; UI worker mobile follow-up | SIM-02 and UI-01 | Local offline controls pass; mobile drawer/targets separately leased | Complete offline mission using actual worker and projected views. |
-| AI-02: real coworker tool cycle | OpenAI worker | G1 and available API credentials | Context fix merged PR7: 3264911; live cycle pending | Authenticated request, valid inspection receipt, completed observation, grounded response. |
-| REPLAY-01: saved run and earlier-cap comparison | Replay worker with transferred path lease | G1 and frozen snapshot contract | Queued | Deterministic hash, saved-run reload, valid and unsupported continuation cases. |
+| UI-02: real mission and radio integration | Coordinator host; UI worker mobile follow-up | SIM-02 and UI-01 | Host merged PR8; mobile drawer/targets separately leased | Complete offline mission using actual worker and projected views. |
+| AI-02: real coworker tool cycle | Coordinator integration | G1 and available API credentials | Local real cycle passed; integration PR pending | Authenticated request, valid inspection receipt, completed observation, grounded response. |
+| REPLAY-01: saved run and earlier-cap comparison | Replay worker with transferred path lease | G1 and frozen snapshot contract | Delivered; independent HIGH mapping correction pending | Deterministic hash, saved-run reload, valid and unsupported continuation cases. |
 | UI-03: factual debrief and comparison view | Game/UI worker | REPLAY-01 ledger contracts | Queued | Engine-derived chart/timeline and correct supported-horizon labeling. |
 | AI-03: grounded debrief and timing sample | OpenAI worker | Outcome ledger and AI-02 | Queued | Grounded explanation, ten representative interaction measurements, fallback evidence. |
 | CONTENT-02: extra Hot Restart presets | Coordinator | G2 and time remaining | Optional, queued | Each preset passes its own observation-based response policy. |

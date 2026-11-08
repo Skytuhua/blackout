@@ -1,0 +1,27 @@
+{
+  "scope": "Actual production browser/worker/local HTTP/official OpenAI cycle; not replay or release acceptance",
+  "sourceBase": "70f5ab02a607e1c73a2fa943edeb3ab099818f84",
+  "modelObserved": "gpt-5.6-luna",
+  "promptVersion": "coworker-v1",
+  "simulation": {
+    "acceptedAt": 10,
+    "completedAt": 47,
+    "deliveredAt": 49,
+    "acceptedBeforeCompletion": true,
+    "delayedReportObserved": true,
+    "followupLive": true
+  },
+  "successfulCheckProviderCalls": 3,
+  "earlierDiagnosticProviderCalls": 5,
+  "apiError": null,
+  "credentialInBrowserRequests": false,
+  "providerCalls": [
+    { "inputTokens": 1734, "outputTokens": 61, "durationMs": 3078 },
+    { "inputTokens": 2004, "outputTokens": 207, "durationMs": 3200 },
+    { "inputTokens": 2066, "outputTokens": 335, "durationMs": 3362 }
+  ],
+  "pageErrors": [],
+  "desktopOverflow": false,
+  "mobileOverflow": false,
+  "tenSampleLatencyAcceptance": false
+}

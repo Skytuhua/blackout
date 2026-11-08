@@ -3,16 +3,26 @@ import { GatewayStartSchema, GatewayContinueSchema, GatewayResponseSchema } from
 import { validStart, validateResponse } from './validation';
 import { bindLifecycle, lifecycleFor, expired, type Lifecycle } from './lifecycle';
 import { scopeKnowledge } from './context';
+import { ProviderCallSchema, type ProviderCall } from './diagnostics';
 const contexts = new Map<string, { start: GatewayStart; lifecycle: Lifecycle }>();
 const evidence = new WeakMap<Lifecycle, Map<string, Observation>>();
-const key = (input: GatewayInput) => JSON.stringify([input.runId, input.requestId, input.actorId]);
+const providerCalls = new WeakMap<GatewayResponse, ProviderCall>();
+export const providerCallFor = (reply: GatewayResponse) => { const call = providerCalls.get(reply); return call && { ...call }; };
+type Identity = Pick<GatewayStart, 'runId' | 'requestId' | 'actorId'>;
+const key = (input: Identity) => JSON.stringify([input.runId, input.requestId, input.actorId]);
 const fallback = (input: GatewayInput, reason: string): GatewayResponse => ({ kind: 'fallback', runId: input.runId, requestId: input.requestId, actorId: input.actorId, mode: 'scripted', reason, message: 'Scripted fallback: use permitted observations and procedures.', facts: [] });
+export function cancelInteraction(input: Identity) {
+  const context = contexts.get(key(input));
+  if (!context || context.lifecycle.closed) return;
+  context.lifecycle.closed = true;
+  void fetch('/api/llm/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ runId: input.runId, requestId: input.requestId, actorId: input.actorId }), keepalive: true }).catch(() => {});
+}
 async function turn(input: GatewayInput, context: GatewayStart, lifecycle: Lifecycle, signal?: AbortSignal): Promise<GatewayResponse> {
   if (signal && signal !== lifecycle.signal) lifecycle.signal = lifecycle.signal ? AbortSignal.any([lifecycle.signal, signal]) : signal;
   const effectiveSignal = lifecycle.signal;
-  const cancel = () => { void fetch('/api/llm/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ runId: input.runId, requestId: input.requestId, actorId: input.actorId }), keepalive: true }).catch(() => {}); };
+  const cancel = () => cancelInteraction(input);
   if (effectiveSignal?.aborted) { lifecycle.closed = true; return fallback(input, 'canceled'); }
-  if (lifecycle.signal?.aborted || performance.now() >= lifecycle.deadline) return fallback(input, 'canceled_or_expired');
+  if (expired(lifecycle)) return fallback(input, 'canceled_or_expired');
   effectiveSignal?.addEventListener('abort', cancel, { once: true });
   let toolPending = false;
   try {
@@ -31,7 +41,7 @@ async function turn(input: GatewayInput, context: GatewayStart, lifecycle: Lifec
     }
     if (!response.ok) return fallback(input, 'gateway_unavailable');
     const reply = GatewayResponseSchema.parse(await response.json());
-    if (lifecycle.signal?.aborted || performance.now() >= lifecycle.deadline) return fallback(input, 'canceled_or_expired');
+    if (expired(lifecycle)) return fallback(input, 'canceled_or_expired');
     if (effectiveSignal?.aborted) return fallback(input, 'canceled');
     if (reply.runId !== input.runId || reply.requestId !== input.requestId || reply.actorId !== input.actorId) return fallback(input, 'stale_response');
     if (reply.kind === 'final' && !validateResponse(reply.response, { ...context, view: { ...wire.view, observations: [...seen.values()] } })) return fallback(input, 'invalid_evidence');
@@ -40,8 +50,15 @@ async function turn(input: GatewayInput, context: GatewayStart, lifecycle: Lifec
       if (lifecycle.closed) return fallback(input, 'canceled_or_expired');
       bindLifecycle(reply.intent, lifecycle); toolPending = true;
     }
-    if (reply.kind === 'fallback') return { ...reply, facts: [] };
-    return reply;
+    const output = reply.kind === 'fallback' ? { ...reply, facts: [] } : reply;
+    const metadata = response.headers.get('X-Blackout-Call');
+    if (metadata && metadata.length <= 1200) {
+      try {
+        const parsed = ProviderCallSchema.safeParse(JSON.parse(metadata));
+        if (parsed.success && parsed.data.runId === input.runId && parsed.data.requestId === input.requestId && parsed.data.actorId === input.actorId) providerCalls.set(output, parsed.data);
+      } catch { /* Optional transport metadata cannot change the game response. */ }
+    }
+    return output;
   } catch { return fallback(input, effectiveSignal?.aborted ? 'canceled' : 'gateway_unavailable'); }
   finally { if (!toolPending) lifecycle.closed = true; effectiveSignal?.removeEventListener('abort', cancel); }
 }
