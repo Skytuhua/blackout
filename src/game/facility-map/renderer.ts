@@ -1,6 +1,5 @@
 import atlas from '../../../public/assets/facility-v2.json';
 import type { FacilityMapProps, FacilityTopology } from '../../shared/facility-map';
-import { freshRunning } from '../../ui/presentation';
 import { routePosition } from '../desktop-world';
 import { assetEvidence, PresentationClock, roomViewport } from './model';
 
@@ -44,11 +43,11 @@ export class FacilityRenderer {
     if (this.frame !== null) cancelAnimationFrame(this.frame);
     this.frame = null; this.lastFrame = null; this.canvas.dataset.animationRequests = '0';
   }
-  private running() { return !this.state.paused && !this.state.reducedMotion && this.state.view.mission.status === 'active'; }
+  private running() { return !this.state.paused && !this.state.reducedMotion && ['active', 'practice'].includes(this.state.view.mission.status); }
   private schedule() {
     if (this.disposed || !this.atlas || !this.running() || this.clock.time >= this.state.view.simTime + 1) { this.canvas.dataset.animationRequests = '0'; return; }
     const { view } = this.state;
-    const motion = view.crew.some(c => c.role !== 'remote' && view.tasks.some(t => t.id === c.taskId && t.actorId === c.id && ['traveling', 'working', 'inspecting'].includes(t.status))) || view.knownTopology.assets.some(a => ['cooling', 'generator'].includes(a.kind) && freshRunning(view.observations.filter(o => o.assetId === a.id), view.simTime));
+    const motion = view.crew.some(c => c.role !== 'remote' && view.tasks.some(t => t.id === c.taskId && t.actorId === c.id && ['traveling', 'working', 'inspecting'].includes(t.status))) || view.knownTopology.assets.some(a => ['cooling', 'generator'].includes(a.kind) && assetEvidence(view.observations.filter(o => o.assetId === a.id), view.simTime).running);
     if (!motion) return;
     this.canvas.dataset.animationRequests = '1';
     this.frame = requestAnimationFrame(now => {
@@ -91,8 +90,9 @@ export class FacilityRenderer {
     ctx.save(); ctx.translate(-b.x * 16, -b.y * 16); ctx.drawImage(this.terrain, 0, 0);
     // Connections describe topology only. Static lines never assert current flow.
     ctx.strokeStyle = colors[this.kind]; ctx.globalAlpha = .55; ctx.lineWidth = 1;
-    const roomAssets = new Set(topology.assets.filter(a => a.roomId === selectedRoomId).map(a => a.id));
-    const connections = topology.connections.filter(c => c.kind === this.kind && (!selectedRoomId || roomAssets.has(c.fromId) || roomAssets.has(c.toId)) && (!selectedAssetId || c.fromId === selectedAssetId || c.toId === selectedAssetId));
+    const effectiveRoomId = topology.rooms.some(room => room.id === selectedRoomId) ? selectedRoomId : null;
+    const roomAssets = new Set(topology.assets.filter(a => a.roomId === effectiveRoomId).map(a => a.id));
+    const connections = topology.connections.filter(c => c.kind === this.kind && (!effectiveRoomId || roomAssets.has(c.fromId) || roomAssets.has(c.toId)) && (!selectedAssetId || c.fromId === selectedAssetId || c.toId === selectedAssetId));
     for (const connection of connections) {
       ctx.beginPath(); connection.points.forEach((p, i) => i ? ctx.lineTo(p.x * 16 + 8.5, p.y * 16 + 8.5) : ctx.moveTo(p.x * 16 + 8.5, p.y * 16 + 8.5)); ctx.stroke();
     }
@@ -102,7 +102,7 @@ export class FacilityRenderer {
     const cycle = this.clock.time;
     for (const asset of topology.assets) {
       const observations = view.observations.filter(o => o.assetId === asset.id), evidence = assetEvidence(observations, view.simTime);
-      const active = freshRunning(observations, view.simTime) && !reducedMotion;
+      const active = evidence.running && !reducedMotion;
       const frame = asset.kind === 'generator' ? `generator_${active ? Math.floor(cycle * 4) % 3 : 0}` : asset.kind;
       this.sprite(ctx, frame, asset.x * 16, asset.y * 16, asset.width * 16, asset.height * 16);
       if (asset.kind === 'cooling') this.sprite(ctx, `fan_${active ? Math.floor(cycle * 6) % 4 : 0}`, asset.x * 16 + 8, asset.y * 16 + 8);

@@ -1,6 +1,6 @@
 import type { FacilityRoom, FacilityTopology } from '../../shared/facility-map';
 import type { Observation } from '../../shared/contracts';
-import { indicatorState, readingStatus } from '../../ui/presentation';
+import { freshRunning, indicatorState, readingStatus } from '../../ui/presentation';
 
 export function roomViewport(topology: FacilityTopology, roomId: string | null): FacilityRoom['bounds'] {
   const room = topology.rooms.find(room => room.id === roomId);
@@ -21,11 +21,14 @@ export function assetEvidence(observations: Observation[], simTime: number) {
   const latest = new Map<string, Observation>();
   for (const o of delivered) if (!latest.has(o.field) || latest.get(o.field)!.observedAt <= o.observedAt) latest.set(o.field, o);
   const rows = [...latest.values()], state = indicatorState(rows, simTime);
+  // Use the same newest delivered record for visual motion and the indicator.
+  const indicator = rows.filter(o => ['state', 'power', 'power_state', 'running', 'output_state'].includes(o.field)).sort((a, b) => b.observedAt - a.observedAt)[0];
+  const running = indicator ? freshRunning([indicator], simTime) : false;
   const fresh = rows.filter(o => readingStatus(o, simTime) === 'fresh');
   const stale = !fresh.length && rows.some(o => readingStatus(o, simTime) === 'stale');
   const label = state === 'active' ? 'Observed active' : state === 'attention' ? 'Observed attention' : stale ? 'Stale' : fresh.length ? 'Reading received' : 'Unknown';
   const readings = rows.filter(o => readingStatus(o, simTime) !== 'unknown').map(o => `${o.field}: ${String(o.value)}${o.units ? ` ${o.units}` : ''} · ${Math.floor(simTime - o.observedAt)}s old${readingStatus(o, simTime) === 'stale' ? ' (stale)' : ''}`).join('; ');
-  return { state, label, readings, badge: stale ? 'stale' : state === 'attention' ? 'warning' : state };
+  return { state, running, label, readings, badge: stale ? 'stale' : state === 'attention' ? 'warning' : state };
 }
 
 /** Bounded visual interpolation. Selection changes cannot reset or advance it. */
