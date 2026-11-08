@@ -19,3 +19,15 @@ If projection is unsupported, retain the existing map route and show a short una
 The new focused Vitest cases cover an actual engine observation, accepted inspection route and interpolation, current-run selection guards, unmodified unknown evidence, unsupported topologies, geometry cache invalidation, restore, and a real headless offline mission plus replay. Typecheck, the project build, and a separate browser-targeted bundle of this leaf were run; the project build does not yet import this adapter. Exact commands and final results belong in the coordinator handoff/PR.
 
 No shared DTO, App, worker, engine, legacy recordings or existing map files are edited. No provider calls or preview changes. The integrated conversation UI, actual map rendering of the notice/unavailable regions, browser mission, save/resume/replay through the host, and laptop/user demo have not been verified. Independent review and the focused PR are required before integration.
+
+## Coordinator verification
+
+At implementation commit `b613215a618e354b2f04894be02dbebd2662ac50`, `npx vitest run tests/ui/facility-demo-projection --maxWorkers=1` passed 9/9, `npm run typecheck` passed, `npm run build` passed, and `npx esbuild src/game/facility-demo-projection/index.ts --bundle --platform=browser --format=esm --outfile=.local/facility-demo-projection/projection.js` passed. `npm test -- --maxWorkers=1` passed all 364 tests in 54 files. The production application build does not import this new leaf; only the separate bundle covers its browser bundling. Existing build emitted the usual third-party annotation and chunk-size warnings.
+
+The isolated worktree uses an ignored `node_modules` junction to the existing installation. Its lockfile bytes differ from the root checkout, but the recorded pinned package versions match for every package present in this worktree's lockfile. No dependencies or lockfile were modified.
+
+## Independent review correction
+
+Review of `4b9d546` found that a dangling source dependency could accidentally match the synthetic unavailable-diagram identifier. The exact case failed before the fix; source dependencies are now checked against original asset IDs before any display placeholder is introduced. The focused suite passes 10/10, including rejection through the projector and both selection guards, ordinary missing references, and a legitimately named source asset. Typecheck and the standalone browser bundle pass.
+
+The reviewer also observed 44 cyan perimeter marks drawn by the existing map renderer for public boundary cells. They are not evidence of physical doors; host integration must visually review this presentation and prominently show the illustrative-map notice. The host must also render the unavailable-area indication and enforce its own reset/generation fence. A prior full suite passed 364/364 before this narrow correction; the new full suite is running separately.

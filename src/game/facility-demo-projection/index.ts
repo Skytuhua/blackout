@@ -32,6 +32,8 @@ function geometry(input: KnowledgeView['knownTopology']): FacilityTopology | nul
   if (!parsed.success) return null;
   const source = parsed.data;
   if (source.width !== 20 || source.height !== 12 || source.walkable.length === 0) return null;
+  const sourceIds = new Set(source.assets.map(asset => asset.id));
+  if (sourceIds.size !== source.assets.length || source.assets.some(asset => asset.dependencies.some(id => !sourceIds.has(id)))) return null;
   const inSource = (p: Point) => Number.isInteger(p.x) && Number.isInteger(p.y) && p.x >= 0 && p.y >= 0 && p.x < source.width && p.y < source.height;
   if (source.walkable.some(p => !inSource(p)) || source.assets.some(a => !inSource(a) || !inSource(a.serviceTile) || !Number.isInteger(a.width) || !Number.isInteger(a.height) || a.x + a.width > source.width || a.y + a.height > source.height)) return null;
   const cells = [...source.walkable, ...source.assets.flatMap(a => [{ x: a.x, y: a.y }, { x: a.x + a.width - 1, y: a.y + a.height - 1 }])];
