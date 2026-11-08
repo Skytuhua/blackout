@@ -1,0 +1,23 @@
+{
+  "mode": "headed Chromium, fresh temporary persistent profile",
+  "browser": "158.0.8127.18",
+  "origin": "http://127.0.0.1:52777",
+  "saved": {
+    "at": 1,
+    "continuedHash": "replay-v1-723ff3a7e236d64f",
+    "initialHash": "replay-v1-49eb54cc997dfe5f"
+  },
+  "resumed": {
+    "resumedAt": 100,
+    "runCount": 0,
+    "checkpointCount": 0
+  },
+  "boundaries": {
+    "corrupt": "rejected",
+    "versionMismatch": "rejected",
+    "badSavePreservedData": true,
+    "closedStore": "explicit failure"
+  },
+  "pageErrors": [],
+  "providerCalls": 0
+}

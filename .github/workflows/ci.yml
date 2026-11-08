@@ -27,6 +27,10 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run verify
+      - name: Check native saved-run storage
+        env:
+          REPLAY_BROWSER_HEADLESS: '1'
+        run: node tests/replay/browser-check.mjs
       - name: Check operational UI fixtures
         if: hashFiles('tests/ui/browser-check.mjs') != ''
         shell: bash
@@ -44,5 +48,6 @@ jobs:
             test-results/
             playwright-report/
             .local/ui-01/*.png
+            .local/replay-01/browser-evidence.json
           if-no-files-found: ignore
           retention-days: 3
