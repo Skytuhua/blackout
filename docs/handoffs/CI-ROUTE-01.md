@@ -1,6 +1,12 @@
 # CI-ROUTE-01 handoff
 
-Status: **migration delivered; CI is blocked by a product reset defect outside this lease**. Final full verification: typecheck PASS, 340/340 unit tests PASS, production build PASS, browser 37/38 PASS (10/11 migrated and 27/27 unchanged current cases). No skipped or excluded tests. This is not green shared CI.
+## Coordinator follow-up
+
+The original reset blocker described below has since been fixed in this branch. Automatic menu capture waits for pending work; queued saves keep Restart and live controls usable, and report an explicit wait when replay or comparison conflicts. Captures retain fresh review evidence if storage fails and restore the current pause state. A subsequent retry clears its prior storage error. Independent review found no blocking regression in the final lifecycle correction; its pre-existing retry-message finding was fixed with a regression.
+
+At commit `1629a621633ad82a036b724125c0bff1492e2725`, typecheck and build passed, and the complete built-app browser suite passed 51/51 without retries. It includes the reset/cancel/late-response path, queued-save and storage-failure races, the full offline win/failure, and native browser persistence/replay. The current full unit run and hosted CI are separate gates. The original author observations below remain as historical evidence; v3 integrated browser validation is still required on the natural-chat branch.
+
+Original author status: **migration delivered; CI was blocked by a product reset defect outside the author's lease**. Final author verification: typecheck PASS, 340/340 unit tests PASS, production build PASS, browser 37/38 PASS (10/11 migrated and 27/27 unchanged current cases). No skipped or excluded tests.
 
 Coordinator follow-up: independent review reproduced the restart blocker and identified an empty inference in the future conversation-v3 order fixture. The fixture now supplies a short nonempty acknowledgment. Typecheck passed after this change; the fixture still requires an integrated v3 browser run. Existing v2 behavior remains unchanged.
 
