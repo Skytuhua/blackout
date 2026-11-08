@@ -1,0 +1,250 @@
+{
+  "schemaVersion": 1,
+  "sources": [
+    {
+      "id": 365641,
+      "author": "furbyguy",
+      "title": "8 Bit Alarm.wav",
+      "sourcePage": "https://freesound.org/people/furbyguy/sounds/365641/",
+      "finalSourcePage": "https://freesound.org/people/furbyguy/sounds/365641/",
+      "observedAtUtc": "2026-11-08T11:22:55.848989+00:00",
+      "sourcePageSha256": "cc63d8a72e0cc49d587aea346dcb4f43ed7d8a8342768fff801c31ed99bc3ab9",
+      "license": {
+        "spdx": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "observedHref": "http://creativecommons.org/publicdomain/zero/1.0/",
+        "observedLabel": "Creative Commons 0"
+      },
+      "originalDownload": {
+        "status": "login-required",
+        "observedLabel": "Login to download"
+      },
+      "download": {
+        "kind": "public-preview",
+        "url": "https://cdn.freesound.org/previews/365/365641_5829171-hq.mp3",
+        "finalUrl": "https://cdn.freesound.org/previews/365/365641_5829171-hq.mp3",
+        "contentType": "audio/mpeg",
+        "retrievedAtUtc": "2026-11-08T11:22:55.848989+00:00",
+        "file": "sources/365641-hq-preview.mp3",
+        "bytes": 9025,
+        "sha256": "c04a8421cc9f9acb7195d79551020a36845def277f86ee131b744f09277fde33"
+      },
+      "probe": {
+        "codec": "mp3",
+        "sampleRate": 44100,
+        "channels": 2,
+        "durationSeconds": 0.4
+      }
+    },
+    {
+      "id": 501102,
+      "author": "EVRetro",
+      "title": "8-bit footsteps.wav",
+      "sourcePage": "https://freesound.org/people/EVRetro/sounds/501102/",
+      "finalSourcePage": "https://freesound.org/people/EVRetro/sounds/501102/",
+      "observedAtUtc": "2026-11-08T11:22:56.039700+00:00",
+      "sourcePageSha256": "c016481b84622c0c1a720c112169ef0860a4e66cf33b2620a011024bd0c93cf3",
+      "license": {
+        "spdx": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "observedHref": "http://creativecommons.org/publicdomain/zero/1.0/",
+        "observedLabel": "Creative Commons 0"
+      },
+      "originalDownload": {
+        "status": "login-required",
+        "observedLabel": "Login to download"
+      },
+      "download": {
+        "kind": "public-preview",
+        "url": "https://cdn.freesound.org/previews/501/501102_6299573-hq.mp3",
+        "finalUrl": "https://cdn.freesound.org/previews/501/501102_6299573-hq.mp3",
+        "contentType": "audio/mpeg",
+        "retrievedAtUtc": "2026-11-08T11:22:56.039700+00:00",
+        "file": "sources/501102-hq-preview.mp3",
+        "bytes": 34518,
+        "sha256": "b06fb39707df5a4648407fbac303b3559900bc6c0a52810c9fd6a8617fc2fb34"
+      },
+      "probe": {
+        "codec": "mp3",
+        "sampleRate": 44100,
+        "channels": 1,
+        "durationSeconds": 3.3
+      }
+    },
+    {
+      "id": 431329,
+      "author": "SomeGuy22",
+      "title": "8-Bit Powerup",
+      "sourcePage": "https://freesound.org/people/SomeGuy22/sounds/431329/",
+      "finalSourcePage": "https://freesound.org/people/SomeGuy22/sounds/431329/",
+      "observedAtUtc": "2026-11-08T11:22:55.978191+00:00",
+      "sourcePageSha256": "35b812385c7f8c273ec2b33d30280ba547c867a92170d2cf6c470d3e4ddd397e",
+      "license": {
+        "spdx": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "observedHref": "http://creativecommons.org/publicdomain/zero/1.0/",
+        "observedLabel": "Creative Commons 0"
+      },
+      "originalDownload": {
+        "status": "login-required",
+        "observedLabel": "Login to download"
+      },
+      "download": {
+        "kind": "public-preview",
+        "url": "https://cdn.freesound.org/previews/431/431329_2711716-hq.mp3",
+        "finalUrl": "https://cdn.freesound.org/previews/431/431329_2711716-hq.mp3",
+        "contentType": "audio/mpeg",
+        "retrievedAtUtc": "2026-11-08T11:22:55.978191+00:00",
+        "file": "sources/431329-hq-preview.mp3",
+        "bytes": 14351,
+        "sha256": "07a83ea16aabc8bd39b3f9221cf75068137d8c801c1523919f44d3f1ab2db4f2"
+      },
+      "probe": {
+        "codec": "mp3",
+        "sampleRate": 44100,
+        "channels": 1,
+        "durationSeconds": 0.501791
+      }
+    },
+    {
+      "id": 869220,
+      "author": "SignatureSoundsOrg",
+      "title": "017_UI_Game_SFX",
+      "sourcePage": "https://freesound.org/people/SignatureSoundsOrg/sounds/869220/",
+      "finalSourcePage": "https://freesound.org/people/SignatureSoundsOrg/sounds/869220/",
+      "observedAtUtc": "2026-11-08T11:22:57.587587+00:00",
+      "sourcePageSha256": "2d7a3f36f58e89f2e46d2ec7d793b3e5f1d06a0c86ef8709033c2b8adf089361",
+      "license": {
+        "spdx": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "observedHref": "http://creativecommons.org/publicdomain/zero/1.0/",
+        "observedLabel": "Creative Commons 0"
+      },
+      "originalDownload": {
+        "status": "login-required",
+        "observedLabel": "Login to download"
+      },
+      "download": {
+        "kind": "public-preview",
+        "url": "https://cdn.freesound.org/previews/869/869220_19205925-hq.mp3",
+        "finalUrl": "https://cdn.freesound.org/previews/869/869220_19205925-hq.mp3",
+        "contentType": "audio/mpeg",
+        "retrievedAtUtc": "2026-11-08T11:22:57.587587+00:00",
+        "file": "sources/869220-hq-preview.mp3",
+        "bytes": 12629,
+        "sha256": "4bbd2262e126c786a466c1b27a515e9a70a13406bd4809d5707caede2b1c6b9d"
+      },
+      "probe": {
+        "codec": "mp3",
+        "sampleRate": 44100,
+        "channels": 2,
+        "durationSeconds": 0.42263
+      }
+    },
+    {
+      "id": 865886,
+      "author": "CAT-FOX_ALEX",
+      "title": "8-Bit UI FX 1",
+      "sourcePage": "https://freesound.org/people/CAT-FOX_ALEX/sounds/865886/",
+      "finalSourcePage": "https://freesound.org/people/CAT-FOX_ALEX/sounds/865886/",
+      "observedAtUtc": "2026-11-08T11:22:57.520521+00:00",
+      "sourcePageSha256": "165fd6e8688efc850bd14c60d8c074b9cc04cb54e1dc2a3ac34fec03108a54f9",
+      "license": {
+        "spdx": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "observedHref": "http://creativecommons.org/publicdomain/zero/1.0/",
+        "observedLabel": "Creative Commons 0"
+      },
+      "originalDownload": {
+        "status": "login-required",
+        "observedLabel": "Login to download"
+      },
+      "download": {
+        "kind": "public-preview",
+        "url": "https://cdn.freesound.org/previews/865/865886_17675683-hq.mp3",
+        "finalUrl": "https://cdn.freesound.org/previews/865/865886_17675683-hq.mp3",
+        "contentType": "audio/mpeg",
+        "retrievedAtUtc": "2026-11-08T11:22:57.520521+00:00",
+        "file": "sources/865886-hq-preview.mp3",
+        "bytes": 28599,
+        "sha256": "189672149db04ea9e9c4ea06bcd2eecb1027b2bd61ff8abab4130cb921735bae"
+      },
+      "probe": {
+        "codec": "mp3",
+        "sampleRate": 44100,
+        "channels": 2,
+        "durationSeconds": 1.360295
+      }
+    },
+    {
+      "id": 404743,
+      "author": "OwlStorm",
+      "title": "Retro video game sfx - Fail",
+      "sourcePage": "https://freesound.org/people/OwlStorm/sounds/404743/",
+      "finalSourcePage": "https://freesound.org/people/OwlStorm/sounds/404743/",
+      "observedAtUtc": "2026-11-08T11:22:57.837148+00:00",
+      "sourcePageSha256": "72ebde67419cc0633fc7bb00628088b80026120780165b45915161c4c74f3fae",
+      "license": {
+        "spdx": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "observedHref": "http://creativecommons.org/publicdomain/zero/1.0/",
+        "observedLabel": "Creative Commons 0"
+      },
+      "originalDownload": {
+        "status": "login-required",
+        "observedLabel": "Login to download"
+      },
+      "download": {
+        "kind": "public-preview",
+        "url": "https://cdn.freesound.org/previews/404/404743_140737-hq.mp3",
+        "finalUrl": "https://cdn.freesound.org/previews/404/404743_140737-hq.mp3",
+        "contentType": "audio/mpeg",
+        "retrievedAtUtc": "2026-11-08T11:22:57.837148+00:00",
+        "file": "sources/404743-hq-preview.mp3",
+        "bytes": 15971,
+        "sha256": "244ed865b39e92996275f8c7d40fed11d28ba62fff3a8bb93ee05d0f405e961c"
+      },
+      "probe": {
+        "codec": "mp3",
+        "sampleRate": 44100,
+        "channels": 1,
+        "durationSeconds": 0.439093
+      }
+    },
+    {
+      "id": 519073,
+      "author": "EVRetro",
+      "title": "8-bit car engine.wav",
+      "sourcePage": "https://freesound.org/people/EVRetro/sounds/519073/",
+      "finalSourcePage": "https://freesound.org/people/EVRetro/sounds/519073/",
+      "observedAtUtc": "2026-11-08T11:23:20.567829+00:00",
+      "sourcePageSha256": "b5a7358c7638001a28a4352531ce66d13b37e0081389cf04b889338d915d6ea3",
+      "license": {
+        "spdx": "CC0-1.0",
+        "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "observedHref": "http://creativecommons.org/publicdomain/zero/1.0/",
+        "observedLabel": "Creative Commons 0"
+      },
+      "originalDownload": {
+        "status": "login-required",
+        "observedLabel": "Login to download"
+      },
+      "download": {
+        "kind": "public-preview",
+        "url": "https://cdn.freesound.org/previews/519/519073_6299573-hq.mp3",
+        "finalUrl": "https://cdn.freesound.org/previews/519/519073_6299573-hq.mp3",
+        "contentType": "audio/mpeg",
+        "retrievedAtUtc": "2026-11-08T11:23:20.567829+00:00",
+        "file": "sources/519073-hq-preview.mp3",
+        "bytes": 1673726,
+        "sha256": "7f9e6b038f0425cc05a813d028cf5153cad57637fa2ffd2e6a3bc51ce0cff958"
+      },
+      "probe": {
+        "codec": "mp3",
+        "sampleRate": 44100,
+        "channels": 1,
+        "durationSeconds": 56.1
+      }
+    }
+  ]
+}
