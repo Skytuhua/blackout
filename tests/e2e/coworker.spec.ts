@@ -138,7 +138,8 @@ test('restart cancels an old interaction and ignores its late inspection request
   } finally { release(); if (captured) await handled; }
 });
 
-for (const priorSnapshot of [false, true]) test(`menu refreshes ${priorSnapshot ? 'an old' : 'an absent'} snapshot after a pending reply`, async ({ page }) => {
+for (const priorSnapshot of ['absent', 'old', 'comparison'] as const) test(`menu refreshes a ${priorSnapshot} snapshot after a pending reply`, async ({ page }) => {
+  test.setTimeout(60000);
   const wire = fixtures(); let captured: GatewayInput | undefined; let release!: () => void;
   const gate = new Promise<void>(resolve => { release = resolve; });
   await page.route('**/api/llm/turn', async route => {
@@ -148,16 +149,56 @@ for (const priorSnapshot of [false, true]) test(`menu refreshes ${priorSnapshot 
   });
   try {
     await begin(page);
-    if (priorSnapshot) await advanceTo(page, 5);
+    if (priorSnapshot === 'comparison') {
+      await advanceTo(page, 2); await suggested(page, 'sam', 'Pause background jobs'); await advanceTo(page, 5);
+      const previous = await menu(page, 'Replay and results');
+      await previous.getByRole('combobox', { name: 'After action section' }).selectOption('compare');
+      await previous.getByRole('spinbutton', { name: 'Earlier simulation second' }).fill('0');
+      await previous.getByRole('button', { name: 'Run comparison' }).click();
+      await expect(previous.getByLabel('Comparison metrics', { exact: true })).toContainText('COMPUTED ALTERNATIVE');
+      await closeMenu(page); await advanceTo(page, 10);
+    } else if (priorSnapshot === 'old') await advanceTo(page, 5);
     await equipment(page, 'cooling-1'); await radio(page, 'What is known?');
     await expect.poll(() => !!captured).toBe(true);
     const dialog = await menu(page, 'Replay and results');
     await dialog.getByRole('combobox', { name: 'After action section' }).selectOption('outcome');
-    if (priorSnapshot) await expect(dialog).toContainText('T+0:00');
+    if (priorSnapshot === 'old') await expect(dialog).toContainText('T+0:00');
+    else if (priorSnapshot === 'comparison') await expect(dialog).toContainText('T+0:05');
     else await expect(dialog).toContainText('Open a mission record');
     release();
-    await expect(dialog).toContainText(priorSnapshot ? 'T+0:05' : 'T+0:00');
+    await expect(dialog).toContainText(priorSnapshot === 'comparison' ? 'T+0:10' : priorSnapshot === 'old' ? 'T+0:05' : 'T+0:00');
+    await dialog.getByRole('combobox', { name: 'After action section' }).selectOption('provenance');
+    expect(await readPages(page, 'Original wire transcript')).toContain(captured!.requestId);
   } finally { release(); }
+});
+
+test('menu refreshes after a pending worker command finishes', async ({ page }) => {
+  await page.addInitScript(() => {
+    const descriptor = Object.getOwnPropertyDescriptor(Worker.prototype, 'onmessage')!;
+    Object.defineProperty(Worker.prototype, 'onmessage', {
+      configurable: true,
+      get: descriptor.get,
+      set(handler: (event: MessageEvent) => void) {
+        descriptor.set!.call(this, (event: MessageEvent) => {
+          if (event.data.kind === 'receipt' && (window as any).__holdReceipt) {
+            (window as any).__releaseReceipt = () => handler.call(this, event);
+          } else handler.call(this, event);
+        });
+      },
+    });
+  });
+  await begin(page);
+  await page.evaluate(() => { (window as any).__holdReceipt = true; });
+  await page.getByRole('tab', { name: /^Sam ·/ }).click();
+  const order = page.getByRole('button', { name: 'Pause background jobs', exact: true });
+  while (!(await order.count())) await page.getByRole('button', { name: 'Next suggested order', exact: true }).click();
+  await order.click();
+  await expect.poll(() => page.evaluate(() => typeof (window as any).__releaseReceipt)).toBe('function');
+  const dialog = await menu(page, 'Replay and results');
+  await dialog.getByRole('combobox', { name: 'After action section' }).selectOption('outcome');
+  await expect(dialog).toContainText('Open a mission record');
+  await page.evaluate(() => (window as any).__releaseReceipt());
+  await expect(dialog).toContainText('ORIGINAL RUN');
 });
 
 test('timestamp facts are formatted as metadata rather than equipment readings', async ({ page }) => {
