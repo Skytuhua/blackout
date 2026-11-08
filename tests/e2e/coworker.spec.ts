@@ -18,7 +18,7 @@ function fixtures() {
       runId: input.runId, requestId: input.requestId, actorId: input.actorId, speaker: input.actorId, mode: 'live',
       ...(current ? { requestKind: action ? 'order' : 'question' } : {}),
       facts: [{ observationId: observation.id, field }],
-      inference: action ? current ? '' : 'Please confirm the proposed work.' : 'Please check the latest readings.',
+      inference: action ? current ? 'I can handle that.' : 'Please confirm the proposed work.' : 'Please check the latest readings.',
       uncertainty: '', proposals: action ? [action] : [],
     } };
   };

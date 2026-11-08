@@ -2,6 +2,8 @@
 
 Status: **migration delivered; CI is blocked by a product reset defect outside this lease**. Final full verification: typecheck PASS, 340/340 unit tests PASS, production build PASS, browser 37/38 PASS (10/11 migrated and 27/27 unchanged current cases). No skipped or excluded tests. This is not green shared CI.
 
+Coordinator follow-up: independent review reproduced the restart blocker and identified an empty inference in the future conversation-v3 order fixture. The fixture now supplies a short nonempty acknowledgment. Typecheck passed after this change; the fixture still requires an integrated v3 browser run. Existing v2 behavior remains unchanged.
+
 ## Custody and commits
 
 - Clean initial branch: `t3/1aac6ca5`.
