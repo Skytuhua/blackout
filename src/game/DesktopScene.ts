@@ -4,7 +4,7 @@ import { freshRunning, indicatorState, readingStatus } from '../ui/presentation'
 import { Commander, nearbyAsset, pointKey, routePosition, terminal, type Direction } from './desktop-world';
 import { atlasFrame } from './atlas-frame';
 
-export type DesktopSceneState = Pick<DesktopGameProps, 'view' | 'selectedAssetId' | 'selectedCrewId' | 'paused' | 'speed' | 'session'> & { reducedMotion: boolean };
+export type DesktopSceneState = Pick<DesktopGameProps, 'view' | 'selectedAssetId' | 'selectedCrewId' | 'paused' | 'speed' | 'session'> & { reducedMotion: boolean; displayOnly?: boolean };
 export type DesktopSceneEvents = { asset: (id: string) => void; crew: (id: string) => void; floor: (point: Point) => void; moved: () => void; pose: (position: Point) => void; art: (ready: boolean) => void };
 const keys: Record<string, Direction> = { w: 'n', ArrowUp: 'n', d: 'e', ArrowRight: 'e', s: 's', ArrowDown: 's', a: 'w', ArrowLeft: 'w' };
 
@@ -43,6 +43,7 @@ export class DesktopScene extends Phaser.Scene {
     this.eventsOut.art(this.hasAtlas && this.availableFrames.size >= 111);
     this.marks = this.add.graphics().setDepth(8);
     this.commanderSprite = this.sprite(0, 0, 'commander_s_idle', 'technician').setDepth(20);
+    this.commanderSprite.setVisible(!this.state.displayOnly);
     this.fans = [this.sprite(9 * 16, 16, 'fan_0', 'cooling'), this.sprite(12 * 16, 16, 'fan_0', 'cooling')];
     this.fans.forEach(f => f.setDisplaySize(16, 16).setDepth(3));
     this.input.on('pointerdown', this.pointer, this);
@@ -53,13 +54,15 @@ export class DesktopScene extends Phaser.Scene {
     const reset = state.view.runId !== this.state.view.runId;
     if (reset) { this.commander.clear(); this.commander = new Commander(state.view.knownTopology); this.clock = 0; this.workerPose.clear(); this.workerFacing.clear(); this.eventsOut.pose(this.commander.position); }
     if (reset || state.view.simTime !== this.state.view.simTime) this.presentationTime = state.view.simTime;
-    if (reset || state.paused || terminal(state.view) || state.session === 'welcome') this.clearKeys();
+    if (reset || state.displayOnly || state.paused || terminal(state.view) || state.session === 'welcome') this.clearKeys();
     this.state = state;
+    this.commanderSprite?.setVisible(!state.displayOnly);
     if (this.marks) this.reconcile();
   }
   focusWorld(focused: boolean) { this.worldFocused = focused; if (!focused) this.clearKeys(); }
   clearKeys() { this.commander.clear(); }
   handleKey(key: string, down: boolean) {
+    if (this.state.displayOnly) return;
     if (!down) { const direction = keys[key]; if (direction) this.commander.release(direction); return; }
     if (!this.worldFocused || this.state.paused || terminal(this.state.view) || this.state.session === 'welcome') return;
     const direction = keys[key];
@@ -67,16 +70,18 @@ export class DesktopScene extends Phaser.Scene {
     if (key.toLowerCase() === 'e') this.inspectNearby();
   }
   nudge(direction: Direction) {
+    if (this.state.displayOnly) return;
     if (this.state.paused || terminal(this.state.view) || this.state.session === 'welcome') return;
     this.commander.clear(); this.commander.hold(direction);
     if (this.commander.advance(.5, 1)) { this.eventsOut.moved(); this.eventsOut.pose(this.commander.position); }
     this.commander.clear();
   }
   inspectNearby() {
+    if (this.state.displayOnly) return;
     const asset = nearbyAsset(this.state.view, this.commander.position);
     if (asset) this.eventsOut.asset(asset.id);
   }
-  diagnostics() { return { objects: this.children.length, pointerListeners: this.input.listenerCount('pointerdown'), equipment: this.equipment.size, crew: this.workers.size, atlas: this.hasAtlas, position: { ...this.commander.position }, clock: this.clock, fanFrames: this.fans.map(f => f.frame.name) }; }
+  diagnostics() { return { objects: this.children.length, pointerListeners: this.input.listenerCount('pointerdown'), equipment: this.equipment.size, crew: this.workers.size, atlas: this.hasAtlas, position: { ...this.commander.position }, clock: this.clock, fanFrames: this.fans.map(f => f.frame.name), displayOnly: !!this.state.displayOnly, commanderVisible: this.commanderSprite?.visible }; }
   private sprite(x: number, y: number, frame: string, fallback: string) {
     const safeFrame = atlasFrame(frame, this.availableFrames);
     return this.add.image(x, y, safeFrame ? 'facility-v2' : `desktop-legacy-${fallback}`, safeFrame ?? undefined).setOrigin(0);
@@ -89,6 +94,11 @@ export class DesktopScene extends Phaser.Scene {
   }
   private pointer(pointer: Phaser.Input.Pointer) {
     const { view } = this.state, point = { x: Math.floor(pointer.x / 16), y: Math.floor(pointer.y / 16) };
+    if (this.state.displayOnly) {
+      const asset = view.knownTopology.assets.find(a => point.x >= a.x && point.x < a.x + a.width && point.y >= a.y && point.y < a.y + a.height);
+      if (asset) this.eventsOut.asset(asset.id);
+      return;
+    }
     const crew = view.crew.find(c => { if (c.role === 'remote') return false; const pose = routePosition(c, view.tasks.find(t => t.id === c.taskId), this.presentationTime, view.knownTopology); return Math.abs(pose.x + .5 - pointer.x / 16) < .45 && Math.abs(pose.y + .5 - pointer.y / 16) < .55; });
     if (crew) { this.eventsOut.crew(crew.id); return; }
     const asset = view.knownTopology.assets.find(a => point.x >= a.x && point.x < a.x + a.width && point.y >= a.y && point.y < a.y + a.height);
@@ -133,7 +143,7 @@ export class DesktopScene extends Phaser.Scene {
     const running = !paused && !terminal(view) && session !== 'welcome';
     const dt = Math.min(delta, 100) / 1000;
     if (running) { this.clock += dt * speed; this.presentationTime = Math.min(view.simTime + 1, this.presentationTime + dt * speed); }
-    if (running && this.worldFocused && this.commander.advance(dt, speed)) { this.eventsOut.moved(); this.eventsOut.pose(this.commander.position); }
+    if (!this.state.displayOnly && running && this.worldFocused && this.commander.advance(dt, speed)) { this.eventsOut.moved(); this.eventsOut.pose(this.commander.position); }
     const walkFrame = Math.floor(this.clock * 6) % 2, workFrame = Math.floor(this.clock * 4) % 2;
     this.commanderSprite.setPosition(Math.round(this.commander.position.x * 16 + 2), Math.round(this.commander.position.y * 16));
     this.frame(this.commanderSprite, `commander_${this.commander.facing}_${this.commander.moving && !reducedMotion ? `walk${walkFrame}` : 'idle'}`);
