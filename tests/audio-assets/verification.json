@@ -1,0 +1,164 @@
+{
+  "status": "PASS",
+  "cues": 22,
+  "rawSources": 7,
+  "runtimeBytes": 957868,
+  "packageBytes": 2794831,
+  "directListeningPerformed": false,
+  "measurements": [
+    {
+      "id": "ui-select",
+      "durationSeconds": 0.09,
+      "peakDbfs": -21.0013,
+      "rmsDbfs": -31.994,
+      "bytes": 7982
+    },
+    {
+      "id": "ui-open",
+      "durationSeconds": 0.2181859410430839,
+      "peakDbfs": -21.0013,
+      "rmsDbfs": -31.0572,
+      "bytes": 19288
+    },
+    {
+      "id": "ui-close",
+      "durationSeconds": 0.26666666666666666,
+      "peakDbfs": -22.9992,
+      "rmsDbfs": -32.9852,
+      "bytes": 23564
+    },
+    {
+      "id": "message-sent",
+      "durationSeconds": 0.15,
+      "peakDbfs": -22.9992,
+      "rmsDbfs": -32.295,
+      "bytes": 13274
+    },
+    {
+      "id": "message-received",
+      "durationSeconds": 0.21,
+      "peakDbfs": -21.0013,
+      "rmsDbfs": -35.189,
+      "bytes": 18566
+    },
+    {
+      "id": "order-accepted",
+      "durationSeconds": 0.20909297052154194,
+      "peakDbfs": -21.0013,
+      "rmsDbfs": -24.6345,
+      "bytes": 18486
+    },
+    {
+      "id": "order-rejected",
+      "durationSeconds": 0.22727891156462585,
+      "peakDbfs": -18.9991,
+      "rmsDbfs": -26.7194,
+      "bytes": 20090
+    },
+    {
+      "id": "crew-step",
+      "durationSeconds": 0.19,
+      "peakDbfs": -28.9974,
+      "rmsDbfs": -45.8011,
+      "bytes": 16802
+    },
+    {
+      "id": "task-start",
+      "durationSeconds": 0.4,
+      "peakDbfs": -24.9985,
+      "rmsDbfs": -35.8763,
+      "bytes": 35324
+    },
+    {
+      "id": "task-complete",
+      "durationSeconds": 0.4181859410430839,
+      "peakDbfs": -21.0013,
+      "rmsDbfs": -26.2561,
+      "bytes": 36928
+    },
+    {
+      "id": "task-cancel",
+      "durationSeconds": 0.17600907029478458,
+      "peakDbfs": -22.9992,
+      "rmsDbfs": -30.3643,
+      "bytes": 15568
+    },
+    {
+      "id": "report-arrived",
+      "durationSeconds": 0.4666666666666667,
+      "peakDbfs": -21.0013,
+      "rmsDbfs": -36.5566,
+      "bytes": 41204
+    },
+    {
+      "id": "incident-warning",
+      "durationSeconds": 0.2941269841269841,
+      "peakDbfs": -18.0005,
+      "rmsDbfs": -26.3882,
+      "bytes": 25986
+    },
+    {
+      "id": "incident-critical",
+      "durationSeconds": 0.4,
+      "peakDbfs": -14.0001,
+      "rmsDbfs": -21.923,
+      "bytes": 35324
+    },
+    {
+      "id": "cooling-recovered",
+      "durationSeconds": 0.6250113378684807,
+      "peakDbfs": -22.9992,
+      "rmsDbfs": -29.638,
+      "bytes": 55170
+    },
+    {
+      "id": "mission-success",
+      "durationSeconds": 0.5,
+      "peakDbfs": -18.0005,
+      "rmsDbfs": -23.5629,
+      "bytes": 44144
+    },
+    {
+      "id": "mission-failure",
+      "durationSeconds": 0.5487528344671202,
+      "peakDbfs": -18.0005,
+      "rmsDbfs": -27.7484,
+      "bytes": 48444
+    },
+    {
+      "id": "save-complete",
+      "durationSeconds": 0.26922902494331064,
+      "peakDbfs": -22.9992,
+      "rmsDbfs": -34.3534,
+      "bytes": 23790
+    },
+    {
+      "id": "simulation-pause",
+      "durationSeconds": 0.24,
+      "peakDbfs": -24.9985,
+      "rmsDbfs": -34.1887,
+      "bytes": 21212
+    },
+    {
+      "id": "simulation-resume",
+      "durationSeconds": 0.15,
+      "peakDbfs": -24.9985,
+      "rmsDbfs": -34.2832,
+      "bytes": 13274
+    },
+    {
+      "id": "work-loop",
+      "durationSeconds": 1.8,
+      "peakDbfs": -32.001,
+      "rmsDbfs": -45.2769,
+      "bytes": 158804
+    },
+    {
+      "id": "facility-loop",
+      "durationSeconds": 3.0,
+      "peakDbfs": -36.0057,
+      "rmsDbfs": -49.5525,
+      "bytes": 264644
+    }
+  ]
+}
