@@ -2,13 +2,15 @@
 
 A 2D pixel-art incident-command game for the NMC² challenge, **Keep the World Running**.
 
-The player directs a data-center team through a cooling failure. Power, heat, workload, technician travel, and delayed observations determine the outcome. OpenAI coworkers inspect the same evidence the player can access, and the debrief explains an engine-computed replay and one alternative response.
+The player directs a data-center team through a cooling failure. Power, heat, workload, technician travel, and delayed observations determine the outcome. OpenAI coworkers use their own permitted evidence and ordinary inspection tasks. The remaining delivery work adds an engine-computed replay, debrief and one alternative response.
 
 ## Status
 
 Playable offline Hot Restart: the production React/Phaser interface uses the deterministic simulation worker, qualified dispatch, travel/work, delayed reports, workload mitigation and recovery verification. Browser controls complete recovery at t331 and an idle run fails at t505. Playback stops at the exact terminal tick; retry creates a fresh run.
 
-Coworker responses in the app are explicitly scripted from that actor's permitted evidence. The bounded OpenAI gateway is implemented and tested separately; the live worker/model cycle, replay, persistence, comparison and final release rehearsal remain unfinished.
+Coworker requests now use the bounded local gateway, with factual selectors rendered from records and inference/uncertainty labeled separately. Inspections go through the real worker; repairs and workload proposals await player confirmation. A live OpenAI cycle accepted inspection at t10, completed work at t47 and delivered its report at t49 before a grounded follow-up. Default scripted mode and provider outages leave the complete mission usable.
+
+Replay, persistence, comparison, the final timing sample and release rehearsal remain unfinished application work. The replay/storage library is undergoing independent review.
 
 The delivery target is a local laptop-browser demonstration for judges. [Public source repository](https://github.com/Skytuhua/blackout). No public game hosting is required for the initial release.
 
@@ -40,6 +42,8 @@ Open `http://127.0.0.1:4173`, read the briefing and start the mission. Pause or 
 TypeScript, React, Phaser, Vite, a deterministic simulation Web Worker, a small local Node service, OpenAI Responses API, Vitest and Playwright. IndexedDB persistence is planned. Dependencies are pinned in the lockfile.
 
 The production command serves client and API from one stable loopback origin, fails if its port is occupied, and defaults to scripted mode. Health checks never make paid provider calls.
+
+For live coworkers, provide `OPENAI_API_KEY` only in the local server environment and set `LLM_MODE=live`; optional local overrides load from `.env.local`. Never put a key in a `VITE_` variable. Routine tests use synthetic transports, while live acceptance checks are run separately with bounded calls.
 
 ## Development model
 

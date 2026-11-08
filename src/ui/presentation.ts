@@ -1,4 +1,11 @@
-import type { ActionIntent, KnowledgeView, Observation } from '../shared/contracts';
+import type { ActionIntent, KnowledgeView, Observation, FactSelector } from '../shared/contracts';
+
+export function formatObservationFact(observation: Observation, field: Extract<FactSelector, { observationId: string }>['field']): string {
+  const metadata = field === 'observedAt' ? 'observed at' : field === 'receivedAt' ? 'received at' : field === 'assetId' ? 'asset' : field;
+  const label = field === 'value' ? observation.field.replaceAll('_', ' ') : `${observation.field.replaceAll('_', ' ')} · ${metadata}`;
+  const value = field === 'observedAt' || field === 'receivedAt' ? `${Math.floor(observation[field] / 60)}:${String(Math.floor(observation[field] % 60)).padStart(2, '0')}` : String(observation[field] ?? 'unknown');
+  return `${observation.assetId} · ${label}: ${value}${field === 'value' && observation.units ? ` ${observation.units}` : ''}`;
+}
 
 export function parseCeiling(value: string): number | undefined {
   return value.trim() ? Number(value) : undefined;

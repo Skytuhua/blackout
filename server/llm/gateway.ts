@@ -3,16 +3,18 @@ import type { GatewayInput, GatewayResponse, GatewayStart, ToolIntent, PublicToo
 import { GatewayInputSchema } from '../../src/shared/schemas';
 import { validStart, validAction, validateResponse } from '../../src/llm/validation';
 import { Budget } from './budget';
+import type { ProviderCall } from '../../src/llm/diagnostics';
 import { initialHistory, parameters, decode, appendOutput, appendToolResult, appendFreshView, officialTransport, type History, type Transport } from './adapter';
 type Options = { mode?: string; keyConfigured?: boolean; transport?: Transport; budget?: Budget; callTimeoutMs?: number; interactionTimeoutMs?: number; debriefTimeoutMs?: number };
-type Diagnostic = { runId: string; requestId: string; model: string; inputTokens: number | null; outputTokens: number | null; durationMs: number; status: string };
 type Interaction = { start: GatewayStart; history: History; evidence: Map<string, Observation>; calls: number; controller: AbortController; deadline: number; pending?: ToolIntent; fingerprint: string; reply?: GatewayResponse; busy: boolean; expires: ReturnType<typeof setTimeout> };
 const sameIdentity = (a: { runId: string; requestId: string; actorId: string }, b: typeof a) => a.runId === b.runId && a.requestId === b.requestId && a.actorId === b.actorId;
 export class Gateway {
   private interactions = new Map<string, Interaction>();
   private providerBusy = false;
-  private recent: Diagnostic[] = [];
-  get diagnostics(): readonly Diagnostic[] { return this.recent.map(item => ({ ...item })); }
+  private recent: ProviderCall[] = [];
+  private receipts = new WeakMap<GatewayResponse, ProviderCall>();
+  get diagnostics(): readonly ProviderCall[] { return this.recent.map(item => ({ ...item })); }
+  receiptFor(reply: GatewayResponse): ProviderCall | undefined { const call = this.receipts.get(reply); return call && { ...call }; }
   remainingMs(identity: { runId: string; requestId: string; actorId: string }): number | undefined {
     const state = [...this.interactions.values()].find(s => sameIdentity(s.start, identity));
     return state ? Math.max(0, Math.min(20000, Math.floor(state.deadline - Date.now()))) : undefined;
@@ -88,6 +90,7 @@ export class Gateway {
     const interactionId = [...this.interactions.entries()].find(([, s]) => s === state)![0];
     const abort = () => state.controller.abort('canceled'); signal?.addEventListener('abort', abort, { once: true });
     state.busy = true;
+    let receipt: ProviderCall | undefined;
     try {
       if (state.calls >= (state.start.role === 'debrief' ? 1 : 3)) throw new Error('interaction_quota');
       const params = parameters(state.start, state.history, state.calls + 1);
@@ -105,7 +108,8 @@ export class Gateway {
       if (state.controller.signal.aborted) close();
       const startedAt = Date.now();
       const provider = Promise.resolve().then(() => { if (callController.signal.aborted) throw new Error('canceled'); return this.transport(params, callController.signal); }).then(response => {
-        this.recent.push({ runId: input.runId, requestId: input.requestId, model: response.model.slice(0, 120), inputTokens: response.usage?.input_tokens ?? null, outputTokens: response.usage?.output_tokens ?? null, durationMs: Date.now() - startedAt, status: String(response.status).slice(0, 30) });
+        receipt = { receiptId: randomUUID(), runId: input.runId, requestId: input.requestId, actorId: input.actorId, model: response.model.slice(0, 120), inputTokens: response.usage?.input_tokens ?? null, outputTokens: response.usage?.output_tokens ?? null, durationMs: Date.now() - startedAt, status: String(response.status).slice(0, 30) };
+        this.recent.push(receipt);
         if (this.recent.length > 64) this.recent.shift();
         if (response.usage) this.budget.reconcile(reservation, response.usage.input_tokens, response.usage.output_tokens);
         return response;
@@ -132,7 +136,7 @@ export class Gateway {
       const status = (error as { status?: number }).status;
       state.reply = this.fallback(input, status === 429 ? 'provider_quota' : allowed.includes(message) ? message : 'malformed_or_unavailable');
       clearTimeout(state.expires);
-    } finally { state.busy = false; signal?.removeEventListener('abort', abort); }
+    } finally { if (receipt && state.reply) this.receipts.set(state.reply, receipt); state.busy = false; signal?.removeEventListener('abort', abort); }
     return state.reply!;
   }
 }

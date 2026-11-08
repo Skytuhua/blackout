@@ -41,6 +41,8 @@ export function createDemoServer(gateway = new Gateway()) {
         const reply = await gateway.turn(parsed.data, controller.signal);
         const remaining = gateway.remainingMs(parsed.data);
         if (remaining !== undefined) res.setHeader('X-Blackout-Deadline-Ms', String(remaining));
+        const call = gateway.receiptFor(reply);
+        if (call) res.setHeader('X-Blackout-Call', JSON.stringify(call));
         if (!res.writableEnded && !res.destroyed) json(200, reply);
       } catch { if (!res.writableEnded && !res.destroyed) json(400, { error: 'Request unavailable.' }); }
       finally { clearTimeout(timer); res.removeListener('close', disconnected); }
