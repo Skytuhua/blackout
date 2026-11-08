@@ -114,3 +114,9 @@ Independent re-review found that the first width-to-font cutoff still allowed co
 
 The long-name browser regression was observed failing before the change. The rebuilt production fixture passed 27 checks, including the reviewed host cases, a long-name collision case, navigation fallback and the previous 72 desktop layouts. The 12 focused map tests and typecheck passed. These remain synthetic fixture checks; actual integrated host and mission acceptance are pending.
 Full suite following measured label placement: 355/355 unit tests passed when run on its own.
+
+## Font metrics and constrained navigation
+
+Independent review of `8387f68` reproduced stale label placement after an already-available font switch and clipped controls when all room names were very long. Both failed in focused browser regressions before this change. Label visibility now preserves measurable layout boxes; a ResizeObserver re-runs placement when actual label dimensions change, without toggling element size. Room navigation measures its full labels and switches to the compact selector when they cannot fit on one row.
+
+The isolated production fixture passed 29 browser checks, including font switch and reappearance, long-name control bounds, host constraints, and the 72 desktop layouts. The 12 focused map tests, typecheck and Impeccable detector passed. Real integrated host performance, moving-crew overlay interactions, and full mission acceptance remain unverified. A fresh independent review is required.

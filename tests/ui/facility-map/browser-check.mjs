@@ -195,7 +195,7 @@ try {
       }, { width, height, font });
       await patch(page, { selectedRoomId: room });
       const overlaps = await page.evaluate(() => {
-        const labels = [...document.querySelectorAll('.fm-room-label, .fm-asset-label, .fm-upstream-mark')].filter(el => el.getClientRects().length);
+        const labels = [...document.querySelectorAll('.fm-room-label, .fm-asset-label, .fm-upstream-mark')].filter(el => el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden');
         return labels.flatMap((a, i) => labels.slice(i + 1).filter(b => {
           const x = a.getBoundingClientRect(), y = b.getBoundingClientRect();
           return Math.min(x.right, y.right) - Math.max(x.left, y.left) > 1 && Math.min(x.bottom, y.bottom) - Math.max(x.top, y.top) > 1;
@@ -216,7 +216,7 @@ try {
     });
     await settle(page);
     const overlaps = await page.evaluate(() => {
-      const labels = [...document.querySelectorAll('.fm-room-label, .fm-upstream-mark')].filter(el => el.getClientRects().length);
+      const labels = [...document.querySelectorAll('.fm-room-label, .fm-upstream-mark')].filter(el => el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden');
       return labels.flatMap((a, i) => labels.slice(i + 1).filter(b => {
         const x = a.getBoundingClientRect(), y = b.getBoundingClientRect();
         return Math.min(x.right, y.right) - Math.max(x.left, y.left) > 1 && Math.min(x.bottom, y.bottom) - Math.max(x.top, y.top) > 1;
@@ -224,6 +224,33 @@ try {
     });
     assert.deepEqual(overlaps, []);
     assert.equal(await page.getByRole('button', { name: /Regional Hall A equipment facility/ }).count() + await page.getByRole('option', { name: /Regional Hall A equipment facility/ }).count(), 1);
+    await page.close();
+  });
+  await check('already-available font switch rearranges map labels without resize', async () => {
+    const page = await open(1280, 720);
+    await page.evaluate(() => { const stage = document.querySelector('.fixture-stage'); stage.style.width = '820px'; stage.style.height = '450px'; document.querySelector('.fm-world').style.fontFamily = 'Arial'; window.facilityFixture.patch({ selectedRoomId: null }); });
+    await settle(page);
+    const before = await page.locator('.fm-world').boundingBox();
+    const beforeLabels = await page.locator('.fm-room-label, .fm-upstream-mark').evaluateAll(labels => labels.filter(el => getComputedStyle(el).visibility !== 'hidden').map(el => el.textContent));
+    await page.evaluate(() => { document.querySelector('.fm-world').style.fontFamily = 'Courier New'; }); await settle(page);
+    const after = await page.locator('.fm-world').boundingBox(); assert.equal(before.width, after.width); assert.equal(before.height, after.height);
+    const overlaps = await page.evaluate(() => {
+      const labels = [...document.querySelectorAll('.fm-room-label, .fm-upstream-mark')].filter(el => el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden');
+      return labels.flatMap((a, i) => labels.slice(i + 1).filter(b => { const x = a.getBoundingClientRect(), y = b.getBoundingClientRect(); return Math.min(x.right, y.right) - Math.max(x.left, y.left) > 1 && Math.min(x.bottom, y.bottom) - Math.max(x.top, y.top) > 1; }).map(b => `${a.textContent}/${b.textContent}`));
+    });
+    assert.deepEqual(overlaps, []);
+    await page.evaluate(() => { document.querySelector('.fm-world').style.fontFamily = 'Arial'; }); await settle(page);
+    const restored = await page.locator('.fm-room-label, .fm-upstream-mark').evaluateAll(labels => labels.filter(el => getComputedStyle(el).visibility !== 'hidden').map(el => el.textContent));
+    assert.deepEqual(restored, beforeLabels); assert.deepEqual(page.errors, []); await page.close();
+  });
+  await check('long names do not clip room or equipment controls in a short host', async () => {
+    const page = await open(1280, 720);
+    await page.evaluate(() => {
+      const stage = document.querySelector('.fixture-stage'); stage.style.width = '820px'; stage.style.height = '450px';
+      const f = window.facilityFixture; f.patch({ selectedRoomId: 'hall-a', view: { ...f.props.view, knownTopology: { ...f.props.view.knownTopology, rooms: f.props.view.knownTopology.rooms.map(r => ({ ...r, label: `Regional ${r.label} electrical and mechanical operations facility` })) } } });
+    });
+    await settle(page);
+    const result = await layout(page); assert(result.world[0] > 0); assert.equal(await page.getByRole('button', { name: /Rack A1/ }).isVisible(), true);
     await page.close();
   });
   await check('host fixture reserves chat and controls without clipping the map', async () => {
