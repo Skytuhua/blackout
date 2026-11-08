@@ -1,9 +1,10 @@
 {
   "scope": "Headless engine proof only; no browser, replay, persistence, provider, or G1 acceptance.",
-  "base": "04603bfd1283aaed8f523f71cc7ce01264a50aa8",
-  "contractVersion": 1,
-  "engineVersion": "sim-02-v1",
-  "scenarioVersion": "hot-restart-v1",
+  "base": "8b1f4242bbdf38db0633f8fca39bf555bc2d20da",
+  "contractVersion": 2,
+  "engineSchemaVersion": 1,
+  "engineVersion": "sim-desktop-v2",
+  "scenarioVersion": "hot-restart-layout-v2",
   "policyUses": "Public observations, public task summaries, and published affordances only.",
   "actions": [
     {
@@ -18,41 +19,41 @@
       "action": "inspect",
       "status": "accepted",
       "reason": "TASK_RESERVED",
-      "eta": 41
+      "eta": 47
     },
     {
-      "at": 43,
+      "at": 49,
       "action": "repair_cooling",
       "status": "accepted",
       "reason": "TASK_RESERVED",
-      "eta": 163
+      "eta": 169
     },
     {
-      "at": 163,
+      "at": 169,
       "action": "independent_reading",
       "status": "accepted",
       "reason": "TASK_RESERVED",
-      "eta": 199
+      "eta": 207
     },
     {
-      "at": 255,
+      "at": 260,
       "action": "set_batch_ceiling",
       "status": "accepted",
       "reason": "TASK_RESERVED",
-      "eta": 258
+      "eta": 263
     },
     {
-      "at": 319,
+      "at": 324,
       "action": "verify_recovery",
       "status": "accepted",
       "reason": "TASK_RESERVED",
-      "eta": 329
+      "eta": 334
     }
   ],
   "milestones": [
     {
       "at": 13,
-      "sequence": 13,
+      "sequence": 12,
       "type": "task.applied",
       "payload": {
         "taskId": "task-4",
@@ -62,7 +63,7 @@
     },
     {
       "at": 15,
-      "sequence": 15,
+      "sequence": 14,
       "type": "report.delivered",
       "payload": {
         "taskId": "task-4",
@@ -79,7 +80,7 @@
       }
     },
     {
-      "at": 41,
+      "at": 47,
       "sequence": 18,
       "type": "task.applied",
       "payload": {
@@ -89,19 +90,19 @@
       }
     },
     {
-      "at": 43,
+      "at": 49,
       "sequence": 19,
       "type": "report.delivered",
       "payload": {
         "taskId": "task-9",
         "evidenceIds": [
-          "observation-386",
-          "observation-387"
+          "observation-428",
+          "observation-429"
         ]
       }
     },
     {
-      "at": 163,
+      "at": 169,
       "sequence": 25,
       "type": "task.applied",
       "payload": {
@@ -111,30 +112,30 @@
       }
     },
     {
-      "at": 165,
+      "at": 171,
       "sequence": 31,
       "type": "report.delivered",
       "payload": {
         "taskId": "task-22",
         "evidenceIds": [
-          "observation-1396"
+          "observation-1438"
         ]
       }
     },
     {
-      "at": 193,
+      "at": 199,
       "sequence": 33,
       "type": "cooling_ready",
       "payload": {}
     },
     {
-      "at": 193,
+      "at": 199,
       "sequence": 34,
       "type": "cooling_ready",
       "payload": {}
     },
     {
-      "at": 199,
+      "at": 207,
       "sequence": 35,
       "type": "task.applied",
       "payload": {
@@ -144,19 +145,19 @@
       }
     },
     {
-      "at": 201,
+      "at": 209,
       "sequence": 36,
       "type": "report.delivered",
       "payload": {
         "taskId": "task-28",
         "evidenceIds": [
-          "observation-1691",
-          "observation-1692"
+          "observation-1775",
+          "observation-1776"
         ]
       }
     },
     {
-      "at": 258,
+      "at": 263,
       "sequence": 42,
       "type": "task.applied",
       "payload": {
@@ -166,25 +167,25 @@
       }
     },
     {
-      "at": 260,
+      "at": 265,
       "sequence": 43,
       "type": "report.delivered",
       "payload": {
         "taskId": "task-39",
         "evidenceIds": [
-          "observation-2197",
-          "observation-2198",
-          "observation-2199",
-          "observation-2200",
-          "observation-2201",
-          "observation-2202",
-          "observation-2203",
-          "observation-2204"
+          "observation-2239",
+          "observation-2240",
+          "observation-2241",
+          "observation-2242",
+          "observation-2243",
+          "observation-2244",
+          "observation-2245",
+          "observation-2246"
         ]
       }
     },
     {
-      "at": 319,
+      "at": 324,
       "sequence": 45,
       "type": "mission.stability_held",
       "payload": {
@@ -192,7 +193,7 @@
       }
     },
     {
-      "at": 329,
+      "at": 334,
       "sequence": 51,
       "type": "task.applied",
       "payload": {
@@ -202,38 +203,38 @@
       }
     },
     {
-      "at": 331,
+      "at": 336,
       "sequence": 52,
       "type": "report.delivered",
       "payload": {
         "taskId": "task-48",
         "evidenceIds": [
-          "observation-1396",
-          "observation-2751",
-          "observation-2755",
-          "observation-2759",
-          "observation-2763",
-          "observation-2767",
-          "observation-2771",
-          "observation-2775",
-          "observation-2779",
-          "observation-2753",
-          "observation-2757",
-          "observation-2761",
-          "observation-2765",
-          "observation-2769",
-          "observation-2773",
-          "observation-2777",
-          "observation-2781",
-          "observation-2787",
-          "observation-2792",
+          "observation-1438",
           "observation-2793",
-          "observation-2794"
+          "observation-2797",
+          "observation-2801",
+          "observation-2805",
+          "observation-2809",
+          "observation-2813",
+          "observation-2817",
+          "observation-2821",
+          "observation-2795",
+          "observation-2799",
+          "observation-2803",
+          "observation-2807",
+          "observation-2811",
+          "observation-2815",
+          "observation-2819",
+          "observation-2823",
+          "observation-2829",
+          "observation-2834",
+          "observation-2835",
+          "observation-2836"
         ]
       }
     },
     {
-      "at": 331,
+      "at": 336,
       "sequence": 53,
       "type": "mission.success",
       "payload": {
@@ -243,28 +244,28 @@
     }
   ],
   "atSuccess": {
-    "horizon": 331,
+    "horizon": 336,
     "result": {
       "status": "success",
       "reason": "RECOVERY_VERIFIED",
       "stabilitySeconds": 72,
       "windowSeconds": 600
     },
-    "peakTemperatureC": 28.61999999999974,
-    "finalTemperatureC": 24.942638915841343,
-    "criticalDemand": 52960,
-    "criticalDelivered": 52960,
-    "interactiveDemand": 28960,
-    "interactiveDelivered": 28960,
-    "batchArrivals": 79440,
+    "peakTemperatureC": 28.769999999999733,
+    "finalTemperatureC": 25.013882563688217,
+    "criticalDemand": 53760,
+    "criticalDelivered": 53760,
+    "interactiveDemand": 29760,
+    "interactiveDelivered": 29760,
+    "batchArrivals": 80640,
     "batchCompleted": 20640,
-    "batchBacklog": 58800,
-    "batchDelayUnitSeconds": 11495400,
+    "batchBacklog": 60000,
+    "batchDelayUnitSeconds": 11880000,
     "conservationResidual": 0,
     "thermalTrips": 0,
     "terminal": {
       "id": "event-53",
-      "simTime": 331,
+      "simTime": 336,
       "sequence": 53,
       "type": "mission.success",
       "entityIds": [],
@@ -285,21 +286,21 @@
       "stabilitySeconds": 72,
       "windowSeconds": 600
     },
-    "peakTemperatureC": 28.61999999999974,
-    "finalTemperatureC": 24.07445695348354,
+    "peakTemperatureC": 28.769999999999733,
+    "finalTemperatureC": 24.081001532278222,
     "criticalDemand": 96000,
     "criticalDelivered": 96000,
     "interactiveDemand": 52800,
     "interactiveDelivered": 52800,
     "batchArrivals": 144000,
-    "batchCompleted": 85200,
-    "batchBacklog": 58800,
-    "batchDelayUnitSeconds": 27312600,
+    "batchCompleted": 84000,
+    "batchBacklog": 60000,
+    "batchDelayUnitSeconds": 27720000,
     "conservationResidual": 0,
     "thermalTrips": 0,
     "terminal": {
       "id": "event-53",
-      "simTime": 331,
+      "simTime": 336,
       "sequence": 53,
       "type": "mission.success",
       "entityIds": [],
@@ -381,5 +382,27 @@
         "stabilitySeconds": 0
       }
     }
+  },
+  "practice": {
+    "horizon": 720,
+    "result": {
+      "status": "practice",
+      "reason": null,
+      "stabilitySeconds": null,
+      "windowSeconds": 0
+    },
+    "peakTemperatureC": 24,
+    "finalTemperatureC": 24,
+    "criticalDemand": 115200,
+    "criticalDelivered": 115200,
+    "interactiveDemand": 57600,
+    "interactiveDelivered": 57600,
+    "batchArrivals": 172800,
+    "batchCompleted": 172800,
+    "batchBacklog": 0,
+    "batchDelayUnitSeconds": 0,
+    "conservationResidual": 0,
+    "thermalTrips": 0,
+    "terminal": null
   }
 }
