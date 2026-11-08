@@ -46,7 +46,7 @@ test('clear chat orders start real work once and a busy crew is never silently r
   const draft = page.getByRole('textbox', { name: 'Message Alex', exact: true });
   await draft.fill('Please inspect the cooling controls.'); await draft.press('Enter');
   await expect(page.locator('.conv-assignment')).toContainText('Walking');
-  const proposal = page.getByRole('button', { name: 'Check cooling controls ? Alex', exact: true });
+  const proposal = page.getByRole('button', { name: 'Check cooling controls \u00b7 Alex', exact: true });
   await expect(proposal).toBeDisabled();
   await draft.fill('Now check something else.'); await draft.press('Enter');
   await expect(page.locator('.conv-history-window > article.conv-entry-fallback')).toHaveCount(1);
