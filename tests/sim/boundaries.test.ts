@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { hotRestart } from '../../src/content/scenarios/hot-restart';
 import { initialize, restore } from '../../src/sim/engine';
+import { pathMeters, route } from '../../src/sim/navigation';
 import type { EngineState, PhysicalState } from '../../src/sim/state';
 import { latest, request } from './mission-policy';
 
@@ -70,8 +71,9 @@ describe('mission boundary and recovery invariants', () => {
   it('rejects impossible idle crew locations on restore', () => {
     const engine = initialize(hotRestart, 'validation');
     const inRack = engine.snapshot();
-    (inRack.state as unknown as EngineState).crew[0].x = 5;
-    (inRack.state as unknown as EngineState).crew[0].y = 3;
+    const rack = hotRestart.topology.assets.find(a => a.kind === 'rack')!;
+    (inRack.state as unknown as EngineState).crew[0].x = rack.x;
+    (inRack.state as unknown as EngineState).crew[0].y = rack.y;
     expect(() => restore(inRack, 'invalid')).toThrow();
   });
 
@@ -110,11 +112,14 @@ describe('mission boundary and recovery invariants', () => {
 
   it('completes external events before a same-boundary inspection and paused dispatch', () => {
     const spec = structuredClone(hotRestart);
-    spec.externalEvents = [{ id: 'same-boundary', kind: 'cooling_control_fault', at: 31, value: null }];
+    const worker = spec.crew.find(c => c.id === 'alex')!;
+    const destination = spec.topology.assets.find(a => a.id === 'controller')!.serviceTile;
+    const completion = Math.ceil(pathMeters(spec, route(spec, worker, destination)!) / worker.speed) + spec.mission.inspectSeconds;
+    spec.externalEvents = [{ id: 'same-boundary', kind: 'cooling_control_fault', at: completion, value: null }];
     const engine = initialize(spec, 'order');
     const task = engine.applyCommand(request(engine, 'inspect', 'controller', { technicianId: 'alex' }));
-    expect(task.eta).toBe(31);
-    engine.step(31);
+    expect(task.eta).toBe(completion);
+    engine.step(completion);
     expect(engine.applyCommand(request(engine, 'repair_cooling', 'controller', { technicianId: 'alex' })).reason).toBe('INSPECTION_REQUIRED');
     engine.step(2);
     expect(latest(engine.observe('player'), 'controller', 'prerequisite_ready')?.value).toBe(false);

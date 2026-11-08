@@ -37,17 +37,18 @@ test('offline controls complete Hot Restart through inspection, repair, sustaina
   test.setTimeout(90000);
   await begin(page); await advanceTo(page, 10);
   await dispatch(page, 'pause batch'); await dispatch(page, 'inspect', 'Cooling control controller');
-  await advanceTo(page, 43); await dispatch(page, 'repair cooling');
-  await advanceTo(page, 163); await dispatch(page, 'independent reading', 'Rack A1 rack');
-  await advanceTo(page, 255);
+  // layout-v2: inspection arrives at 17, completes at 47, and its report is delivered at 49.
+  await advanceTo(page, 49); await dispatch(page, 'repair cooling');
+  await advanceTo(page, 169); await dispatch(page, 'independent reading', 'Rack A1 rack');
+  await advanceTo(page, 260);
   const cap = page.locator('.bo-site-actions .bo-action').filter({ has: page.getByRole('button', { name: 'Dispatch set batch ceiling', exact: true }) });
   await cap.getByRole('spinbutton').fill('30'); await cap.getByRole('button').click();
   await expect(page.locator('.mission-controls [role=status]').first()).toContainText('accepted');
   await expect(page.getByRole('button', { name: 'Step 1 second', exact: true })).toBeEnabled();
-  await advanceTo(page, 319); await dispatch(page, 'verify recovery');
+  await advanceTo(page, 324); await dispatch(page, 'verify recovery');
   await advanceTo(page, 400);
   await expect(page.getByRole('heading', { name: 'Mission success', exact: true })).toBeVisible();
-  expect(await elapsed(page)).toBe(331);
+  expect(await elapsed(page)).toBe(336);
   await expect(page.getByRole('button', { name: 'Resume simulation', exact: true })).toBeDisabled();
 });
 

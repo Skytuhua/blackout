@@ -9,8 +9,12 @@ export const active = (task: EngineTask) => !['completed', 'canceled'].includes(
 const remoteActions: Exclude<Action, 'move_crew'>[] = ['pause_batch', 'resume_batch', 'set_batch_ceiling', 'verify_recovery'];
 
 export function requiredRole(state: EngineState, intent: ActionIntent): Crew['role'] | null {
+  if (intent.action === 'move_crew') {
+    const worker = state.crew.find(c => c.id === intent.targetId);
+    return worker && worker.role !== 'remote' ? worker.role : null;
+  }
   const asset = state.scenario.topology.assets.find(a => a.id === intent.targetId);
-  if (intent.action !== 'move_crew' && remoteActions.includes(intent.action)) return intent.targetId === 'site' || (asset?.kind === 'rack' && intent.action !== 'verify_recovery') ? 'remote' : null;
+  if (remoteActions.includes(intent.action)) return intent.targetId === 'site' || (asset?.kind === 'rack' && intent.action !== 'verify_recovery') ? 'remote' : null;
   if (!asset) return null;
   if (intent.action === 'reset_ups') return asset.kind === 'ups' ? 'electrical' : null;
   if (intent.action === 'repair_cooling' || intent.action === 'restart_cooling') return ['cooling', 'controller'].includes(asset.kind) ? 'facilities' : null;
@@ -20,12 +24,14 @@ export function requiredRole(state: EngineState, intent: ActionIntent): Crew['ro
 }
 
 export function workSeconds(state: EngineState, action: Action) {
+  if (action === 'move_crew') return 0;
   const m = state.scenario.mission;
   return Math.ceil(action === 'repair_cooling' ? m.repairSeconds : ['inspect', 'independent_reading'].includes(action) ? m.inspectSeconds
     : action === 'verify_recovery' ? m.verifySeconds : action === 'reset_ups' ? 20 : action === 'restart_cooling' ? 0 : m.remoteSeconds);
 }
 
 export function taskArgumentError(state: EngineState, intent: ActionIntent): string | null {
+  if (intent.action === 'move_crew') return intent.args.technicianId && intent.args.technicianId !== intent.targetId ? 'TECHNICIAN_MISMATCH' : null;
   const role = requiredRole(state, intent);
   if (role && role !== 'remote' && !intent.args.technicianId) return 'TECHNICIAN_REQUIRED';
   if (intent.action === 'set_batch_ceiling' && intent.args.ceiling === undefined) return 'CEILING_REQUIRED';
@@ -38,7 +44,8 @@ export function taskResources(intent: ActionIntent) {
 
 export function actionPlan(state: EngineState, actorId: string, intent: ActionIntent) {
   const fail = (reason: string) => ({ reason, worker: null, path: null, travelSeconds: 0, workSeconds: 0, resources: [] as string[] });
-  if (state.mission.status !== 'active') return fail('MISSION_ENDED');
+  if (!['active', 'practice'].includes(state.mission.status)) return fail('MISSION_ENDED');
+  if (intent.action === 'move_crew' && actorId !== 'player') return fail('NOT_AUTHORIZED');
   if (intent.action === 'cancel_task') {
     const task = state.tasks.find(t => t.public.id === intent.args.taskId && t.public.targetId === intent.targetId);
     if (!task || !active(task)) return fail('TASK_NOT_ACTIVE');
@@ -49,7 +56,7 @@ export function actionPlan(state: EngineState, actorId: string, intent: ActionIn
   if (!role) return fail('INVALID_TARGET_ACTION');
   const argumentError = taskArgumentError(state, intent);
   if (argumentError) return fail(argumentError);
-  const worker = role === 'remote' ? state.crew.find(c => c.role === 'remote') : state.crew.find(c => c.id === intent.args.technicianId);
+  const worker = role === 'remote' ? state.crew.find(c => c.role === 'remote') : state.crew.find(c => c.id === (intent.action === 'move_crew' ? intent.targetId : intent.args.technicianId));
   if (!worker) return fail('TECHNICIAN_REQUIRED');
   if (worker.role !== role) return fail('NOT_QUALIFIED');
   if (actorId !== 'player' && actorId !== worker.id) return fail('NOT_AUTHORIZED');
@@ -63,7 +70,8 @@ export function actionPlan(state: EngineState, actorId: string, intent: ActionIn
   if (intent.action === 'reset_ups' && !evidence(state, actorId).some(o => o.assetId === intent.targetId && o.field === 'inspection_complete' && o.value === true)) return fail('INSPECTION_REQUIRED');
   const resources = taskResources(intent);
   if (resources.some(id => state.reservations[id])) return fail('RESOURCE_BUSY');
-  const path = role === 'remote' ? [] : route(state.scenario, worker, state.scenario.topology.assets.find(a => a.id === intent.targetId)!.serviceTile);
+  const destination = intent.action === 'move_crew' ? intent.args.destination : state.scenario.topology.assets.find(a => a.id === intent.targetId)?.serviceTile;
+  const path = role === 'remote' ? [] : destination ? route(state.scenario, worker, destination) : null;
   if (path === null) return fail('PATH_BLOCKED');
   const travelSeconds = role === 'remote' ? 0 : Math.ceil(pathMeters(state.scenario, path) / worker.speed);
   return { reason: null, worker, path, travelSeconds, workSeconds: workSeconds(state, intent.action), resources };
@@ -150,7 +158,7 @@ function completeTask(state: EngineState, task: EngineTask, at: number, emit: Em
   }
   task.public.status = 'completed'; task.public.progress = 1; task.public.reason = applied ? null : 'PRECONDITION_CHANGED';
   release(state, task);
-  emit('task.applied', [target, task.technicianId], { taskId: task.public.id, action, applied });
+  emit(action === 'move_crew' ? 'crew.moved' : 'task.applied', [...new Set([target, task.technicianId])], { taskId: task.public.id, action, applied });
 }
 
 export function advanceTasks(state: EngineState, at: number, emit: Emit) {

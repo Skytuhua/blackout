@@ -11,13 +11,13 @@ import { request } from '../sim/mission-policy';
 const database = 'replay-01-isolated-proof';
 const assert = (condition: unknown, message: string) => { if (!condition) throw new Error(message); };
 
-async function rawPut(key: string, value: unknown) {
+async function rawPut(key: string, value: unknown, store: 'runs' | 'checkpoints' = 'runs') {
   await new Promise<void>((resolve, reject) => {
     const request = indexedDB.open(database, 1);
     request.onerror = () => reject(request.error);
     request.onsuccess = () => {
       const db = request.result;
-      const tx = db.transaction('runs', 'readwrite'); tx.objectStore('runs').put(value, key);
+      const tx = db.transaction(store, 'readwrite'); tx.objectStore(store).put(value, key);
       tx.oncomplete = () => { db.close(); resolve(); };
       tx.onabort = () => { db.close(); reject(tx.error); };
     };
@@ -75,8 +75,37 @@ const api = {
     const store = await openRunStore(database);
     const record = initialize(hotRestart, 'bad').exportRecord();
     try {
+      const archived = initialize(hotRestart, 'archived').exportRecord();
+      archived.engineVersion = 'sim-02-v1';
+      archived.scenario.contentVersion = 'hot-restart-v1';
+      delete archived.scenario.mode;
+      for (const checkpoint of [archived.initialCheckpoint, archived.finalCheckpoint]) {
+        checkpoint.engineVersion = archived.engineVersion;
+        checkpoint.scenarioVersion = archived.scenario.contentVersion;
+        checkpoint.state.scenario = structuredClone(archived.scenario);
+      }
+      const runText = `\n${JSON.stringify({ ...archived, schemaVersion: 2, lineage: [], interactions: [] }, null, 2)}\n`;
+      const checkpointText = ` ${JSON.stringify(archived.finalCheckpoint)}\n`;
+      await store.saveRun(record); await store.saveCheckpoint(record.finalCheckpoint);
+      await rawPut('archived', runText); await rawPut('archived', checkpointText, 'checkpoints');
+      for (const summaries of [await store.listRuns(), await store.listCheckpoints()]) {
+        assert(summaries.length === 2, 'Old and current records coexist in native storage listings');
+        const old = summaries.find(summary => summary.runId === 'archived');
+        assert(old?.incompatibility?.code === 'VERSION_MISMATCH' && old.scenarioId === 'hot-restart' && old.simTime === 0, 'Old save is explicitly archive-only');
+        assert(JSON.stringify(summaries.find(summary => summary.runId === 'bad')) === JSON.stringify({ runId: 'bad', scenarioId: 'hot-restart', simTime: 0 }), 'Compatible summary shape remains unchanged');
+      }
+      await rejected(() => store.loadRun('archived'), 'VERSION_MISMATCH');
+      await rejected(() => store.loadCheckpoint('archived'), 'VERSION_MISMATCH');
+      assert(await store.exportRun('archived') === runText && await store.exportCheckpoint('archived') === checkpointText, 'Raw archive export preserves exact stored JSON bytes');
+      assert((await store.loadRun('bad'))?.runId === 'bad' && (await store.loadCheckpoint('bad'))?.runId === 'bad', 'Incompatible neighbors do not block current resumes');
+      assert(await store.exportRun('missing') === null && await store.exportCheckpoint('missing') === null, 'Missing export is explicit');
+      await rawPut('wrong-key', runText); await rejected(() => store.exportRun('wrong-key'), 'IDENTITY_MISMATCH'); await store.removeRun('wrong-key');
+      await rawPut('wrong-key', checkpointText, 'checkpoints'); await rejected(() => store.exportCheckpoint('wrong-key'), 'IDENTITY_MISMATCH'); await store.removeCheckpoint('wrong-key');
+      assert(await store.exportRun('archived') === runText && await store.exportCheckpoint('archived') === checkpointText, 'Inspection and refused resume leave archived bytes intact');
+      await store.removeRun('archived'); await store.removeCheckpoint('archived'); await store.removeCheckpoint('bad');
       await rawPut('bad', '{'); await rejected(() => store.loadRun('bad'), 'CORRUPT');
       await rejected(() => store.listRuns(), 'CORRUPT');
+      await rejected(() => store.exportRun('bad'), 'CORRUPT');
       await rawPut('bad', JSON.stringify({ ...record, engineVersion: 'future' }));
       await rejected(() => store.loadRun('bad'), 'VERSION_MISMATCH');
       await rawPut('bad', record); await rejected(() => store.loadRun('bad'), 'CORRUPT');
@@ -97,7 +126,7 @@ const api = {
       request.onerror = () => reject(request.error);
     });
     await rejected(() => openRunStore('replay-01-future-db'), 'VERSION_MISMATCH');
-    return { corrupt: 'rejected', versionMismatch: 'rejected', badSavePreservedData: true, closedStore: 'explicit failure' };
+    return { corrupt: 'rejected', versionMismatch: 'rejected', incompatibleArchives: 'listed and exported exactly, resume refused', badSavePreservedData: true, closedStore: 'explicit failure' };
   },
 };
 declare global { interface Window { replayProof: typeof api } }

@@ -33,7 +33,7 @@ const task = z.strictObject({
 export type EngineTask = z.infer<typeof task>;
 
 export const MissionStateSchema = z.strictObject({
-  status: z.enum(['active', 'success', 'failure']), reason: z.string().nullable(),
+  status: z.enum(['practice', 'active', 'success', 'failure']), reason: z.string().nullable(),
   stabilitySeconds: nonnegative.int(), criticalLossSeconds: nonnegative.int(), heldAt: nonnegative.nullable(),
   evidenceHoldSeconds: z.record(z.string(), nonnegative.int()),
 });
