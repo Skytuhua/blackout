@@ -67,7 +67,7 @@ function HistoryEntry({ props, thread, entryId }: { props: ConversationMenuProps
   const identity = props.reader ?? { actorId: thread?.actorId, entryId };
   const owner = props.reader ? props.conversations.find(item => item.actorId === identity.actorId) : thread;
   const entry = owner?.entries.find(item => item.id === identity.entryId && item.actorId === owner.actorId);
-  const [sectionId, setSectionId] = useState(entry?.kind === 'report' ? 'section:findings' : 'full');
+  const [sectionId, setSectionId] = useState<string | null>(null);
   const [proposalId, setProposalId] = useState<string | null>(null);
   const read = useRef(new Set<string>());
   const opened = !!props.reader;
@@ -81,16 +81,17 @@ function HistoryEntry({ props, thread, entryId }: { props: ConversationMenuProps
     read.current.add(key); props.onReadEntries(owner.actorId, [entry.id]);
   }, [shown, entry, owner, props.onReadEntries]);
   if (!entry || !owner) return <><p className="cm-empty">{entryId || props.reader ? 'This entry is no longer available.' : 'No history for this character yet.'}</p>{opened && <button className="cm-reader-back" onClick={props.onCloseEntry}>Back to history</button>}</>;
+  const selectedSectionId = sectionId ?? (entry.kind === 'report' ? 'section:findings' : 'full');
   const structured = reportFirstSections(entry).map(item => ({ ...item, id: `section:${item.id}` }));
   const notice = { id: 'full', label: entry.kind === 'report' ? 'Delivery notice' : 'Full message', text: entry.text };
   const sections = [...(entry.kind === 'report' ? [...structured, notice] : [notice, ...structured]), ...(entry.proposals ?? []).filter(item => item.reason).map(item => ({ id: `proposal:${item.id}`, label: `${item.assignedName} action result`, text: `${item.label}\n${item.status}\n${item.reason}` }))];
-  const section = sections.find(item => item.id === sectionId);
+  const section = sections.find(item => item.id === selectedSectionId);
   const proposals = entry.proposals ?? [], proposal = proposalId === null ? proposals[0] : proposals.find(item => item.id === proposalId);
   return <>
     <p className="cm-meta">{owner.name} · {kindNames[entry.kind]} · <time>{time(entry.at)}</time></p>
     {opened ? <>
-      <div className="cm-row"><button className="cm-reader-back" onClick={props.onCloseEntry}>Back to entry</button>{(sections.length > 1 || !section) && <select aria-label="Reader section" value={sectionId} onChange={event => setSectionId(event.target.value)}>{!section && <option value={sectionId}>Section no longer available</option>}{sections.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>}</div>
-      <ReaderText key={sectionId} text={section?.text ?? 'This section is no longer available. Choose Full message.'} label="Message text" />
+      <div className="cm-row"><button className="cm-reader-back" onClick={props.onCloseEntry}>Back to entry</button>{(sections.length > 1 || !section) && <select aria-label="Reader section" value={selectedSectionId} onChange={event => setSectionId(event.target.value)}>{!section && <option value={selectedSectionId}>Section no longer available</option>}{sections.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>}</div>
+      <ReaderText key={selectedSectionId} text={section?.text ?? 'This section is no longer available. Choose another section.'} label="Message text" />
     </> : <>
       <div className="cm-entry-preview">
         <div ref={measure} className="cm-text-measure" aria-hidden="true">{entry.text}</div>

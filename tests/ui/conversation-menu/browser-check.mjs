@@ -2,7 +2,7 @@ import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
 
-const out = 'C:/Users/user/Documents/Blackout/.local/conv-01-independent/MENU-01';
+const out = process.env.MENU_REVIEW_OUTPUT ?? 'C:/Users/user/Documents/Blackout/.local/conv-01-independent/MENU-01';
 mkdirSync(out, { recursive: true });
 const browser = await chromium.launch({ headless: true });
 const results = [], failures = [], errors = [], requests = [];
@@ -14,7 +14,7 @@ async function open(width = 1280, height = 720) {
   page.setDefaultTimeout(4000);
   page.on('pageerror', e => errors.push(e.message));
   page.on('request', r => { if (new URL(r.url()).pathname.startsWith('/api/')) requests.push(r.url()); });
-  await page.goto('http://127.0.0.1:5192/tests/ui/conversation-menu/fixture.html');
+  await page.goto(`${process.env.MENU_REVIEW_ORIGIN ?? 'http://127.0.0.1:5192'}/tests/ui/conversation-menu/fixture.html`);
   await button(page, 'Open menu fixture').click(); await settle(page); return page;
 }
 async function check(name, run) {
@@ -102,6 +102,18 @@ try {
       assert.deepEqual(await calls(page, 'proposal'), [{ name: 'proposal', args: ['opaque-original-proposal-id'] }]);
       await page.close();
     });
+    await check('missing controlled report hydrates to Findings while explicit section choice stays selected', async () => {
+      const page = await open(); await button(page, 'History').click();
+      await patch(page, { reader: { actorId: 'alex', entryId: 'late-report' } });
+      assert.equal(await page.getByText('This entry is no longer available.', { exact: true }).isVisible(), true);
+      await page.evaluate(() => { const conversations = structuredClone(window.menuFixtureProps.conversations); conversations[0].entries.push({ id: 'late-report', actorId: 'alex', kind: 'report', at: 40, text: 'Timestamped field report delivered.', unread: true, sections: [{ id: 'findings', label: 'Findings', text: 'Cooling start condition: not met.' }] }); window.menuFixture.patch({ conversations }); }); await settle(page);
+      assert.equal(await page.getByLabel('Reader section').inputValue(), 'section:findings');
+      assert.equal(await readAll(page, 'Message text'), 'Cooling start condition: not met.');
+      await page.getByLabel('Reader section').selectOption('full');
+      await page.evaluate(() => { const conversations = structuredClone(window.menuFixtureProps.conversations); conversations[0].entries.at(-1).sections[0].text = 'Updated known findings.'; window.menuFixture.patch({ conversations }); }); await settle(page);
+      assert.equal(await page.getByLabel('Reader section').inputValue(), 'full');
+      assert.equal(await readAll(page, 'Message text'), 'Timestamped field report delivered.'); await page.close();
+    });
     await check('history retains >20 entries, exact report/proposal, only selected reads, stable late updates', async () => {
       const page = await open(); await button(page, 'History').click();
       await settle(page);
@@ -111,6 +123,9 @@ try {
       assert.equal((await calls(page, 'read')).some(e => e.args[1].includes('alex-0')), false, 'summary alone must not mark the report read');
       await button(page, 'Read report').click();
       assert.deepEqual(await calls(page, 'open'), [{ name: 'open', args: ['alex', 'alex-0'] }]);
+      assert.equal(await page.getByLabel('Reader section').inputValue(), 'section:findings');
+      assert.equal(await readAll(page, 'Message text'), 'No findings are available for this report.');
+      await page.getByLabel('Reader section').selectOption('full');
       assert.equal(await readAll(page, 'Message text'), await page.evaluate(() => window.menuFixture.longText));
       await page.getByLabel('Reader section').selectOption('section:original-evidence');
       assert.equal(await page.getByLabel('Message text', { exact: true }).textContent(), 'Original section, complete.');
