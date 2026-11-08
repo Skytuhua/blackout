@@ -186,6 +186,37 @@ try {
       await page.close(); return dimensions;
     });
   }
+  for (const [width, height, font, room] of [[640, 500, 32, 'hall-a'], [908, 500, 32, null], [908, 500, 16, null], [640, 500, 16, 'hall-a'], [640, 500, 32, null]]) {
+    await check(`host-constrained labels do not overlap ${width}x${height} ${font}px ${room ?? 'overview'}`, async () => {
+      const page = await open(1280, 720);
+      await page.evaluate(({ width, height, font }) => {
+        document.documentElement.style.fontSize = `${font}px`;
+        const stage = document.querySelector('.fixture-stage'); stage.style.width = `${width}px`; stage.style.height = `${height}px`;
+      }, { width, height, font });
+      await patch(page, { selectedRoomId: room });
+      const overlaps = await page.evaluate(() => {
+        const labels = [...document.querySelectorAll('.fm-room-label, .fm-asset-label, .fm-upstream-mark')].filter(el => el.getClientRects().length);
+        return labels.flatMap((a, i) => labels.slice(i + 1).filter(b => {
+          const x = a.getBoundingClientRect(), y = b.getBoundingClientRect();
+          return Math.min(x.right, y.right) - Math.max(x.left, y.left) > 1 && Math.min(x.bottom, y.bottom) - Math.max(x.top, y.top) > 1;
+        }).map(b => `${a.textContent}/${b.textContent}`));
+      });
+      assert.deepEqual(overlaps, []);
+      assert.equal(await page.getByRole('button', { name: 'Overview' }).isVisible(), true);
+      if (room) assert.equal(await page.getByRole('button', { name: /Rack A1/ }).isVisible(), true);
+      await page.close();
+    });
+  }
+  await check('host fixture reserves chat and controls without clipping the map', async () => {
+    const page = await open(1280, 720);
+    await page.goto(`${origin}/tests/ui/facility-map/fixture.html?layout=host`);
+    await page.locator('.facility-map[data-art=ready]').waitFor();
+    assert.equal(await page.locator('aside').innerText(), 'Reserved chat sidebar');
+    assert.equal(await page.locator('.fixture-host footer').last().innerText(), 'Reserved game controls');
+    const dimensions = await layout(page);
+    assert(dimensions.stage[0] < 1280 - 360);
+    await page.close(); return dimensions;
+  });
   await check('undersized container stays contained with readable navigation', async () => {
     const page = await open(800, 600); await page.evaluate(() => { const stage = document.querySelector('.fixture-stage'); stage.style.width = '460px'; stage.style.height = '400px'; });
     const result = await layout(page); assert(result.scale < 1); assert.equal(result.fontSize, '16px'); await page.close(); return result;
