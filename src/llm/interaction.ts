@@ -18,7 +18,7 @@ export async function runCoworker(input: CoworkerRequest): Promise<CoworkerResul
   const role = view.crew.find(c => c.id === input.actorId)?.role;
   if (!role || view.runId !== input.runId || view.actorId !== input.actorId) throw new Error('stale_or_invalid_actor');
   const focusTargets = input.targetId ? [input.targetId] : [];
-  if ([CONVERSATION_PROMPT_VERSION, 'coworker-v2'].includes(input.promptVersion ?? '') && role === 'remote') {
+  if ([CONVERSATION_PROMPT_VERSION, 'coworker-v3', 'coworker-v2'].includes(input.promptVersion ?? '') && role === 'remote') {
     focusTargets.push(...view.knownTopology.assets.filter(asset => asset.kind === 'cooling').map(asset => asset.id));
     const hottest = view.observations.filter(observation => observation.field.includes('temperature') && typeof observation.value === 'number').sort((a, b) => Number(b.value) - Number(a.value))[0];
     if (hottest) focusTargets.push(hottest.assetId);

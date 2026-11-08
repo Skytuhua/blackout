@@ -1,4 +1,5 @@
 import type { KnowledgeView } from '../shared/contracts';
+import { onPublicFloor } from './desktop-world';
 
 export function publicTaskProgress(view: KnowledgeView, actorId: string) {
   const active = view.crew.find(crew => crew.id === actorId)?.taskId;
@@ -14,7 +15,7 @@ export function publicTaskProgress(view: KnowledgeView, actorId: string) {
 export type NearbyEquipment = { runId: string; actorId: string; assetId: string; distance: number };
 /** Public crew positions and known footprints only. Small exit margin prevents edge flicker. */
 export function nearbyEquipment(view: KnowledgeView, selectedActor: string, selectedAsset: string | null, previous?: NearbyEquipment | null): NearbyEquipment | null {
-  const candidates = view.crew.filter(crew => crew.role !== 'remote').flatMap(crew => view.knownTopology.assets.map(asset => {
+  const candidates = view.crew.filter(crew => crew.role !== 'remote' || onPublicFloor(crew, view.knownTopology)).flatMap(crew => view.knownTopology.assets.map(asset => {
     const dx = Math.max(asset.x - crew.x, 0, crew.x - (asset.x + asset.width - 1));
     const dy = Math.max(asset.y - crew.y, 0, crew.y - (asset.y + asset.height - 1));
     return { runId: view.runId, actorId: crew.id, assetId: asset.id, distance: Math.hypot(dx, dy) };

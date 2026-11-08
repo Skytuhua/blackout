@@ -54,7 +54,6 @@ export function actionPlan(state: EngineState, actorId: string, intent: ActionIn
   }
   const role = requiredRole(state, intent);
   if (!role) return fail('INVALID_TARGET_ACTION');
-  if (intent.action === 'move_crew' && role === 'remote') return fail('NOT_QUALIFIED');
   const argumentError = taskArgumentError(state, intent);
   if (argumentError) return fail(argumentError);
   const worker = intent.action === 'move_crew' ? state.crew.find(c => c.id === intent.targetId)
@@ -72,11 +71,25 @@ export function actionPlan(state: EngineState, actorId: string, intent: ActionIn
   if (intent.action === 'reset_ups' && !evidence(state, actorId).some(o => o.assetId === intent.targetId && o.field === 'inspection_complete' && o.value === true)) return fail('INSPECTION_REQUIRED');
   const resources = taskResources(intent);
   if (resources.some(id => state.reservations[id])) return fail('RESOURCE_BUSY');
-  const path = role === 'remote' ? [] : route(state.scenario, worker, intent.action === 'move_crew'
-    ? intent.args.destination : state.scenario.topology.assets.find(a => a.id === intent.targetId)!.serviceTile);
+  const physical = role !== 'remote' || intent.action === 'move_crew';
+  const path = !physical ? [] : intent.action === 'move_crew' && role === 'remote'
+    ? remoteMovementPath(state, worker, intent.args.destination)
+    : route(state.scenario, worker, intent.action === 'move_crew'
+      ? intent.args.destination : state.scenario.topology.assets.find(a => a.id === intent.targetId)!.serviceTile);
   if (path === null) return fail('PATH_BLOCKED');
-  const travelSeconds = role === 'remote' ? 0 : Math.ceil(pathMeters(state.scenario, path) / worker.speed);
+  const travelSeconds = physical ? Math.ceil(pathMeters(state.scenario, path) / worker.speed) : 0;
   return { reason: null, worker, path, travelSeconds, workSeconds: workSeconds(state, intent.action), resources };
+}
+
+// Old scenarios place remote coworkers off the modeled floor. The first accepted
+// walk enters at the nearest existing floor tile; no off-map route is invented.
+export function remoteMovementPath(state: EngineState, worker: Crew, destination: { x: number; y: number }) {
+  if (isWalkablePosition(state.scenario, worker)) return route(state.scenario, worker, destination);
+  const original = state.scenario.crew.find(c => c.id === worker.id);
+  if (!original || original.x !== worker.x || original.y !== worker.y) return null;
+  const candidates = [...state.scenario.topology.walkable].sort((a, b) =>
+    (Math.abs(a.x - worker.x) + Math.abs(a.y - worker.y)) - (Math.abs(b.x - worker.x) + Math.abs(b.y - worker.y)) || a.y - b.y || a.x - b.x);
+  return candidates.length ? route(state.scenario, candidates[0], destination) : null;
 }
 
 export function bumpVersions(state: EngineState, ids: string[]) {
@@ -91,6 +104,7 @@ export function reserveTask(state: EngineState, actorId: string, intent: ActionI
     public: { id, actorId: plan.worker.id, targetId: intent.targetId, action: intent.action, status: plan.travelSeconds > 0 ? 'traveling' : intent.action === 'inspect' || intent.action === 'independent_reading' ? 'inspecting' : 'working', startedAt: at, arrivalAt: at + plan.travelSeconds, completesAt: at + plan.travelSeconds + plan.workSeconds, progress: 0, path: plan.path, reason: null },
     requestedBy: actorId, intent: structuredClone(intent), technicianId: plan.worker.id, distanceMeters: pathMeters(state.scenario, plan.path), traveledMeters: 0, workSeconds: plan.workSeconds, resources: plan.resources,
   };
+  if (intent.action === 'move_crew' && plan.worker.role === 'remote' && !isWalkablePosition(state.scenario, plan.worker)) Object.assign(plan.worker, plan.path[0]);
   state.tasks.push(task); plan.worker.taskId = id;
   for (const resource of task.resources) state.reservations[resource] = id;
   bumpVersions(state, [...task.resources, plan.worker.id]);

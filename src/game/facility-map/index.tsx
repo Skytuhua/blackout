@@ -1,6 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type MouseEvent } from 'react';
 import type { FacilityMapProps } from '../../shared/facility-map';
 import type { DemoProjection } from '../facility-demo-projection';
+import { onPublicFloor } from '../desktop-world';
 import { assetEvidence, fitMap, roomViewport } from './model';
 import { FacilityRenderer, type ConnectionKind } from './renderer';
 import './map.css';
@@ -103,6 +104,7 @@ export function FacilityMap(props: FacilityMapProps & { demo?: DemoMapDetails })
 
   const upstream = topology.connections.find(c => c.fromId === topology.sharedUpstream.id)?.points[0];
   return <section className="facility-map" aria-label="Public facility map" data-room={room?.id ?? 'overview'} data-art={art} data-compact={compact} data-demo={Boolean(props.demo)}>
+    {props.demo && <p className="fm-demo-description">Additional rooms are visual only and cannot be entered.</p>}
     <nav className="fm-rooms" aria-label="Facility rooms">
       <div className="fm-rooms-measure" ref={navMeasure} aria-hidden="true"><span>Overview</span>{topology.rooms.map(r => <span key={r.id}>{r.label}</span>)}</div>
       <button type="button" aria-pressed={!room} onClick={() => onSelectRoom(null)}>Overview</button>
@@ -121,11 +123,13 @@ export function FacilityMap(props: FacilityMapProps & { demo?: DemoMapDetails })
     <div className="fm-stage" ref={stage}>
       <div className="fm-world" ref={world} style={{ width: fitted.width, height: fitted.height }}>
         <canvas ref={canvas} width={bounds.width * 16} height={bounds.height * 16} aria-hidden="true" onClick={selectFromMap} />
-        {props.demo && !room && props.demo.unavailableAreas.map(area => <div key={area.id} data-demo-unavailable aria-hidden="true" className="fm-demo-unavailable" style={{ left: `${area.bounds.x / topology.width * 100}%`, top: `${area.bounds.y / topology.height * 100}%`, width: `${area.bounds.width / topology.width * 100}%`, height: `${area.bounds.height / topology.height * 100}%` }} />)}
+        {props.demo && !room && props.demo.unavailableAreas.map(area => <div key={area.id} data-demo-unavailable aria-hidden="true" className="fm-demo-unavailable" style={{ left: `${area.bounds.x / topology.width * 100}%`, top: `${area.bounds.y / topology.height * 100}%`, width: `${area.bounds.width / topology.width * 100}%`, height: `${area.bounds.height / topology.height * 100}%` }}>
+          {(area.id === 'left' || area.id === 'right' ? [0, 1] : [0]).map(part => <span key={part} data-demo-room className="fm-demo-room-label" style={{ top: area.id === 'left' || area.id === 'right' ? `${part * 50 + 50}%` : '100%' }}>Visual only</span>)}
+        </div>)}
         {!room && topology.rooms.map(r => <span key={r.id} className="fm-room-label" title={r.label} style={{ left: `${(r.bounds.x + r.bounds.width / 2) / topology.width * 100}%`, top: `${(r.bounds.y + r.bounds.height - 1) / topology.height * 100}%` }}>{compact ? r.label.split(' ').map(word => word[0]).join('') : r.label}</span>)}
         {!room && upstream && <span className="fm-upstream-mark" style={{ left: `${(upstream.x + .5) / topology.width * 100}%`, top: `${(upstream.y + 1) / topology.height * 100}%` }}>Shared upstream</span>}
         {assets.map((a, i) => <span key={a.id} className="fm-asset-label" style={{ left: `${(a.x + a.width / 2 - bounds.x) / bounds.width * 100}%`, top: `${(a.y + a.height - bounds.y) / bounds.height * 100}%` }}>{a.kind === 'rack' && !compact ? a.label.replace(/^Rack /, '') : i + 1}</span>)}
-        {view.crew.filter(c => c.role !== 'remote').map(c => <span key={c.id} className="fm-crew-label" data-crew-label={c.id} data-selected={c.id === selectedActorId} hidden>{c.name}</span>)}
+        {view.crew.filter(c => c.role !== 'remote' || onPublicFloor(c, topology)).map(c => <span key={c.id} className="fm-crew-label" data-crew-label={c.id} data-selected={c.id === selectedActorId} hidden>{c.name}</span>)}
       </div>
       {art !== 'ready' && <p className="fm-art-status" role="status">{art === 'error' ? 'Map artwork unavailable. Room and equipment controls remain available.' : 'Loading facility artwork…'}</p>}
     </div>
@@ -145,7 +149,7 @@ export function FacilityMap(props: FacilityMapProps & { demo?: DemoMapDetails })
     {!props.demo && <footer className="fm-footer">
       <div className="fm-crew" aria-label="Public crew assignments">{view.crew.map(c => {
         const task = view.tasks.find(t => t.id === c.taskId && t.actorId === c.id), target = topology.assets.find(a => a.id === task?.targetId);
-        return <span key={c.id} data-selected={c.id === selectedActorId}>{c.name} · {c.role === 'remote' ? 'remote' : task ? `${task.status}${target ? ` · ${target.label}` : ''}` : 'ready'}</span>;
+        return <span key={c.id} data-selected={c.id === selectedActorId}>{c.name} · {task ? `${task.status}${target ? ` · ${target.label}` : ''}` : c.role === 'remote' && !onPublicFloor(c, topology) ? 'remote' : 'ready'}</span>;
       })}</div>
       <span className="fm-upstream">{topology.sharedUpstream.label}</span>
     </footer>}

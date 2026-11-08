@@ -3,6 +3,9 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import type { FacilityMapProps } from '../../../src/shared/facility-map';
 import { createFacilityMapFixture } from '../../../src/shared/facility-map-fixture';
 import { FacilityMap } from '../../../src/game/facility-map';
+import { createFacilityDemoProjector } from '../../../src/game/facility-demo-projection';
+import { initialize } from '../../../src/sim/engine';
+import { hotRestart } from '../../../src/content/scenarios/hot-restart';
 
 const props = (patch: Partial<FacilityMapProps> = {}): FacilityMapProps => ({
   view: createFacilityMapFixture(), selectedRoomId: null, selectedAssetId: null, selectedActorId: 'alex',
@@ -10,6 +13,15 @@ const props = (patch: Partial<FacilityMapProps> = {}): FacilityMapProps => ({
 });
 
 describe('public facility map', () => {
+  it('shows six decorative rooms without adding selectable rooms or equipment', () => {
+    const demo = createFacilityDemoProjector()(initialize(hotRestart, 'decorative-map').observe('player'));
+    if (demo.status !== 'available') throw new Error(demo.reason);
+    const html = renderToStaticMarkup(<FacilityMap {...props({ view: demo.view, selectedRoomId: null })} demo={demo} />);
+    expect((html.match(/data-demo-room=/g) ?? [])).toHaveLength(6);
+    expect(html).toContain('Additional rooms are visual only and cannot be entered.');
+    expect(demo.view.knownTopology.rooms).toHaveLength(1);
+    expect(demo.view.knownTopology.connections).toHaveLength(0);
+  });
   it('exposes overview and all seven known rooms as keyboard controls', () => {
     const html = renderToStaticMarkup(<FacilityMap {...props()} />);
     expect(html).toContain('Facility rooms');

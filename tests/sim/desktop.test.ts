@@ -102,9 +102,8 @@ describe('desktop crew destination travel', () => {
     expect(engine.observe('player').tasks).toEqual([]);
   });
 
-  it('rejects remote, unknown, mismatched and invalid destinations without reserving work', () => {
+  it('rejects unknown, mismatched and invalid destinations without reserving work', () => {
     const engine = initialize(hotRestart, 'invalid-moves');
-    expect(move(engine, destination, 'player', 'sam').reason).toBe('NOT_QUALIFIED');
     expect(move(engine, destination, 'player', 'controller').reason).toBe('INVALID_TARGET_ACTION');
     expect(engine.applyCommand(request(engine, 'move_crew', 'alex', { destination, technicianId: 'jules' })).reason).toBe('NOT_QUALIFIED');
     const rack = hotRestart.topology.assets.find(a => a.kind === 'rack')!;

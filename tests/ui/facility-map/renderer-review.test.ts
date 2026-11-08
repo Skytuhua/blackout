@@ -36,6 +36,16 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('renderer review regressions', () => {
+  it('draws Sam only when his actual position is on the public floor', () => {
+    const state = props(); const sam = state.view.crew.find(c => c.id === 'sam')!;
+    sam.x = -1; sam.y = -1;
+    const { c, renderer } = mount(state);
+    expect(JSON.parse(c.dataset.crew).sam).toBeUndefined();
+    Object.assign(sam, state.view.knownTopology.walkable[0]);
+    renderer.update(state, 'power');
+    expect(JSON.parse(c.dataset.crew).sam).toMatchObject({ x: sam.x, y: sam.y, frame: 'portrait_it' });
+    renderer.destroy();
+  });
   it('adds static wall details without decorating travel tiles or equipment', () => {
     const state = props(); const { renderer } = mount(state);
     const decorations = painted.filter(p => p.name.startsWith('fixture_') || p.name.startsWith('infra_'));

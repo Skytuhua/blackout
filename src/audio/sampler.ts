@@ -81,7 +81,7 @@ export class CueSampler {
       const old = previous.crew.get(task.actorId);
       const finishedTravel = before?.status === 'traveling' && task.status === 'completed' && person?.taskId === null;
       const moving = task.status === 'traveling' || before?.status === 'traveling' && current.working.has(task.id) || finishedTravel;
-      if (moving && current.time > previous.time && person && old && person.role !== 'remote'
+      if (moving && current.time > previous.time && person && old && (person.role !== 'remote' || task.action === 'move_crew')
         && (person.taskId === task.id || finishedTravel) && old.taskId === task.id && (person.x !== old.x || person.y !== old.y)
         && onRoute(person, task.path) && onRoute(old, task.path)) cues.add('crew-step');
     }
