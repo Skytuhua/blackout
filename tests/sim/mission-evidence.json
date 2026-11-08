@@ -1,0 +1,385 @@
+{
+  "scope": "Headless engine proof only; no browser, replay, persistence, provider, or G1 acceptance.",
+  "base": "04603bfd1283aaed8f523f71cc7ce01264a50aa8",
+  "contractVersion": 1,
+  "engineVersion": "sim-02-v1",
+  "scenarioVersion": "hot-restart-v1",
+  "policyUses": "Public observations, public task summaries, and published affordances only.",
+  "actions": [
+    {
+      "at": 10,
+      "action": "pause_batch",
+      "status": "accepted",
+      "reason": "TASK_RESERVED",
+      "eta": 13
+    },
+    {
+      "at": 10,
+      "action": "inspect",
+      "status": "accepted",
+      "reason": "TASK_RESERVED",
+      "eta": 41
+    },
+    {
+      "at": 43,
+      "action": "repair_cooling",
+      "status": "accepted",
+      "reason": "TASK_RESERVED",
+      "eta": 163
+    },
+    {
+      "at": 163,
+      "action": "independent_reading",
+      "status": "accepted",
+      "reason": "TASK_RESERVED",
+      "eta": 199
+    },
+    {
+      "at": 255,
+      "action": "set_batch_ceiling",
+      "status": "accepted",
+      "reason": "TASK_RESERVED",
+      "eta": 258
+    },
+    {
+      "at": 319,
+      "action": "verify_recovery",
+      "status": "accepted",
+      "reason": "TASK_RESERVED",
+      "eta": 329
+    }
+  ],
+  "milestones": [
+    {
+      "at": 13,
+      "sequence": 13,
+      "type": "task.applied",
+      "payload": {
+        "taskId": "task-4",
+        "action": "pause_batch",
+        "applied": true
+      }
+    },
+    {
+      "at": 15,
+      "sequence": 15,
+      "type": "report.delivered",
+      "payload": {
+        "taskId": "task-4",
+        "evidenceIds": [
+          "observation-126",
+          "observation-127",
+          "observation-128",
+          "observation-129",
+          "observation-130",
+          "observation-131",
+          "observation-132",
+          "observation-133"
+        ]
+      }
+    },
+    {
+      "at": 41,
+      "sequence": 18,
+      "type": "task.applied",
+      "payload": {
+        "taskId": "task-9",
+        "action": "inspect",
+        "applied": true
+      }
+    },
+    {
+      "at": 43,
+      "sequence": 19,
+      "type": "report.delivered",
+      "payload": {
+        "taskId": "task-9",
+        "evidenceIds": [
+          "observation-386",
+          "observation-387"
+        ]
+      }
+    },
+    {
+      "at": 163,
+      "sequence": 25,
+      "type": "task.applied",
+      "payload": {
+        "taskId": "task-22",
+        "action": "repair_cooling",
+        "applied": true
+      }
+    },
+    {
+      "at": 165,
+      "sequence": 31,
+      "type": "report.delivered",
+      "payload": {
+        "taskId": "task-22",
+        "evidenceIds": [
+          "observation-1396"
+        ]
+      }
+    },
+    {
+      "at": 193,
+      "sequence": 33,
+      "type": "cooling_ready",
+      "payload": {}
+    },
+    {
+      "at": 193,
+      "sequence": 34,
+      "type": "cooling_ready",
+      "payload": {}
+    },
+    {
+      "at": 199,
+      "sequence": 35,
+      "type": "task.applied",
+      "payload": {
+        "taskId": "task-28",
+        "action": "independent_reading",
+        "applied": true
+      }
+    },
+    {
+      "at": 201,
+      "sequence": 36,
+      "type": "report.delivered",
+      "payload": {
+        "taskId": "task-28",
+        "evidenceIds": [
+          "observation-1691",
+          "observation-1692"
+        ]
+      }
+    },
+    {
+      "at": 258,
+      "sequence": 42,
+      "type": "task.applied",
+      "payload": {
+        "taskId": "task-39",
+        "action": "set_batch_ceiling",
+        "applied": true
+      }
+    },
+    {
+      "at": 260,
+      "sequence": 43,
+      "type": "report.delivered",
+      "payload": {
+        "taskId": "task-39",
+        "evidenceIds": [
+          "observation-2197",
+          "observation-2198",
+          "observation-2199",
+          "observation-2200",
+          "observation-2201",
+          "observation-2202",
+          "observation-2203",
+          "observation-2204"
+        ]
+      }
+    },
+    {
+      "at": 319,
+      "sequence": 45,
+      "type": "mission.stability_held",
+      "payload": {
+        "stabilitySeconds": 60
+      }
+    },
+    {
+      "at": 329,
+      "sequence": 51,
+      "type": "task.applied",
+      "payload": {
+        "taskId": "task-48",
+        "action": "verify_recovery",
+        "applied": true
+      }
+    },
+    {
+      "at": 331,
+      "sequence": 52,
+      "type": "report.delivered",
+      "payload": {
+        "taskId": "task-48",
+        "evidenceIds": [
+          "observation-1396",
+          "observation-2751",
+          "observation-2755",
+          "observation-2759",
+          "observation-2763",
+          "observation-2767",
+          "observation-2771",
+          "observation-2775",
+          "observation-2779",
+          "observation-2753",
+          "observation-2757",
+          "observation-2761",
+          "observation-2765",
+          "observation-2769",
+          "observation-2773",
+          "observation-2777",
+          "observation-2781",
+          "observation-2787",
+          "observation-2792",
+          "observation-2793",
+          "observation-2794"
+        ]
+      }
+    },
+    {
+      "at": 331,
+      "sequence": 53,
+      "type": "mission.success",
+      "payload": {
+        "reason": "RECOVERY_VERIFIED",
+        "stabilitySeconds": 72
+      }
+    }
+  ],
+  "atSuccess": {
+    "horizon": 331,
+    "result": {
+      "status": "success",
+      "reason": "RECOVERY_VERIFIED",
+      "stabilitySeconds": 72,
+      "windowSeconds": 600
+    },
+    "peakTemperatureC": 28.61999999999974,
+    "finalTemperatureC": 24.942638915841343,
+    "criticalDemand": 52960,
+    "criticalDelivered": 52960,
+    "interactiveDemand": 28960,
+    "interactiveDelivered": 28960,
+    "batchArrivals": 79440,
+    "batchCompleted": 20640,
+    "batchBacklog": 58800,
+    "batchDelayUnitSeconds": 11495400,
+    "conservationResidual": 0,
+    "thermalTrips": 0,
+    "terminal": {
+      "id": "event-53",
+      "simTime": 331,
+      "sequence": 53,
+      "type": "mission.success",
+      "entityIds": [],
+      "causalParents": [],
+      "visibility": "public",
+      "actorIds": [],
+      "payload": {
+        "reason": "RECOVERY_VERIFIED",
+        "stabilitySeconds": 72
+      }
+    }
+  },
+  "equalHorizonSuccess": {
+    "horizon": 600,
+    "result": {
+      "status": "success",
+      "reason": "RECOVERY_VERIFIED",
+      "stabilitySeconds": 72,
+      "windowSeconds": 600
+    },
+    "peakTemperatureC": 28.61999999999974,
+    "finalTemperatureC": 24.07445695348354,
+    "criticalDemand": 96000,
+    "criticalDelivered": 96000,
+    "interactiveDemand": 52800,
+    "interactiveDelivered": 52800,
+    "batchArrivals": 144000,
+    "batchCompleted": 85200,
+    "batchBacklog": 58800,
+    "batchDelayUnitSeconds": 27312600,
+    "conservationResidual": 0,
+    "thermalTrips": 0,
+    "terminal": {
+      "id": "event-53",
+      "simTime": 331,
+      "sequence": 53,
+      "type": "mission.success",
+      "entityIds": [],
+      "causalParents": [],
+      "visibility": "public",
+      "actorIds": [],
+      "payload": {
+        "reason": "RECOVERY_VERIFIED",
+        "stabilitySeconds": 72
+      }
+    }
+  },
+  "equalHorizonIdle": {
+    "horizon": 600,
+    "result": {
+      "status": "failure",
+      "reason": "CRITICAL_SERVICE_LOST",
+      "stabilitySeconds": null,
+      "windowSeconds": 600
+    },
+    "peakTemperatureC": 40.37999999999911,
+    "finalTemperatureC": 40.37999999999911,
+    "criticalDemand": 96000,
+    "criticalDelivered": 71200,
+    "interactiveDemand": 52800,
+    "interactiveDelivered": 40400,
+    "batchArrivals": 144000,
+    "batchCompleted": 85680,
+    "batchBacklog": 58320,
+    "batchDelayUnitSeconds": 8373240,
+    "conservationResidual": 0,
+    "thermalTrips": 8,
+    "terminal": {
+      "id": "event-23",
+      "simTime": 505,
+      "sequence": 23,
+      "type": "mission.failure",
+      "entityIds": [],
+      "causalParents": [],
+      "visibility": "public",
+      "actorIds": [],
+      "payload": {
+        "reason": "CRITICAL_SERVICE_LOST",
+        "stabilitySeconds": 0
+      }
+    }
+  },
+  "timeout": {
+    "horizon": 600,
+    "result": {
+      "status": "failure",
+      "reason": "MISSION_TIMEOUT",
+      "stabilitySeconds": null,
+      "windowSeconds": 600
+    },
+    "peakTemperatureC": 45.80499999999858,
+    "finalTemperatureC": 45.80499999999858,
+    "criticalDemand": 96000,
+    "criticalDelivered": 96000,
+    "interactiveDemand": 52800,
+    "interactiveDelivered": 52800,
+    "batchArrivals": 144000,
+    "batchCompleted": 110480,
+    "batchBacklog": 33520,
+    "batchDelayUnitSeconds": 6451240,
+    "conservationResidual": 0,
+    "thermalTrips": 0,
+    "terminal": {
+      "id": "event-15",
+      "simTime": 600,
+      "sequence": 15,
+      "type": "mission.failure",
+      "entityIds": [],
+      "causalParents": [],
+      "visibility": "public",
+      "actorIds": [],
+      "payload": {
+        "reason": "MISSION_TIMEOUT",
+        "stabilitySeconds": 0
+      }
+    }
+  }
+}
