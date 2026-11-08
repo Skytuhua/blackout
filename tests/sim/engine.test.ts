@@ -174,24 +174,24 @@ describe('frozen simulation engine physical slice', () => {
     expect(RunRecordSchema.safeParse(fresh.exportRecord()).success).toBe(true);
   });
 
-  it('publishes unknown observations rather than physical state, latent faults or future events', () => {
+  it('publishes timestamped evidence rather than physical state, latent faults or future events', () => {
     const engine = initialize(hotRestart, 'run-a');
     engine.step(30);
     const view = KnowledgeViewSchema.parse(engine.observe('alex'));
-    expect(view.observations).toEqual([]);
-    expect(Object.values(view.summary).filter(value => value !== null)).toEqual([0]);
-    expect(view.mission.status).toBe('briefing');
-    expect(view.affordances.every(a => !a.enabled)).toBe(true);
+    expect(view.observations.length).toBeGreaterThan(0);
+    expect(view.summary.observedAt).toBe(30);
+    expect(view.mission.status).toBe('active');
+    expect(view.observations.some(o => o.field === 'prerequisite_ready')).toBe(false);
     expect(JSON.stringify(view)).not.toMatch(/controllerFault|energyKwh|externalEvents|checkpoint|causalParents/);
     view.knownTopology.assets[0].id = 'changed';
     expect(engine.observe('alex').knownTopology.assets[0].id).toBe('rack-1');
   });
 
-  it('explicitly rejects unavailable actions without accepting tasks, advancing time, or duplicating effects', () => {
+  it('explicitly rejects unqualified dispatches without accepting tasks, advancing time, or duplicating effects', () => {
     const engine = initialize(healthy(), 'run-a');
     const receipt = engine.applyCommand(command());
     expect(receipt.status).toBe('rejected');
-    expect(receipt.reason).toBe('SIM01_ACTION_UNAVAILABLE');
+    expect(receipt.reason).toBe('TECHNICIAN_REQUIRED');
     expect(receipt.taskId).toBeNull();
     expect(engine.step(0).simTime).toBe(0);
     expect(engine.observe('player').tasks).toEqual([]);
