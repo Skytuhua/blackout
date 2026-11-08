@@ -1,4 +1,4 @@
-import type { GatewayResponse, GatewayStart, KnowledgeView, PublicToolResult, ToolIntent } from '../shared/contracts';
+import type { GatewayInput, GatewayResponse, GatewayStart, KnowledgeView, PublicToolResult, RecordedInteraction, ToolIntent } from '../shared/contracts';
 import type { SimulationClient } from '../workers/SimulationClient';
 import { procedures } from '../content/procedures';
 import { scopeKnowledge } from './context';
@@ -6,8 +6,8 @@ import { cancelInteraction, continueInteraction, startInteraction, providerCallF
 import { executeToolIntent, type ScopedContext } from './tools';
 import type { ProviderCall } from './diagnostics';
 
-export type CoworkerResult = { start: GatewayStart; targetId: string | null; view: KnowledgeView; reply: Exclude<GatewayResponse, { kind: 'tool_request' }>; tools: PublicToolResult[]; intents: ToolIntent[]; calls: ProviderCall[]; durationMs: number };
-export type CoworkerRequest = { simulation: Pick<SimulationClient, 'observe' | 'command'>; runId: string; actorId: string; targetId: string | null; message: string; signal: AbortSignal; onTool?: (intent: ToolIntent, result: PublicToolResult) => Promise<void> };
+export type CoworkerResult = { start: GatewayStart; targetId: string | null; view: KnowledgeView; reply: Exclude<GatewayResponse, { kind: 'tool_request' }>; tools: PublicToolResult[]; intents: ToolIntent[]; calls: ProviderCall[]; durationMs: number; recording: RecordedInteraction | null };
+export type CoworkerRequest = { simulation: Pick<SimulationClient, 'observe' | 'command'>; runId: string; actorId: string; targetId: string | null; message: string; signal: AbortSignal; getSimTime?: () => number; onTool?: (intent: ToolIntent, result: PublicToolResult) => Promise<void> };
 
 export async function runCoworker(input: CoworkerRequest): Promise<CoworkerResult> {
   const began = performance.now();
@@ -18,16 +18,29 @@ export async function runCoworker(input: CoworkerRequest): Promise<CoworkerResul
   const context: ScopedContext = { start, simulation: input.simulation, signal: input.signal };
   const tools: PublicToolResult[] = [], intents: ToolIntent[] = [];
   const calls: ProviderCall[] = [];
+  const turns: RecordedInteraction['turns'] = [];
   const targets = new Set(input.targetId ? [input.targetId] : []);
   const evidenceIds = new Set<string>();
   const fallback = (reason: string): CoworkerResult['reply'] => ({ kind: 'fallback', runId: start.runId, requestId: start.requestId, actorId: start.actorId, mode: 'scripted', reason, message: 'Use permitted observations and procedures.', facts: [] });
-  const finish = (reply: CoworkerResult['reply']): CoworkerResult => ({ start: context.start, targetId: input.targetId, view, reply, tools, intents, calls, durationMs: Math.round(performance.now() - began) });
+  const finish = (reply: CoworkerResult['reply']): CoworkerResult => {
+    const durationMs = Math.round(performance.now() - began);
+    const atSimTime = Math.max(view.simTime, input.getSimTime?.() ?? 0, ...turns.map(t => t.atSimTime), ...tools.map(t => t.receipt?.observedAt ?? 0));
+    const recording: RecordedInteraction | null = turns.length ? structuredClone({ turns, end: { atSimTime, reason: input.signal.aborted ? 'canceled' : reply.kind === 'final' ? 'final' : 'fallback', reply, durationMs } }) : null;
+    return { start: context.start, targetId: input.targetId, view, reply, tools, intents, calls, durationMs, recording };
+  };
+  const receive = async (wire: GatewayInput, send: () => Promise<GatewayResponse>) => {
+    const turn: RecordedInteraction['turns'][number] = { atSimTime: wire.view.simTime, input: structuredClone(wire), reply: null, call: null, toolResult: null };
+    turns.push(turn);
+    const reply = await send();
+    turn.reply = structuredClone(reply); turn.call = providerCallFor(reply) ?? null;
+    return reply;
+  };
   const cancel = () => cancelInteraction(start);
   input.signal.addEventListener('abort', cancel, { once: true });
   let complete = false;
   try {
     if (input.signal.aborted) return finish(fallback('canceled'));
-    let reply = await startInteraction(start, input.signal);
+    let reply = await receive(start, () => startInteraction(start, input.signal));
     for (let round = 0; round < 3; round++) {
       const call = providerCallFor(reply); if (call && !calls.some(known => known.receiptId === call.receiptId)) calls.push(call);
       if (input.signal.aborted) return finish(fallback('canceled'));
@@ -36,6 +49,7 @@ export async function runCoworker(input: CoworkerRequest): Promise<CoworkerResul
       const intent = reply.intent;
       intents.push(intent);
       const result = await executeToolIntent(intent, context); tools.push(result);
+      turns.at(-1)!.toolResult = structuredClone(result);
       if (input.signal.aborted) return finish(fallback('canceled'));
       await input.onTool?.(intent, result);
       if (input.signal.aborted) return finish(fallback('canceled'));
@@ -45,7 +59,8 @@ export async function runCoworker(input: CoworkerRequest): Promise<CoworkerResul
       if (input.signal.aborted) return finish(fallback('canceled'));
       if (view.runId !== input.runId || view.actorId !== input.actorId) return finish(fallback('stale_run'));
       context.start = { ...start, view: scopeKnowledge(view, [...targets], [...evidenceIds]) };
-      reply = await continueInteraction({ kind: 'continue', runId: start.runId, requestId: start.requestId, actorId: start.actorId, interactionId: intent.interactionId, expectedCallId: intent.callId, result, view: context.start.view }, input.signal);
+      const continuation: GatewayInput = { kind: 'continue', runId: start.runId, requestId: start.requestId, actorId: start.actorId, interactionId: intent.interactionId, expectedCallId: intent.callId, result, view: context.start.view };
+      reply = await receive(continuation, () => continueInteraction(continuation, input.signal));
     }
     return finish(fallback('interaction_quota'));
   } catch { return finish(fallback(input.signal.aborted ? 'canceled' : 'worker_unavailable')); }
