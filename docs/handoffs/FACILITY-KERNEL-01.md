@@ -1,6 +1,14 @@
 # FACILITY-KERNEL-01 handoff
 
-Status: initial independent review requested two numeric corrections. The parent implemented the corrections below and reran the required checks; fresh affected-code review is pending. No independent approval or integrated facility mission is claimed.
+Status: initial independent review requested two numeric corrections. The parent implemented the corrections below and reran the required checks. Fresh affected-code review passes allocator quality and closes F1/original F2, but requests changes for an inherited multi-rack actual-use accounting gap in the unchanged thermal solver. The unwired kernel is being published as a draft; combined facility integration remains blocked on that consumer seam. No full specification approval or integrated mission is claimed.
+
+## Fresh review and remaining consumer boundary
+
+Exact reviewed source: `30527884d20c1095e2dab1076b65c0ad51da9eb8`. Report: `C:/Users/user/.t3/worktrees/Blackout/t3-ea73faaf/docs/reviews/FACILITY-KERNEL-01-fixes.md`. Independent results: 15,925 selected allocation boundary cases pass; original overflow, fractional/tiny summed-budget and single-rack actual-use cases pass. Review verdict is **quality pass for allocator delta; specification changes requested** because of F2-R below.
+
+With three 30°C racks on one train, zero auxiliary demand, COP 3 and 0.1 kW electrical budget, allocation returns 0.3 kW thermal capacity. The existing proportional solver removes `0.30000000000000004`, consuming `0.10000000000000002` kW. A sixteen-rack ordinary-profile case at budget 10.53 consumes `10.530000000000001`. Both occur at old and new source SHAs; no material mission/temperature impact is claimed. Independent regressions: 7 pass, 1 fails.
+
+This is not an unresolved allocator capacity counterexample. It is an inherited thermal-consumer rounding gap at `src/sim/systems/thermal.ts:16-21`, outside this task's writable lease. Root has the exact report/reproductions and owns the conservation-preserving remedy or contract ruling for the new facility engine. Per-rack removals, temperatures and reported total must remain consistent; clamping only the electricity counter would conceal created cooling. No legacy solver/source/hash changes were made. Do not claim strict actual-use closure, merge-readiness or full facility acceptance from the allocation checks. Subsequent documentation-only commits do not alter reviewed source bytes.
 
 ## Parent remediation after independent review
 
