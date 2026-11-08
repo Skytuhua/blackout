@@ -18,6 +18,15 @@ describe('whole conversation history', () => {
     expect(entryPresentation({ kind: 'live', text: short })).toEqual({ text: short, reader: false });
     const text = 'Report detail. '.repeat(100);
     expect(entryPresentation({ kind: 'report', text, summary: short })).toEqual({ text: short, reader: true });
-    expect(entryPresentation({ kind: 'fallback', text })).toEqual({ text: 'A longer message is available.', reader: true });
+    expect(entryPresentation({ kind: 'fallback', text })).toEqual({ text: 'A detailed reply is saved in Menu → History.', reader: false });
+  });
+  it('keeps a short character reply inline even when detailed provenance is retained', () => {
+    const text = 'I can check the controls.';
+    expect(entryPresentation({ kind: 'live', text, sections: [{ id: 'wire', label: 'Provenance', text: 'Retained exact metadata' }] })).toEqual({ text, reader: false });
+  });
+  it('keeps newline-heavy unexpected replies accessible without overflowing the measured window', () => {
+    const text = 'One line.\n'.repeat(20);
+    expect(entryPresentation({ kind: 'live', text }, true)).toEqual({ reader: false, text: 'A detailed reply is saved in Menu → History.' });
+    expect(text.split('\n')).toHaveLength(21);
   });
 });
