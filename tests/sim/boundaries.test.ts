@@ -5,6 +5,44 @@ import type { EngineState, PhysicalState } from '../../src/sim/state';
 import { latest, request } from './mission-policy';
 
 describe('mission boundary and recovery invariants', () => {
+  it.each(['missing', 'changed'] as const)('rejects a %s restored ceiling argument inconsistent with its accepted command', change => {
+    const engine = initialize(hotRestart, 'task-args');
+    expect(engine.applyCommand(request(engine, 'set_batch_ceiling', 'site', { ceiling: 30 })).status).toBe('accepted');
+    const checkpoint = engine.snapshot();
+    const state = checkpoint.state as unknown as EngineState;
+    if (change === 'missing') delete state.tasks[0].intent.args.ceiling;
+    else state.tasks[0].intent.args.ceiling = 25;
+    expect(() => restore(checkpoint, 'invalid')).toThrow();
+  });
+
+  it('rejects a restored field task without its required technician argument', () => {
+    const engine = initialize(hotRestart, 'task-tech');
+    engine.applyCommand(request(engine, 'inspect', 'controller', { technicianId: 'alex' }));
+    const checkpoint = engine.snapshot();
+    delete (checkpoint.state as unknown as EngineState).tasks[0].intent.args.technicianId;
+    expect(() => restore(checkpoint, 'invalid')).toThrow();
+  });
+
+  it('rejects a completed task before its declared arrival and completion time', () => {
+    const engine = initialize(hotRestart, 'task-time');
+    engine.applyCommand(request(engine, 'inspect', 'controller', { technicianId: 'alex' }));
+    const checkpoint = engine.snapshot();
+    const state = checkpoint.state as unknown as EngineState;
+    const task = state.tasks[0]; task.public.status = 'completed'; task.public.progress = 1; task.traveledMeters = task.distanceMeters;
+    state.crew.find(c => c.id === task.technicianId)!.taskId = null; state.reservations = {};
+    expect(() => restore(checkpoint, 'invalid')).toThrow();
+  });
+
+  it('rejects a selected technician that disagrees with the restored task worker', () => {
+    const engine = initialize(hotRestart, 'task-worker');
+    engine.applyCommand(request(engine, 'inspect', 'controller', { technicianId: 'alex' }));
+    const checkpoint = engine.snapshot();
+    const state = checkpoint.state as unknown as EngineState;
+    state.tasks[0].intent.args.technicianId = 'jules';
+    state.commands[0].intent = structuredClone(state.tasks[0].intent);
+    state.idempotency[0].intent = JSON.stringify(state.tasks[0].intent);
+    expect(() => restore(checkpoint, 'invalid')).toThrow();
+  });
   it('retains accepted and rejected idempotency receipts across a new-run restore', () => {
     const engine = initialize(hotRestart, 'original');
     const accepted = request(engine, 'inspect', 'rack-3', { technicianId: 'alex' });

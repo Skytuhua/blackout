@@ -3,7 +3,7 @@ import { ActionRequestSchema, CheckpointSchema, ScenarioSpecSchema } from '../sh
 import { EngineStateSchema, type EngineState } from './state';
 import { advancePhysical, createPhysical } from './systems/physical';
 import { actorIds, evidence, evidenceConditions, isActor, latest, publicSummary, sampleSensors } from './knowledge';
-import { actionPlan, active, advanceTasks, affordances, cancelTask, deliverReports, requiredRole, reserveTask, taskResources, workSeconds, type Emit } from './tasks';
+import { actionPlan, active, advanceTasks, affordances, cancelTask, deliverReports, requiredRole, reserveTask, taskArgumentError, taskResources, workSeconds, type Emit } from './tasks';
 import { isWalkablePath, isWalkablePosition, pathMeters, positionAlong, route } from './navigation';
 
 export const ENGINE_VERSION = 'sim-02-v1';
@@ -73,12 +73,15 @@ function validateRestoredState(state: EngineState, at: number) {
   for (const task of state.tasks) {
     const pub = task.public;
     const worker = state.crew.find(c => c.id === task.technicianId);
+    const command = state.commands.find(c => c.receipt.taskId === pub.id && c.receipt.status === 'accepted');
+    if (taskArgumentError(state, task.intent) || !command || command.actorId !== task.requestedBy || command.at !== pub.startedAt || JSON.stringify(command.intent) !== JSON.stringify(task.intent)) throw new Error('Invalid checkpoint task arguments or accepted command.');
     if (!worker || pub.actorId !== worker.id || !actors.includes(task.requestedBy) || pub.targetId !== task.intent.targetId || pub.action !== task.intent.action || pub.startedAt > at || pub.arrivalAt < pub.startedAt || pub.completesAt !== pub.arrivalAt + task.workSeconds || task.traveledMeters > task.distanceMeters) throw new Error('Invalid checkpoint task identity or time.');
-    if (worker.role !== requiredRole(state, task.intent) || !['player', worker.id].includes(task.requestedBy) || task.workSeconds !== workSeconds(state, pub.action) || JSON.stringify(task.resources) !== JSON.stringify(taskResources(task.intent))) throw new Error('Invalid checkpoint task qualification or duration.');
+    if (worker.role !== requiredRole(state, task.intent) || (worker.role !== 'remote' && task.intent.args.technicianId !== worker.id) || !['player', worker.id].includes(task.requestedBy) || task.workSeconds !== workSeconds(state, pub.action) || JSON.stringify(task.resources) !== JSON.stringify(taskResources(task.intent))) throw new Error('Invalid checkpoint task qualification or duration.');
     const asset = state.scenario.topology.assets.find(a => a.id === pub.targetId);
     if (worker.role !== 'remote' && (!asset || !isWalkablePath(state.scenario, pub.path, asset.serviceTile))) throw new Error('Invalid checkpoint task path.');
     if (worker.role === 'remote' && (pub.path.length || task.distanceMeters !== 0 || task.traveledMeters !== 0 || pub.arrivalAt !== pub.startedAt)) throw new Error('Invalid checkpoint remote travel.');
     if (worker.role !== 'remote' && (Math.abs(pathMeters(state.scenario, pub.path) - task.distanceMeters) > 1e-8 || pub.arrivalAt !== pub.startedAt + Math.ceil(task.distanceMeters / worker.speed))) throw new Error('Invalid checkpoint travel timing.');
+    if (pub.status === 'completed' && (pub.completesAt > at || pub.progress !== 1 || Math.abs(task.traveledMeters - task.distanceMeters) > 1e-8)) throw new Error('Invalid checkpoint completed task timing or progress.');
     if (active(task)) {
       if (state.mission.status !== 'active' || workers.has(worker.id) || worker.taskId !== pub.id || pub.completesAt <= at) throw new Error('Invalid checkpoint worker reservation.');
       workers.add(worker.id);

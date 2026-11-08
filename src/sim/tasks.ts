@@ -25,6 +25,13 @@ export function workSeconds(state: EngineState, action: Action) {
     : action === 'verify_recovery' ? m.verifySeconds : action === 'reset_ups' ? 20 : action === 'restart_cooling' ? 0 : m.remoteSeconds);
 }
 
+export function taskArgumentError(state: EngineState, intent: ActionIntent): string | null {
+  const role = requiredRole(state, intent);
+  if (role && role !== 'remote' && !intent.args.technicianId) return 'TECHNICIAN_REQUIRED';
+  if (intent.action === 'set_batch_ceiling' && intent.args.ceiling === undefined) return 'CEILING_REQUIRED';
+  return null;
+}
+
 export function taskResources(intent: ActionIntent) {
   return [intent.targetId, ...(['repair_cooling', 'restart_cooling'].includes(intent.action) && intent.targetId !== 'controller' ? ['controller'] : [])];
 }
@@ -40,12 +47,13 @@ export function actionPlan(state: EngineState, actorId: string, intent: ActionIn
   }
   const role = requiredRole(state, intent);
   if (!role) return fail('INVALID_TARGET_ACTION');
+  const argumentError = taskArgumentError(state, intent);
+  if (argumentError) return fail(argumentError);
   const worker = role === 'remote' ? state.crew.find(c => c.role === 'remote') : state.crew.find(c => c.id === intent.args.technicianId);
   if (!worker) return fail('TECHNICIAN_REQUIRED');
   if (worker.role !== role) return fail('NOT_QUALIFIED');
   if (actorId !== 'player' && actorId !== worker.id) return fail('NOT_AUTHORIZED');
   if (worker.taskId !== null) return fail('WORKER_BUSY');
-  if (intent.action === 'set_batch_ceiling' && intent.args.ceiling === undefined) return fail('CEILING_REQUIRED');
   if (['repair_cooling', 'restart_cooling'].includes(intent.action)) {
     const inspection = prerequisiteEvidence(state, actorId, intent.targetId);
     if (!inspection) return fail('INSPECTION_REQUIRED');
