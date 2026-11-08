@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { SimulationClient } from '../../src/workers/SimulationClient';
 import { hotRestart } from '../../src/content/scenarios/hot-restart';
 import { alarmFixture } from '../../src/shared/fixtures';
@@ -58,4 +58,18 @@ it('restores from the active envelope into a new run and recovers from a rejecte
   expect((await restored).runId).toBe('branch');
   const view = client.observe(); expect(worker.messages[4].runId).toBe('branch');
   worker.reply(4, { kind: 'view', view: { ...alarmFixture, runId: 'branch' } }); await view; client.dispose();
+});
+
+it('stops the playback timer on a terminal view and cannot resume that run', async () => {
+  vi.useFakeTimers();
+  const worker = new TestWorker(); const client = new SimulationClient(worker as unknown as Worker);
+  try {
+    const initialized = client.initialize(hotRestart, 'clock');
+    worker.reply(0, { kind: 'initialized', view: { ...alarmFixture, runId: 'clock' } }); await initialized;
+    client.setSpeed(4); client.resume(); await vi.advanceTimersByTimeAsync(1000);
+    expect(worker.messages[1]).toMatchObject({ kind: 'advance', ticks: 4 });
+    worker.reply(1, { kind: 'advanced', view: { ...alarmFixture, runId: 'clock', simTime: 505, mission: { ...alarmFixture.mission, status: 'failure' } } });
+    await vi.advanceTimersByTimeAsync(5000); client.resume(); await vi.advanceTimersByTimeAsync(5000);
+    expect(worker.messages).toHaveLength(2);
+  } finally { client.dispose(); vi.useRealTimers(); }
 });

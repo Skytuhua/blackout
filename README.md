@@ -6,7 +6,9 @@ The player directs a data-center team through a cooling failure. Power, heat, wo
 
 ## Status
 
-Foundation shell: strict schemas, authored scenario inputs, React/Phaser host, typed worker bridge, local production server and contract/browser checks. The displayed world and readings are labeled development fixtures. The mission engine, final artwork, model gateway and replay are not integrated yet.
+Playable offline Hot Restart: the production React/Phaser interface uses the deterministic simulation worker, qualified dispatch, travel/work, delayed reports, workload mitigation and recovery verification. Browser controls complete recovery at t331 and an idle run fails at t505. Playback stops at the exact terminal tick; retry creates a fresh run.
+
+Coworker responses in the app are explicitly scripted from that actor's permitted evidence. The bounded OpenAI gateway is implemented and tested separately; the live worker/model cycle, replay, persistence, comparison and final release rehearsal remain unfinished.
 
 The delivery target is a local laptop-browser demonstration for judges. [Public source repository](https://github.com/Skytuhua/blackout). No public game hosting is required for the initial release.
 
@@ -19,7 +21,7 @@ The delivery target is a local laptop-browser demonstration for judges. [Public 
 - [Initial agent packets](docs/agent-task-packets.md): foundation, simulation, game/interface, OpenAI, and reviewer briefs.
 - [Asset provenance](docs/asset-provenance.md): how shipped assets and template code will be attributed.
 
-## Run the foundation
+## Run the mission
 
 Requires Node.js 24 and npm. All runtime fonts are local.
 
@@ -29,11 +31,13 @@ npm run build
 npm run demo
 ```
 
-Open `http://127.0.0.1:4173`. `npm run dev` starts client and local service together. `npm run verify` checks types, unit tests, the production build and Chromium tests (first install: `npx playwright install chromium`). Focused simulation, gateway and replay scripts are reserved for their upcoming packages.
+Open `http://127.0.0.1:4173`, read the briefing and start the mission. Pause or step time to review evidence before dispatch. Use the equipment list with a keyboard, select a qualified technician, and wait for task completion and the delayed report before choosing a repair. Workload controls preserve deferred batch work.
+
+`npm run dev` starts client and local service together. `npm run verify` checks types, unit tests, the production build and Chromium mission tests (first install: `npx playwright install chromium`). `npm run test:sim`, `npm run test:contracts` and `npm run test:llm` run focused suites.
 
 ## Stack
 
-TypeScript, React, Phaser, Vite, a deterministic simulation Web Worker, a small local Node service, OpenAI Responses API, IndexedDB, Vitest, and Playwright. The foundation task pins a compatible dependency set and adds the runnable commands.
+TypeScript, React, Phaser, Vite, a deterministic simulation Web Worker, a small local Node service, OpenAI Responses API, Vitest and Playwright. IndexedDB persistence is planned. Dependencies are pinned in the lockfile.
 
 The production command serves client and API from one stable loopback origin, fails if its port is occupied, and defaults to scripted mode. Health checks never make paid provider calls.
 

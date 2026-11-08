@@ -18,9 +18,9 @@ export function makeAction(affordance: KnowledgeView['affordances'][number], sim
 }
 
 export function indicatorState(observations: Observation[], simTime: number): 'unknown' | 'active' | 'attention' {
-  const state = observations.filter(o => o.field === 'state' || o.field === 'power').sort((a, b) => b.observedAt - a.observedAt)[0];
+  const state = observations.filter(o => ['state', 'power', 'power_state', 'running', 'output_state'].includes(o.field)).sort((a, b) => b.observedAt - a.observedAt)[0];
   if (!state || readingStatus(state, simTime) !== 'fresh') return 'unknown';
-  if (state.value === true || state.value === 'running' || state.value === 'online' || state.value === 'ready') return 'active';
-  if (state.value === false || state.value === 'not_ready' || state.value === 'offline' || state.value === 'stopped') return 'attention';
+  if (state.value === true || ['running', 'online', 'ready', 'available'].includes(String(state.value))) return 'active';
+  if (state.value === false || ['not_ready', 'offline', 'stopped', 'off', 'booting', 'throttled', 'thermal_tripped', 'tripped', 'unavailable'].includes(String(state.value))) return 'attention';
   return 'unknown';
 }
