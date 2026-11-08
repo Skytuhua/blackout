@@ -1,0 +1,19 @@
+# Larger facility and five-minute training demo
+
+User approved implementation. Baseline frontend: 9edaf6acd140bc98626a129ed463352891166125, independently checked with 27 production browser cases and matching served assets. No visual-approval gate remains. New facility work uses separate focused branches and preserves the original engine and recordings.
+
+Build one 48 by 28 tile site at 16 pixels per tile: control room, Hall A and Hall B with eight racks each, separate UPS/distribution rooms with an explicitly shared upstream, hall-specific cooling controls/units, and generator yard. Provide overview and readable room views. Changing rooms never changes crew tasks or simulation time. Equipment details explain purpose, supply and served equipment first. Keep the existing conversation sidebar, public task progress, notifications and nearby details.
+
+Hall A has the one primary cooling incident; Hall B provides a healthy comparison. New engine state has controller-specific faults, explicit rack cooling groups and hall-targeted background work. Repairs affect only their group. Preserve heat storage, restart delays, backlog, UPS load/energy/capacity and shared-source accounting. No manual breaker operation or extra random emergency. Repair requires delivered inspection evidence from the correct equipment. Alex handles cooling, Jules qualified power work, and Sam IT. The model never owns outcomes or grades competence.
+
+The five-minute route introduces the affected hall, compares readings, pauses its background jobs, obtains Alex's actual delayed report, authorizes repair, observes cooling/temperature recovery, resumes sustainable work, then verifies and debriefs with exact evidence. Use visible 4x playback over the same fixed one-second steps. Guided reading/model waits may pause; manual Pause wins. Direct suggestions must support an offline full win. Never hardcode report/arrival times or require verification before restoring sustainable work. Retry preserves recorded consequences.
+
+Deterministic assessment links observations, accepted commands, tasks and delivered reports to area, age, service protection and recovery. Criteria are demonstrated, missed or not observed. Company accounts, instructor dashboards, other incident families and formal training validation come later. Actual laptop rehearsal within five minutes and an uncoached novice walkthrough remain human acceptance gates.
+
+Coordinator owns shared contracts, host, worker protocol, replay/persistence dispatch, global files and release. Facility contract7 follows additive natural-conversation contract6. Planned new identities: sim-facility-v3; scenario/view/checkpoint/ledger schema2; engine record3; host save4. Original formats and canonical bytes remain supported, never silently migrated.
+
+Initial map seam is committed independently: src/shared/facility-map.ts and its synthetic development fixture. It freezes public geometry/membership and controlled callbacks only; it does not claim the new scenario or engine exists. Full simulation/content interfaces follow separately. The existing independently owned cooling kernel is imported only after review.
+
+The user's later capacity override permits up to FIVE active workers across the project, with exclusive worktrees/paths and no nested fanout. Count actual running implementations and reviews. Map development can run beside simulation work. Reuse later freed capacity for independent reviews; no worker approves its own patch.
+
+Required checks: hall isolation and conservation, unknown/stale evidence boundaries, routes/progress/report delays/pause/cancel across views, full offline browser win, exact new save/resume/replay, desktop and enlarged-text layout, then laptop/novice acceptance. Synthetic fixtures and automated checks do not establish human acceptance or suitability for employee training.
