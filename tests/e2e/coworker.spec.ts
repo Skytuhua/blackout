@@ -32,13 +32,20 @@ test('gateway inspection uses the real worker; factual records and explicit prop
   await expect(page.getByRole('region', { name: 'Coworker response', exact: true })).toContainText('observed 0:00');
   await page.getByText('Response provenance', { exact: true }).click();
   await expect(page.getByRole('region', { name: 'Coworker response', exact: true })).toContainText('Observed model: mock-actual-model. 2 provider call receipt(s).');
+  const repair = page.getByRole('button', { name: 'Dispatch repair cooling', exact: true });
+  await page.locator('.bo-action').filter({ has: repair }).getByRole('combobox', { name: 'Technician', exact: true }).selectOption('alex');
+  await expect(repair).toBeDisabled();
   await page.getByRole('combobox', { name: 'Simulation speed', exact: true }).selectOption('4');
   await page.getByRole('button', { name: 'Resume simulation', exact: true }).click();
-  for (let tick = 1; tick <= 10; tick++) {
+  // Wait for the delivered field report, including travel on the current layout.
+  for (let tick = 1; tick <= 20; tick++) {
     await page.clock.fastForward(1000);
-    await expect(page.locator('.bo-header-status')).toContainText(`Simulation 0:${String(tick * 4).padStart(2, '0')}`);
+    const seconds = tick * 4;
+    await expect(page.locator('.bo-header-status')).toContainText(`Simulation ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`);
+    if (await repair.isEnabled()) break;
   }
   await page.getByRole('button', { name: 'Pause simulation', exact: true }).click();
+  await expect(repair).toBeEnabled();
   await ask(page, 'Propose the indicated repair.');
   const confirm = page.getByRole('button', { name: 'Confirm repair cooling for Cooling 01', exact: true });
   await expect(confirm).toBeEnabled();
