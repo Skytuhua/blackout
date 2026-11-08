@@ -7,7 +7,7 @@ export function createAudioHost(audio: GameAudio) {
   let runId: string | null = null, generation = 0, replay = false, destroyed = false;
   const capture = (): Ticket => ({ runId, generation });
   const emit = (cue: RootSoundCue, id: string, ticket: Ticket = capture()) => {
-    if (!destroyed && runId && !replay && ticket.runId === runId && ticket.generation === generation) audio.play(cue, `${cue}:${id}`);
+    if (!destroyed && runId && (!replay || cue.startsWith('ui-')) && ticket.runId === runId && ticket.generation === generation) audio.play(cue, `${cue}:${id}`);
   };
   return {
     audio, capture, emit,

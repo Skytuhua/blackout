@@ -3,6 +3,7 @@ import type { ConversationThread } from '../../shared/contracts';
 import type { SavedRunSummary } from '../../persistence/runs';
 import { PagedText } from '../DesktopPaging';
 import { reportFirstSections } from '../conversation/report-findings';
+import { SoundSettings, type AudioSettings } from '../audio-settings';
 import './ConversationMenu.css';
 
 export interface ConversationMenuProps {
@@ -16,6 +17,7 @@ export interface ConversationMenuProps {
   guidanceEnabled: boolean;
   speed: 1 | 2 | 4;
   afterActionContent?: ReactNode;
+  audioSettings?: { value: AudioSettings; onChange: (next: AudioSettings) => void; onTest: () => void };
   onClose(): void;
   onSave(): void;
   onRefreshSaves(): void;
@@ -32,8 +34,8 @@ export interface ConversationMenuProps {
   onStartPractice(): void;
 }
 
-type View = 'home' | 'history' | 'saves' | 'replay' | 'help' | 'options' | 'notice' | 'error';
-const titles: Record<View, string> = { home: 'Menu', history: 'History', saves: 'Saved games', replay: 'Replay and results', help: 'How to play', options: 'Game options', notice: 'Notice', error: 'Error' };
+type View = 'home' | 'history' | 'saves' | 'replay' | 'help' | 'options' | 'sound' | 'notice' | 'error';
+const titles: Record<View, string> = { home: 'Menu', history: 'History', saves: 'Saved games', replay: 'Replay and results', help: 'How to play', options: 'Game options', sound: 'Sound', notice: 'Notice', error: 'Error' };
 const kindNames = { player: 'You', order: 'Order', system: 'Update', live: 'Coworker', fallback: 'Scripted fallback', report: 'Report' };
 const time = (at: number) => `T+${Math.floor(at / 60)}:${String(at % 60).padStart(2, '0')}`;
 
@@ -172,23 +174,25 @@ export function ConversationMenu(props: ConversationMenuProps) {
   const homes: { label: string; view?: View; run?: () => void }[] = [
     { label: 'Save game', run: props.onSave }, { label: 'History', view: 'history' }, { label: 'Saved games', view: 'saves' },
     { label: 'Replay and results', view: 'replay' }, { label: 'How to play', view: 'help' }, { label: 'Game options', view: 'options' },
+    ...(props.audioSettings ? [{ label: 'Sound', view: 'sound' as const }] : []),
   ];
   const help = [
     { label: 'Direct your team', text: 'Choose Alex for cooling, Jules for power, or Sam for IT. Suggested orders send a validated task. Characters travel and work automatically.' },
     { label: 'Read the evidence', text: 'Reports describe what the team observed and when. History keeps earlier messages for each character. Open a report to read its full text and evidence.' },
-    { label: 'Authorize an order', text: 'A coworker can suggest work in a reply. The labeled action button authorizes that exact proposal. Sending a message alone does not execute it.' },
+    { label: 'Give an order', text: 'Clear chat orders start eligible work. Questions ask for an explanation. Busy work needs an explicit stop.' },
     { label: 'Guidance and practice', text: 'Guidance explains important mission moments. Use Game options for speed, a mission restart, or healthy practice. The game controls when work completes.' },
   ];
   return <div className="cm-overlay"><section ref={panel} className="cm-panel" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} data-view={view} data-compact={compact}>
     <header className="cm-heading">{view !== 'home' && <button ref={back} onClick={() => navigate('home')}>Back</button>}<h2 id={titleId}>{titles[view]}</h2><button ref={close} aria-label="Close menu" onClick={props.onClose}>Close</button></header>
     {view !== 'notice' && view !== 'error' && (props.notice || props.error || props.busy) && <div className="cm-messages">{props.busy && <p role="status">Working…</p>}{(['notice', 'error'] as const).map(kind => props[kind] && (props[kind].length <= 100 ? <p key={kind} role={kind === 'error' ? 'alert' : 'status'} className={kind === 'error' ? 'cm-error' : ''}>{props[kind]}</p> : <button key={kind} onClick={event => navigate(kind, event.currentTarget)}>Read {kind}</button>))}</div>}
     <div className="cm-body">
-      {view === 'home' && <div className="cm-home"><nav className="cm-home-actions" aria-label="Menu actions">{homes.slice(compact ? homePage * 3 : 0, compact ? homePage * 3 + 3 : homes.length).map(item => <button key={item.label} data-menu-action={item.label} disabled={!!item.run && props.busy} onClick={event => item.view ? navigate(item.view, event.currentTarget) : item.run?.()}>{item.label}</button>)}</nav>{compact && <button className="cm-more" onClick={() => setHomePage(previous => previous ? 0 : 1)}>{homePage ? 'First menu actions' : 'More menu actions'}</button>}<label className="cm-guidance"><input type="checkbox" checked={props.guidanceEnabled} disabled={props.busy} onChange={event => props.onGuidanceChange(event.target.checked)} />Guidance</label></div>}
+      {view === 'home' && <div className="cm-home"><nav className="cm-home-actions" aria-label="Menu actions">{homes.slice(compact ? homePage * 3 : 0, compact ? homePage * 3 + 3 : homes.length).map(item => <button key={item.label} data-menu-action={item.label} disabled={!!item.run && props.busy} onClick={event => item.view ? navigate(item.view, event.currentTarget) : item.run?.()}>{item.label}</button>)}</nav>{compact && <button className="cm-more" onClick={() => setHomePage(previous => (previous + 1) % Math.ceil(homes.length / 3))}>{homePage === Math.ceil(homes.length / 3) - 1 ? 'First menu actions' : 'More menu actions'}</button>}<label className="cm-guidance"><input type="checkbox" checked={props.guidanceEnabled} disabled={props.busy} onChange={event => props.onGuidanceChange(event.target.checked)} />Guidance</label></div>}
       {view === 'history' && <div className="cm-focus">
         {!props.reader && <div className="cm-row cm-history-nav"><select aria-label="History character" value={actorId} onChange={event => selectActor(event.target.value)}>{!thread && <option value={actorId}>Character unavailable</option>}{props.conversations.map(item => <option key={item.actorId} value={item.actorId}>{item.name} · {item.role}</option>)}</select><button aria-label="Previous entry" disabled={index <= 0} onClick={() => moveEntry(index - 1)}>Previous</button><button aria-label="Next entry" disabled={index < 0 || index >= (thread?.entries.length ?? 0) - 1} onClick={() => moveEntry(index + 1)}>Next</button></div>}
         <HistoryEntry key={JSON.stringify(props.reader ?? { actorId, entryId })} props={historyProps} thread={thread} entryId={entryId} />
         {!props.reader && index < 0 && !!thread?.entries.length && <button onClick={() => moveEntry(thread.entries.length - 1)}>Latest entry</button>}
       </div>}
+      {view === 'sound' && props.audioSettings && <SoundSettings {...props.audioSettings} />}
       {view === 'saves' && <div className="cm-focus">
         {!!props.savedRuns.length && <select aria-label="Saved game" value={save?.runId ?? ''} onChange={event => setSaveId(event.target.value)}><option value="" disabled>Choose a saved game</option>{props.savedRuns.map(item => <option key={item.runId} value={item.runId}>{item.scenarioId} · {time(item.simTime)} · {item.runId}</option>)}</select>}
         {save ? <ReaderText key={save.runId} label="Saved game details" text={`${save.scenarioId}\n${save.runId}\n${time(save.simTime)}${save.unavailableReason ? `\nUnavailable: ${save.unavailableReason}\nOriginal bytes remain exportable.` : ''}`} /> : <p className="cm-empty">{props.savedRuns.length ? 'This saved game is no longer listed. Choose a saved game or refresh.' : 'No saved games listed. Save the current game or refresh the list.'}</p>}

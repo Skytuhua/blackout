@@ -61,3 +61,8 @@
 .cm-panel[data-compact=true] .cm-focus { gap:6px; }
 .cm-panel[data-compact=true] .cm-more { min-height:36px; padding:4px 8px; }
 .cm-panel[data-compact=true] .cm-guidance { min-height:36px; }
+
+.cm-audio { display:flex; flex-direction:column; gap:12px; min-width:0; margin:0; padding:12px; }
+.cm-audio label { display:flex; align-items:center; gap:8px; }
+.cm-audio output { margin-left:auto; }
+.cm-audio input[type=range] { width:100%; margin:0; }
