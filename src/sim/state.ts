@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ScenarioSpecSchema, RecordedCommandSchema, SimEventSchema, TelemetrySchema, CommandReceiptSchema } from '../shared/schemas';
+import { ScenarioSpecSchema, RecordedCommandSchema, SimEventSchema, TelemetrySchema, CommandReceiptSchema, CrewSchema, TaskSchema, ObservationSchema, PublicMessageSchema, ActionIntentSchema } from '../shared/schemas';
 
 const finite = z.number().finite();
 const nonnegative = finite.nonnegative();
@@ -24,9 +24,32 @@ export const PhysicalStateSchema = z.strictObject({
 export type PhysicalState = z.infer<typeof PhysicalStateSchema>;
 export type RackState = PhysicalState['racks'][number];
 
+const scopedObservation = z.strictObject({ observation: ObservationSchema, actorIds: z.array(z.string()) });
+const task = z.strictObject({
+  public: TaskSchema, requestedBy: z.string(), intent: ActionIntentSchema, technicianId: z.string(),
+  distanceMeters: nonnegative, traveledMeters: nonnegative, workSeconds: nonnegative,
+  resources: z.array(z.string()),
+});
+export type EngineTask = z.infer<typeof task>;
+
+export const MissionStateSchema = z.strictObject({
+  status: z.enum(['active', 'success', 'failure']), reason: z.string().nullable(),
+  stabilitySeconds: nonnegative.int(), criticalLossSeconds: nonnegative.int(), heldAt: nonnegative.nullable(),
+  evidenceHoldSeconds: z.record(z.string(), nonnegative.int()),
+});
+
 export const EngineStateSchema = z.strictObject({
   scenario: ScenarioSpecSchema, physical: PhysicalStateSchema, initialPhysical: PhysicalStateSchema,
   eventCursor: nonnegative.int(), nextSequence: nonnegative.int(),
+  boundaryConsumed: z.boolean(), lastSensorAt: nonnegative.int(), nextObservation: nonnegative.int(),
+  crew: z.array(CrewSchema), tasks: z.array(task), reservations: z.record(z.string(), z.string()),
+  entityVersions: z.record(z.string(), nonnegative.int()),
+  observations: z.array(scopedObservation), messages: z.array(z.strictObject({ message: PublicMessageSchema, actorIds: z.array(z.string()) })),
+  pendingReports: z.array(z.strictObject({
+    deliverAt: nonnegative.int(), taskId: z.string(), observations: z.array(scopedObservation),
+    message: PublicMessageSchema, actorIds: z.array(z.string()),
+  })),
+  mission: MissionStateSchema,
   commands: z.array(RecordedCommandSchema), events: z.array(SimEventSchema), telemetry: z.array(TelemetrySchema),
   idempotency: z.array(z.strictObject({ actorId: z.string(), key: z.string(), intent: z.string(), receipt: CommandReceiptSchema })),
 });
