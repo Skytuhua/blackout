@@ -22,6 +22,12 @@ describe('controlled menu boundary', () => {
     expect(html).toContain('role="dialog"');
     expect(html).toContain('aria-modal="true"');
   });
+  it('keeps pending host work visible on home without claiming a successful save', () => {
+    const html = renderToStaticMarkup(<ConversationMenu {...emptyProps} busy />);
+    expect(html).toContain('Working…');
+    expect(html).toContain('disabled=""');
+    expect(html).not.toContain('Game saved');
+  });
   it('renders a missing controlled reader truthfully rather than substituting a message', () => {
     const html = renderToStaticMarkup(<ConversationMenu {...emptyProps} reader={{ actorId: 'missing-actor', entryId: 'missing-entry' }} />);
     expect(html).toContain('This entry is no longer available');

@@ -44,6 +44,7 @@ try {
       await page.getByLabel('Reader section').selectOption('section:original-evidence');
       assert.equal(await page.getByLabel('Message text', { exact: true }).textContent(), 'Original section, complete.');
       await button(page, 'Back to entry').click();
+      assert.equal(await button(page, 'Read report').evaluate(e => e === document.activeElement), true, 'reader Back must restore focus inside the dialog');
       await button(page, 'Check controls · Jules').click();
       assert.deepEqual(await calls(page, 'proposal'), [{ name: 'proposal', args: ['opaque-original-proposal-id'] }]);
       await page.evaluate(() => { const threads = structuredClone(window.menuFixtureProps.conversations); threads[0].entries.push({ id: 'alex-late', actorId: 'alex', at: 30, kind: 'live', text: 'Late response', unread: true }); window.menuFixture.patch({ conversations: threads }); });
@@ -120,7 +121,7 @@ try {
   }
   if (process.argv.includes('--visual')) {
     await check('batched geometry, complete short states, long readers and advanced slot', async () => {
-      const measured = [];
+      const measured = [], geometryProblems = [];
       for (const [width, height, font] of [[1280, 720, 16], [1366, 768, 16], [1920, 1080, 16], [640, 360, 16], [1280, 720, 32]]) {
         const page = await open(width, height); await page.evaluate(font => { document.documentElement.style.fontSize = `${font}px`; }, font); await settle(page);
         const inspect = async state => {
@@ -137,9 +138,9 @@ try {
             for (const e of panel.querySelectorAll('.blackout-font-probe')) if (getComputedStyle(e).visibility !== 'hidden') problems.push('visible M probe');
             return { width: box.width, height: box.height, problems, text: panel.innerText };
           });
-          assert.deepEqual(data.problems, [], `${width}x${height}/${font} ${state}`);
-          measured.push({ width, height, font, state, panel: [data.width, data.height] });
-          if (state === 'home' && font === 16 && width > 640) { assert.ok(data.width <= 560); assert.ok(data.height < 500); }
+          geometryProblems.push(...data.problems.map(problem => `${width}x${height}/${font} ${state}: ${problem}`));
+          measured.push({ width, height, font, state, panel: [data.width, data.height], problems: data.problems });
+          if (state === 'home' && font === 16 && width > 640 && (data.width > 560 || data.height >= 500)) geometryProblems.push('Home footprint is too large');
           await page.screenshot({ path: `${out}/${width}x${height}-${font}-${state}.png` });
         };
         await inspect('home');
@@ -149,6 +150,7 @@ try {
         assert.equal(await page.locator('.blackout-font-probe').count(), 0); assert.equal(await page.getByText('1 / 1', { exact: true }).count(), 0);
         await patch(page, { notice: '', error: '', savedRuns: [{ runId: 'long-original-save-id-'.repeat(10), scenarioId: 'Hot Restart', simTime: 80, unavailableReason: 'VERSION_MISMATCH: original bytes can be exported.' }] });
         await page.getByLabel('Saved game', { exact: true }).selectOption({ index: 1 }); await inspect('populated-saves');
+        await patch(page, { busy: true }); await inspect('busy-saves'); await patch(page, { busy: false });
         await button(page, 'Back').click(); await button(page, 'History').click(); await inspect('history');
         for (let i = 0; i < 24; i++) await button(page, 'Previous entry').click();
         await button(page, 'Read report').click(); await inspect('long-reader');
@@ -156,8 +158,17 @@ try {
         await button(page, 'Back to entry').click(); await button(page, 'Back').click();
         if (!(await button(page, 'Replay and results').count())) await button(page, 'More menu actions').click();
         await button(page, 'Replay and results').click(); await inspect('advanced');
+        await button(page, 'Back').click();
+        await button(page, 'How to play').click(); await inspect('help');
+        await button(page, 'Back').click(); await button(page, 'Game options').click(); await inspect('options');
+        await button(page, 'Back').click();
+        await patch(page, { notice: await page.evaluate(() => window.menuFixture.longText) });
+        await button(page, 'Read notice').click(); await inspect('long-notice');
+        assert.equal(await readAll(page, 'Notice details'), await page.evaluate(() => window.menuFixture.longText));
         await page.close();
       }
+      writeFileSync(`${out}/geometry-measurements.json`, JSON.stringify(measured, null, 2));
+      assert.deepEqual(geometryProblems, []);
       return measured;
     });
   }

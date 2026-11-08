@@ -35,7 +35,7 @@
 .cm-entry-preview, .cm-reader-text { position:relative; flex:1; min-height:24px; min-width:0; }
 .cm-entry-preview { display:flex; flex-direction:column; align-items:flex-start; gap:8px; }
 .cm-entry-preview p { white-space:pre-wrap; overflow-wrap:anywhere; }
-.cm-text-measure { position:absolute; inset:0; visibility:hidden; pointer-events:none; white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; line-height:1.4; }
+.cm-text-measure { position:absolute; inset:0; visibility:hidden; overflow:hidden; pointer-events:none; white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; line-height:1.4; }
 .cm-direct-text { white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; }
 .cm-proposals { flex:none; display:flex; flex-direction:column; gap:4px; }
 .cm-proposals .cm-row > span { flex:1; }
@@ -47,11 +47,12 @@
 .cm-panel .blackout-paged-text, .cm-panel .blackout-draft { display:flex; flex-direction:column; gap:6px; min-height:0; min-width:0; flex:1; height:100%; }
 .cm-panel .blackout-page-window, .cm-panel .blackout-editor-window { position:relative; flex:1; min-height:24px; }
 .cm-panel .blackout-page-copy { position:absolute; inset:0; white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; line-height:1.4; }
-.cm-panel .blackout-measure, .cm-panel .blackout-font-probe { visibility:hidden; pointer-events:none; }
+.cm-panel .blackout-measure, .cm-panel .blackout-font-probe { visibility:hidden; overflow:hidden; pointer-events:none; }
 .cm-panel .blackout-font-probe { position:absolute; top:0; left:0; }
 .cm-panel .blackout-page-controls { display:flex; align-items:center; justify-content:space-between; gap:8px; flex:none; }
 .cm-panel .blackout-page-controls button { display:flex; align-items:center; justify-content:center; flex:none; }
 .cm-panel .blackout-page-controls span { font-variant-numeric:tabular-nums; }
+.cm-panel .blackout-paged-text[data-page-count="1"] .blackout-page-controls { display:none; }
 .cm-advanced > * { min-height:0; min-width:0; }
 .cm-panel[data-compact=true] { padding:10px; gap:8px; }
 .cm-panel[data-compact=true] .cm-home { gap:6px; }

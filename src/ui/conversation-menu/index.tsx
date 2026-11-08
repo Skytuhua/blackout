@@ -86,12 +86,12 @@ function HistoryEntry({ props, thread, entryId }: { props: ConversationMenuProps
   return <>
     <p className="cm-meta">{owner.name} · {kindNames[entry.kind]} · <time>{time(entry.at)}</time></p>
     {opened ? <>
-      <div className="cm-row"><button onClick={props.onCloseEntry}>Back to entry</button>{sections.length > 1 && <select aria-label="Reader section" value={sectionId} onChange={event => setSectionId(event.target.value)}>{!section && <option value={sectionId}>Section no longer available</option>}{sections.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>}</div>
+      <div className="cm-row"><button className="cm-reader-back" onClick={props.onCloseEntry}>Back to entry</button>{sections.length > 1 && <select aria-label="Reader section" value={sectionId} onChange={event => setSectionId(event.target.value)}>{!section && <option value={sectionId}>Section no longer available</option>}{sections.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>}</div>
       <ReaderText key={sectionId} text={section?.text ?? 'This section is no longer available. Choose Full message.'} label="Message text" />
     </> : <>
       <div className="cm-entry-preview">
         <div ref={measure} className="cm-text-measure" aria-hidden="true">{entry.text}</div>
-        {long ? <><p>{entry.summary && entry.summary.length <= 100 ? entry.summary : 'A longer message is available.'}</p><button onClick={() => props.onOpenEntry(owner.actorId, entry.id)}>{entry.kind === 'report' ? 'Read report' : 'Read full message'}</button></> : <p className="cm-direct-text">{entry.text}</p>}
+        {long ? <><p>{entry.summary && entry.summary.length <= 100 ? entry.summary : 'A longer message is available.'}</p><button className="cm-open-entry" onClick={() => props.onOpenEntry(owner.actorId, entry.id)}>{entry.kind === 'report' ? 'Read report' : 'Read full message'}</button></> : <p className="cm-direct-text">{entry.text}</p>}
       </div>
       {!!proposals.length && <div className="cm-proposals">
         {proposals.length > 1 && <select aria-label="Proposed action" value={proposal?.id ?? ''} onChange={event => setProposalId(event.target.value)}><option value="" disabled>Choose an action</option>{proposals.map(item => <option key={item.id} value={item.id}>{item.label} · {item.assignedName}</option>)}</select>}
@@ -110,6 +110,7 @@ export function ConversationMenu(props: ConversationMenuProps) {
   const [compact, setCompact] = useState(false), [homePage, setHomePage] = useState(0);
   const panel = useRef<HTMLElement>(null), close = useRef<HTMLButtonElement>(null), back = useRef<HTMLButtonElement>(null);
   const returnAction = useRef<string | null>(null), navigating = useRef(false), latest = useRef(props);
+  const readerNavigation = useRef<'open' | 'close' | null>(null);
   latest.current = props;
   const titleId = useId();
 
@@ -141,11 +142,20 @@ export function ConversationMenu(props: ConversationMenuProps) {
     if (view === 'home') ([...(panel.current?.querySelectorAll<HTMLButtonElement>('[data-menu-action]') ?? [])].find(element => element.dataset.menuAction === returnAction.current) ?? close.current)?.focus();
     else back.current?.focus();
   }, [view]);
+  useLayoutEffect(() => {
+    if (!readerNavigation.current) return;
+    (panel.current?.querySelector<HTMLButtonElement>(readerNavigation.current === 'open' ? '.cm-reader-back' : '.cm-open-entry') ?? back.current)?.focus();
+    readerNavigation.current = null;
+  }, [props.reader?.actorId, props.reader?.entryId]);
   const navigate = (next: View, source?: HTMLButtonElement) => { if (source) returnAction.current = source.dataset.menuAction ?? null; navigating.current = true; setView(next); };
   const thread = props.conversations.find(item => item.actorId === actorId);
   const entryId = entries[actorId] ?? null;
   const index = thread?.entries.findIndex(entry => entry.id === entryId) ?? -1;
   const save = props.savedRuns.find(item => item.runId === saveId);
+  const historyProps: ConversationMenuProps = { ...props,
+    onOpenEntry: (actor, entry) => { readerNavigation.current = 'open'; props.onOpenEntry(actor, entry); },
+    onCloseEntry: () => { readerNavigation.current = 'close'; props.onCloseEntry(); },
+  };
   const selectActor = (next: string) => {
     setActorId(next);
     setEntries(previous => next in previous ? previous : { ...previous, [next]: props.conversations.find(item => item.actorId === next)?.entries.at(-1)?.id ?? null });
@@ -167,19 +177,19 @@ export function ConversationMenu(props: ConversationMenuProps) {
   ];
   return <div className="cm-overlay"><section ref={panel} className="cm-panel" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} data-view={view} data-compact={compact}>
     <header className="cm-heading">{view !== 'home' && <button ref={back} onClick={() => navigate('home')}>Back</button>}<h2 id={titleId}>{titles[view]}</h2><button ref={close} aria-label="Close menu" onClick={props.onClose}>Close</button></header>
-    {view !== 'notice' && view !== 'error' && (props.notice || props.error) && <div className="cm-messages">{(['notice', 'error'] as const).map(kind => props[kind] && (props[kind].length <= 100 ? <p key={kind} role={kind === 'error' ? 'alert' : 'status'} className={kind === 'error' ? 'cm-error' : ''}>{props[kind]}</p> : <button key={kind} onClick={event => navigate(kind, event.currentTarget)}>Read {kind}</button>))}</div>}
+    {view !== 'notice' && view !== 'error' && (props.notice || props.error || props.busy) && <div className="cm-messages">{props.busy && <p role="status">Working…</p>}{(['notice', 'error'] as const).map(kind => props[kind] && (props[kind].length <= 100 ? <p key={kind} role={kind === 'error' ? 'alert' : 'status'} className={kind === 'error' ? 'cm-error' : ''}>{props[kind]}</p> : <button key={kind} onClick={event => navigate(kind, event.currentTarget)}>Read {kind}</button>))}</div>}
     <div className="cm-body">
       {view === 'home' && <div className="cm-home"><nav className="cm-home-actions" aria-label="Menu actions">{homes.slice(compact ? homePage * 3 : 0, compact ? homePage * 3 + 3 : homes.length).map(item => <button key={item.label} data-menu-action={item.label} disabled={!!item.run && props.busy} onClick={event => item.view ? navigate(item.view, event.currentTarget) : item.run?.()}>{item.label}</button>)}</nav>{compact && <button className="cm-more" onClick={() => setHomePage(previous => previous ? 0 : 1)}>{homePage ? 'First menu actions' : 'More menu actions'}</button>}<label className="cm-guidance"><input type="checkbox" checked={props.guidanceEnabled} disabled={props.busy} onChange={event => props.onGuidanceChange(event.target.checked)} />Guidance</label></div>}
       {view === 'history' && <div className="cm-focus">
         {!props.reader && <div className="cm-row cm-history-nav"><select aria-label="History character" value={actorId} onChange={event => selectActor(event.target.value)}>{!thread && <option value={actorId}>Character unavailable</option>}{props.conversations.map(item => <option key={item.actorId} value={item.actorId}>{item.name} · {item.role}</option>)}</select><button aria-label="Previous entry" disabled={index <= 0} onClick={() => moveEntry(index - 1)}>Previous</button><button aria-label="Next entry" disabled={index < 0 || index >= (thread?.entries.length ?? 0) - 1} onClick={() => moveEntry(index + 1)}>Next</button></div>}
-        <HistoryEntry key={JSON.stringify(props.reader ?? { actorId, entryId })} props={props} thread={thread} entryId={entryId} />
+        <HistoryEntry key={JSON.stringify(props.reader ?? { actorId, entryId })} props={historyProps} thread={thread} entryId={entryId} />
         {!props.reader && index < 0 && !!thread?.entries.length && <button onClick={() => moveEntry(thread.entries.length - 1)}>Latest entry</button>}
       </div>}
       {view === 'saves' && <div className="cm-focus">
         {!!props.savedRuns.length && <select aria-label="Saved game" value={save?.runId ?? ''} onChange={event => setSaveId(event.target.value)}><option value="" disabled>Choose a saved game</option>{props.savedRuns.map(item => <option key={item.runId} value={item.runId}>{item.scenarioId} · {time(item.simTime)} · {item.runId}</option>)}</select>}
         {save ? <ReaderText key={save.runId} label="Saved game details" text={`${save.scenarioId}\n${save.runId}\n${time(save.simTime)}${save.unavailableReason ? `\nUnavailable: ${save.unavailableReason}\nOriginal bytes remain exportable.` : ''}`} /> : <p className="cm-empty">{props.savedRuns.length ? 'This saved game is no longer listed. Choose a saved game or refresh.' : 'No saved games listed. Save the current game or refresh the list.'}</p>}
         <div className="cm-row cm-save-actions"><button disabled={props.busy || !save || !!save.unavailableReason} onClick={() => save && !save.unavailableReason && props.onResumeSave(save.runId)}>Resume save</button><button disabled={props.busy || !save || !!save.unavailableReason} onClick={() => save && !save.unavailableReason && props.onReplaySave(save.runId)}>Replay save</button><button disabled={props.busy || !save} onClick={() => save && props.onExportSave(save.runId)}>Export original</button></div>
-        <div className="cm-row"><button disabled={props.busy} onClick={props.onSave}>Save game</button><button disabled={props.busy} onClick={props.onRefreshSaves}>Refresh saves</button>{props.busy && <span role="status">Working…</span>}</div>
+        <div className="cm-row"><button disabled={props.busy} onClick={props.onSave}>Save game</button><button disabled={props.busy} onClick={props.onRefreshSaves}>Refresh saves</button></div>
       </div>}
       {view === 'replay' && <div className="cm-focus cm-advanced">{props.afterActionContent ?? <p>No replay or results are open. Choose a saved game to replay its recorded run.</p>}</div>}
       {view === 'help' && <div className="cm-focus"><select aria-label="Help topic" value={helpSection} onChange={event => setHelpSection(Number(event.target.value))}>{help.map((item, i) => <option key={item.label} value={i}>{item.label}</option>)}</select><p className="cm-help-copy">{help[helpSection].text}</p></div>}
