@@ -3,11 +3,12 @@ import { ConversationGame } from './ui/conversation/ConversationGame';
 import { DesktopReplayView } from './ui/debrief/DesktopReplayView';
 import { ConversationMenu } from './ui/conversation-menu';
 import { savedConversations } from './ui/conversation/recorded-history';
+import { reportSections } from './ui/conversation/report-findings';
 import { fallbackCopy } from './ui/conversation/fallback-copy';
 import { CONVERSATION_PROMPT_VERSION } from './llm/conversation-mode';
 import { formatObservationFact, formatConversationReply } from './ui/presentation';
 import { directOrderAuthorizationIds } from './llm/natural-conversation';
-import { radioCitations, radioProvenance, radioReceipts, radioReport, observationText } from './ui/desktop-copy';
+import { radioCitations, radioProvenance, radioReceipts, radioReport } from './ui/desktop-copy';
 import { SimulationClient } from './workers/SimulationClient';
 import { hotRestart, practiceScenario } from './content/scenarios/hot-restart';
 import { latestObservations } from './llm/context';
@@ -70,7 +71,7 @@ export default function App() {
   function ingestReports(raw: KnowledgeView) {
     updateThreads(previous => {
       let next = previous;
-      for (const message of raw.messages) if (person(message.speaker)) next = hydrateConversationReport(next, { id: message.id, actorId: message.speaker, at: message.at, kind: message.id.startsWith('report-') ? 'report' : 'system', text: message.text, summary: `${person(message.speaker)!.name} has sent a report.`, unread: true, reportId: message.id, sections: [{ id: 'evidence', label: 'Evidence', text: raw.observations.filter(observation => message.evidenceIds.includes(observation.id)).map(observation => observationText(observation, raw.simTime)).join('\n\n') || 'No new reading supplied.' }] });
+      for (const message of raw.messages) if (person(message.speaker)) next = hydrateConversationReport(next, { id: message.id, actorId: message.speaker, at: message.at, kind: message.id.startsWith('report-') ? 'report' : 'system', text: message.text, summary: 'Report findings available.', unread: true, reportId: message.id, sections: reportSections(message, raw) });
       return withConversationAssignments(next, raw);
     });
   }
