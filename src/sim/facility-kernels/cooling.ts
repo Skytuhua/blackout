@@ -39,14 +39,27 @@ export function allocateCoolingCapacity(
     count * profile.coolingTrainKw,
     profile.coolingCop * Math.max(0, electricalBudgetKw - standbyKw),
   );
-  let capacityKw = thermalCapacityKw / count;
-  if (capacityKw * count > thermalCapacityKw
-    || capacityKw * count / profile.coolingCop + standbyKw > electricalBudgetKw) {
-    // A rounded-up share can create capacity at subnormal budgets. Leave that
-    // unrepresentable residue unused by taking the preceding positive float.
+  let capacityKw = Math.min(profile.coolingTrainKw, thermalCapacityKw / count);
+  const fitsBudget = (share: number): boolean => {
+    let totalKw = 0;
+    for (let i = 0; i < count; i++) totalKw += share;
+    return Number.isFinite(totalKw) && totalKw <= thermalCapacityKw
+      && totalKw / profile.coolingCop + standbyKw <= electricalBudgetKw;
+  };
+  if (!fitsBudget(capacityKw)) {
+    // Search positive float representations: bounded iterations, no epsilon,
+    // and the same summed capacity that downstream consumers actually use.
     const bits = new DataView(new ArrayBuffer(8));
     bits.setFloat64(0, capacityKw);
-    bits.setBigUint64(0, bits.getBigUint64(0) - 1n);
+    let low = 0n;
+    let high = bits.getBigUint64(0);
+    while (low < high) {
+      const middle = (low + high + 1n) / 2n;
+      bits.setBigUint64(0, middle);
+      if (fitsBudget(bits.getFloat64(0))) low = middle;
+      else high = middle - 1n;
+    }
+    bits.setBigUint64(0, low);
     capacityKw = bits.getFloat64(0);
   }
   return {

@@ -55,6 +55,23 @@ describe('facility cooling capacity', () => {
     expect(result.allocations.map(unit => unit.capacityKw)).toEqual(Array(4).fill(Number.MIN_VALUE));
   });
 
+  it.each([
+    { count: 4, budgetKw: 1e308, trainKw: 1e308 },
+    { count: 3, budgetKw: 0.1, trainKw: 80 },
+    { count: 7, budgetKw: 1e-12, trainKw: 80 },
+    { count: 3, budgetKw: 1, trainKw: 0.1 },
+  ])('conserves the final summed budget for $count trains at $budgetKw kW', ({ count, budgetKw, trainKw }) => {
+    const result = allocateCoolingCapacity(Array.from({ length: count }, (_, i) => `unit-${i}`), budgetKw, {
+      coolingAuxiliaryKw: 0, coolingTrainKw: trainKw, coolingCop: 3,
+    });
+    const totalKw = result.allocations.reduce((sum, unit) => sum + unit.capacityKw, 0);
+    expect(result.allocations.every(unit => Number.isFinite(unit.capacityKw) && unit.capacityKw <= trainKw)).toBe(true);
+    expect(Number.isFinite(totalKw)).toBe(true);
+    expect(totalKw / 3 + result.standbyKw).toBeLessThanOrEqual(budgetKw);
+    expect(new Set(result.allocations.map(unit => unit.capacityKw)).size).toBe(1);
+    expect(totalKw).toBeGreaterThan(0);
+  });
+
   it('uses canonical code-unit order without changing caller IDs or profile', () => {
     const readyIds = Object.freeze(['a-2', 'ä-1', 'Z-1', 'a-10']);
     const profile = Object.freeze({ ...hotRestart.profile });

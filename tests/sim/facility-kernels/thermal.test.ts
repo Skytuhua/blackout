@@ -1,7 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { createZones, evaluateCooling, runCoolingTrace, unitIds } from './thermal-reference';
+import { hotRestart } from '../../../src/content/scenarios/hot-restart';
+import { allocateCoolingCapacity } from '../../../src/sim/facility-kernels/cooling';
+import { advanceThermal } from '../../../src/sim/systems/thermal';
 
 describe('two-hall cooling with the existing thermal solver', () => {
+  it('keeps actual solver electricity within a fractional shared budget', () => {
+    const profile = { ...hotRestart.profile, coolingAuxiliaryKw: 0 };
+    const zones = Array.from({ length: 3 }, (_, i) => ({ id: `rack-${i}`, temperatureC: 30, powerKw: 8 }));
+    const allocation = allocateCoolingCapacity(['unit-0', 'unit-1', 'unit-2'], 0.1, profile);
+    const thermal = advanceThermal(zones, allocation.allocations.map((unit, i) => ({
+      capacityKw: unit.capacityKw, rackIds: [zones[i].id],
+    })), profile, 1);
+    expect(allocation.standbyKw + thermal.removedKw / profile.coolingCop).toBeLessThanOrEqual(0.1);
+    expect(thermal.removedKw).toBeGreaterThan(0);
+  });
+
   it('keeps B balanced while A warms, retains restart heat, then recovers A through its connections', () => {
     const trace = runCoolingTrace();
     const outageEnd = trace.steps[75];

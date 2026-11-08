@@ -1,6 +1,21 @@
 # FACILITY-KERNEL-01 handoff
 
-Status: ready for the parent's independent review and integration. Implementation and all required local checks are complete. No independent approval or integrated facility mission is claimed.
+Status: initial independent review requested two numeric corrections. The parent implemented the corrections below and reran the required checks; fresh affected-code review is pending. No independent approval or integrated facility mission is claimed.
+
+## Parent remediation after independent review
+
+Reviewed candidate: `e8d4fdfd5a8e6a7542d3fe9f1e21bcee794c39f0`. Report: `C:/Users/user/.t3/worktrees/Blackout/t3-100ba87d/docs/reviews/FACILITY-KERNEL-01-independent.md`. Both P2 findings concern admitted numeric boundary values, not a demonstrated default-mission failure. The original review remains changes requested until a fresh reviewer checks the new immutable candidate.
+
+- F1: prevent aggregate overflow from becoming an oversized train share. Clamp the initial share to each finite declared train capacity; do not pass nonfinite values to float-representation correction.
+- F2: test the actual sequential allocation sum and electrical cost, rather than reconstructing by multiplication. When adjustment is needed, a bounded binary search over positive finite float representations chooses a conservative equal share whose final sum is finite and remains within thermal/electrical budgets. The search uses at most 63 iterations, no budget epsilon or unchecked one-ULP assumption.
+- The finite input domain is retained. If the mathematical total exceeds JavaScript's largest finite value, leave unrepresentable capacity unused: the consumer-summed output remains finite. Ordinary declared-profile arithmetic/results are retained. No engine, schema, format, clock, dependency or legacy path changed.
+- Added five regression cases: four-unit aggregate overflow; three-unit fractional budget; seven-unit tiny budget; fractional per-train ceiling; and the fractional-budget reproduction through the unchanged real thermal solver. Existing subnormal, purity, scope and sixteen-rack trace tests remain.
+
+Observed parent RED/GREEN: the first four new regressions failed against the reviewed implementation (4 failed, 49 passed). A further fractional per-train check exposed rounding above the individual ceiling (1 failed, 49 passed); the final cap correction resolves it. Final focused suite: **54 passed in 2 files**. `npm run typecheck`: passed. Final `npm test`: **394 passed in 51 files**. `git diff --check`: passed; normal checkout CRLF warnings are separate from whitespace errors.
+
+Numeric receipts (zero auxiliary demand, COP 3): the four-unit `1e308` budget/train case returns `4.4942328371557893e307` per unit, finite total `1.7976931348623157e308` and electric `5.992310449541053e307`; the three-unit `0.1` budget returns `0.09999999999999999` per unit, total `0.3`, electric `0.09999999999999999`; the seven-unit `1e-12` budget returns total `3e-12`, electric `1e-12`. Three trains capped at `0.1` each retain that cap even when the total multiplication rounds upward.
+
+Parent local evidence extends `.local/facility-kernel-01/` with `red-review-fixes.log`, `red-review-train-cap.log`, `green-review-fixes.log`, `typecheck-review-fixes.log` and `full-review-fixes.log`. The original author evidence and counts below describe the initial implementation, not the final remediation candidate. These are parent-run checks, not independent approval.
 
 ## Custody and revisions
 
@@ -51,7 +66,7 @@ export function restartCoolingUnits(
 
 Allocation applies the packet's shared-budget formula once to the combined eligible IDs. Each ready unit receives an equal capacity; output IDs use code-unit comparison and caller order is preserved. All numeric and ID validation runs even for empty lists. No units means zero standby and no division. Numeric rejections use `RangeError`; blank, duplicate and unknown IDs throw `Error`.
 
-One numerical correction was required by the tiny-budget invariant: IEEE-754 rounding can make four equal shares overrun the computed capacity. With zero auxiliary demand, COP 3, and budget `1e-323`, naive division allocates `4e-323` thermal against `3e-323` available. When reconstructing equal shares exceeds the formula's total or electric budget, the module uses the preceding representable share. It adds no epsilon or generated resources and does not round consumed energy. The regression observed this failure before the correction.
+The initial implementation used one preceding representable share for a four-unit subnormal case. Independent review subsequently found that correction insufficient. The parent remediation above replaces it with a bounded search and checks the actual consumer sum. It adds no epsilon or generated resources and does not round consumed energy. The original subnormal regression remains passing.
 
 Restart validates the entire request, clones state objects, and changes only selected existing IDs to `ready: false` with the full supplied duration. Zero seconds remains not ready. It does not tick timers, resolve faults or eligibility, perform work, change temperatures, or authorize repairs.
 
