@@ -44,6 +44,12 @@ it('rejects unknown tools, forged targets and wrong start identity', async () =>
   }
   expect((await setup(async () => text(final)).turn({ ...start, actorId: 'alex' })).kind).toBe('fallback');
 });
+
+it('rejects an advisory inspection even if the provider emits an excluded legacy tool', async () => {
+  const gateway = setup(async () => response([{ type: 'function_call', call_id: 'injected', name: 'inspect_asset', arguments: JSON.stringify({ targetId: 'cooling-1', action: { action: 'inspect', targetId: 'cooling-1', atSimTime: 75, args: { technicianId: 'alex', ceiling: null, taskId: null } } }) }]));
+  const reply = await gateway.turn({ ...start, interactionMode: 'advisory' });
+  expect(reply.kind === 'fallback' && reply.reason).toBe('advisory_execution_forbidden');
+});
 it('does not call transport in scripted or missing-key mode', async () => {
   let calls = 0;
   const transport = async () => { calls++; return text(final); };

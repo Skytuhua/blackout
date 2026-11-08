@@ -39,3 +39,17 @@ it('distinguishes procedure targets and read-only arguments from equipment inspe
   expect(properties.targetId.enum).toEqual(['hot-restart-v1']);
   expect(properties.action.type).toBe('null');
 });
+
+it('offers read-only tools and confirmation proposals including inspection in advisory mode', () => {
+  const input = { ...start, interactionMode: 'advisory' as const };
+  const params = parameters(input, initialHistory(input), 1);
+  const names = params.tools!.map(tool => tool.type === 'function' && tool.name);
+  expect(names).not.toContain('inspect_asset');
+  expect(names).toContain('read_observations');
+  const proposal = params.tools!.find(tool => tool.type === 'function' && tool.name === 'propose_action');
+  expect(proposal && proposal.type === 'function' && (proposal.parameters as any).properties.targetId.enum).toEqual(['cooling-1']);
+  expect(params.instructions).toContain('Answer questions');
+  expect(params.instructions).toContain('clarification');
+  expect(params.instructions).not.toContain('Inspections dispatch ordinary tasks');
+  expect(parameters(start, initialHistory(start), 1).tools!.some(tool => tool.type === 'function' && tool.name === 'inspect_asset')).toBe(true);
+});

@@ -14,7 +14,7 @@ export async function runCoworker(input: CoworkerRequest): Promise<CoworkerResul
   let view = await input.simulation.observe(input.actorId);
   const role = view.crew.find(c => c.id === input.actorId)?.role;
   if (!role || view.runId !== input.runId || view.actorId !== input.actorId) throw new Error('stale_or_invalid_actor');
-  const start: GatewayStart = { kind: 'start', runId: input.runId, requestId: crypto.randomUUID(), actorId: input.actorId, role, message: input.message, view: scopeKnowledge(view, input.targetId ? [input.targetId] : []), procedures: procedures.filter(p => view.allowedProcedureIds.includes(p.id)), promptVersion: 'coworker-v1' };
+  const start: GatewayStart = { kind: 'start', runId: input.runId, requestId: crypto.randomUUID(), actorId: input.actorId, role, message: input.message, view: scopeKnowledge(view, input.targetId ? [input.targetId] : []), procedures: procedures.filter(p => view.allowedProcedureIds.includes(p.id)), promptVersion: 'coworker-v1', ...(input.interactionMode ? { interactionMode: input.interactionMode } : {}) };
   const context: ScopedContext = { start, simulation: input.simulation, signal: input.signal };
   const tools: PublicToolResult[] = [], intents: ToolIntent[] = [];
   const calls: ProviderCall[] = [];

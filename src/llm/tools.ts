@@ -18,6 +18,8 @@ export async function executeToolIntent(intent: ToolIntent, context: ScopedConte
   if (cached) return cached.fingerprint === fingerprint ? cached.result : reject('duplicate_call_conflict');
   const result = (async (): Promise<PublicToolResult> => {
     if (closed()) return reject('canceled_or_expired');
+    // Defense in depth for injected or legacy-shaped replies in the advisory route.
+    if (context.start.interactionMode === 'advisory' && intent.tool === 'inspect_asset') return reject('advisory_execution_forbidden');
     const view = context.simulation ? KnowledgeViewSchema.parse(await context.simulation.observe(intent.actorId)) : context.start.view;
     if (closed()) return reject('canceled_or_expired');
     if (view.runId !== intent.runId || view.actorId !== intent.actorId) return reject('stale_run');
